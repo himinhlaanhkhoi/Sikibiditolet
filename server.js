@@ -12,12 +12,10 @@ let statistics = {
   hu: { total: 0, wins: 0, losses: 0, accuracy: 0, currentStreak: 0, maxStreak: 0 },
   md5: { total: 0, wins: 0, losses: 0, accuracy: 0, currentStreak: 0, maxStreak: 0 }
 };
-let processedPhienHu = new Set();
-let processedPhienMd5 = new Set();
 
 // ==================== 20 THUẬT TOÁN DỰ ĐOÁN ====================
 
-function algorithmBet(results) {
+function algBet(results) {
   let streak = 1;
   for (let i = 1; i < results.length; i++) {
     if (results[i] === results[0]) streak++;
@@ -31,7 +29,7 @@ function algorithmBet(results) {
   return null;
 }
 
-function algorithmDao(results) {
+function algDao(results) {
   let alt = 1;
   for (let i = 1; i < Math.min(10, results.length); i++) {
     if (results[i] !== results[i-1]) alt++;
@@ -43,25 +41,25 @@ function algorithmDao(results) {
   return null;
 }
 
-function algorithm22(results) {
+function alg22(results) {
   if (results.length < 6) return null;
   if (results[0] === results[1] && results[2] === results[3] && results[0] !== results[2]) {
-    return { pred: results[2] === 'Tài' ? 'Xỉu' : 'Tài', conf: 76, name: 'PAIR22' };
+    return { pred: results[2] === 'Tài' ? 'Xỉu' : 'Tài', conf: 76, name: '22' };
   }
   return null;
 }
 
-function algorithm33(results) {
+function alg33(results) {
   if (results.length < 9) return null;
   if (results[0] === results[1] && results[1] === results[2] &&
       results[3] === results[4] && results[4] === results[5] &&
       results[0] !== results[3]) {
-    return { pred: results[3] === 'Tài' ? 'Xỉu' : 'Tài', conf: 80, name: 'PAIR33' };
+    return { pred: results[3] === 'Tài' ? 'Xỉu' : 'Tài', conf: 80, name: '33' };
   }
   return null;
 }
 
-function algorithm121(results) {
+function alg121(results) {
   if (results.length < 4) return null;
   if (results[0] !== results[1] && results[1] === results[2] && results[2] !== results[3] && results[0] === results[3]) {
     return { pred: results[0], conf: 78, name: '121' };
@@ -69,7 +67,7 @@ function algorithm121(results) {
   return null;
 }
 
-function algorithm123(results) {
+function alg123(results) {
   if (results.length < 6) return null;
   if (results[0] === results[1] && results[1] === results[2] && results[3] === results[4] && results[0] !== results[3]) {
     return { pred: results[5], conf: 76, name: '123' };
@@ -77,7 +75,7 @@ function algorithm123(results) {
   return null;
 }
 
-function algorithm321(results) {
+function alg321(results) {
   if (results.length < 6) return null;
   if (results[3] === results[4] && results[4] === results[5] && results[1] === results[2] && results[3] !== results[1]) {
     return { pred: results[1], conf: 77, name: '321' };
@@ -85,7 +83,7 @@ function algorithm321(results) {
   return null;
 }
 
-function algorithmDiamond(results) {
+function algDiamond(results) {
   if (results.length < 7) return null;
   if (results[0] !== results[1] && results[1] === results[2] && results[2] !== results[3] &&
       results[3] === results[4] && results[4] !== results[5] && results[5] === results[6]) {
@@ -94,7 +92,7 @@ function algorithmDiamond(results) {
   return null;
 }
 
-function algorithmWave(results) {
+function algWave(results) {
   if (results.length < 8) return null;
   let up = 0, down = 0;
   for (let i = 1; i < 8; i++) {
@@ -109,7 +107,7 @@ function algorithmWave(results) {
   return null;
 }
 
-function algorithmZigzag(results) {
+function algZigzag(results) {
   if (results.length < 5) return null;
   let isZigzag = true;
   for (let i = 1; i < 5; i++) {
@@ -121,7 +119,7 @@ function algorithmZigzag(results) {
   return null;
 }
 
-function algorithmButterfly(results) {
+function algButterfly(results) {
   if (results.length < 8) return null;
   if (results[0] === results[7] && results[1] === results[6] && results[2] === results[5] && results[3] === results[4]) {
     return { pred: results[0] === 'Tài' ? 'Xỉu' : 'Tài', conf: 82, name: 'BUTTERFLY' };
@@ -129,7 +127,7 @@ function algorithmButterfly(results) {
   return null;
 }
 
-function algorithmTornado(results) {
+function algTornado(results) {
   if (results.length < 7) return null;
   let center = results[3];
   if (results[0] !== center && results[1] !== center && results[2] !== center &&
@@ -139,7 +137,7 @@ function algorithmTornado(results) {
   return null;
 }
 
-function algorithmCopy(results) {
+function algCopy(results) {
   if (results.length < 6) return null;
   if (results[0] === results[3] && results[1] === results[4] && results[2] === results[5]) {
     return { pred: results[3] === 'Tài' ? 'Xỉu' : 'Tài', conf: 80, name: 'COPY' };
@@ -147,7 +145,7 @@ function algorithmCopy(results) {
   return null;
 }
 
-function algorithmMeanRev(results) {
+function algMeanRev(results) {
   let tai = 0;
   for (let i = 0; i < Math.min(10, results.length); i++) {
     if (results[i] === 'Tài') tai++;
@@ -157,7 +155,7 @@ function algorithmMeanRev(results) {
   return null;
 }
 
-function algorithmMarkov(results) {
+function algMarkov(results) {
   if (results.length < 5) return null;
   let tt = 0, tx = 0, xt = 0, xx = 0;
   for (let i = 0; i < results.length - 1; i++) {
@@ -173,7 +171,7 @@ function algorithmMarkov(results) {
   return null;
 }
 
-function algorithmMonteCarlo(results) {
+function algMonteCarlo(results) {
   if (results.length < 10) return null;
   let streak = 1;
   for (let i = 1; i < results.length; i++) {
@@ -185,10 +183,10 @@ function algorithmMonteCarlo(results) {
   else if (streak === 6) prob = 0.7;
   else if (streak >= 7) prob = 0.75;
   let pred = Math.random() < prob ? 'Tài' : 'Xỉu';
-  return { pred: pred, conf: 65, name: 'MONTE_CARLO' };
+  return { pred: pred, conf: 65, name: 'MONTE' };
 }
 
-function algorithmLinearReg(results) {
+function algLinearReg(results) {
   if (results.length < 10) return null;
   let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
   for (let i = 0; i < 10; i++) {
@@ -204,10 +202,10 @@ function algorithmLinearReg(results) {
   let next = slope * 10 + intercept;
   let pred = next > 0.5 ? 'Tài' : 'Xỉu';
   let conf = 60 + Math.abs(next - 0.5) * 30;
-  return { pred: pred, conf: Math.min(85, conf), name: 'LINEAR_REG' };
+  return { pred: pred, conf: Math.min(85, conf), name: 'LINEAR' };
 }
 
-function algorithmTrend(results) {
+function algTrend(results) {
   if (results.length < 8) return null;
   let trend = 0;
   for (let i = 1; i < 8; i++) {
@@ -219,7 +217,7 @@ function algorithmTrend(results) {
   return null;
 }
 
-function algorithmVolatility(results) {
+function algVolatility(results) {
   if (results.length < 10) return null;
   let changes = 0;
   for (let i = 1; i < 10; i++) {
@@ -231,7 +229,7 @@ function algorithmVolatility(results) {
   return null;
 }
 
-function algorithmBayesian(results) {
+function algBayesian(results) {
   if (results.length < 15) return null;
   let likelihood = 0;
   for (let i = 0; i < 10; i++) {
@@ -245,18 +243,15 @@ function algorithmBayesian(results) {
 }
 
 const algorithms = [
-  algorithmBet, algorithmDao, algorithm22, algorithm33,
-  algorithm121, algorithm123, algorithm321, algorithmDiamond,
-  algorithmWave, algorithmZigzag, algorithmButterfly, algorithmTornado,
-  algorithmCopy, algorithmMeanRev, algorithmMarkov,
-  algorithmMonteCarlo, algorithmLinearReg, algorithmTrend,
-  algorithmVolatility, algorithmBayesian
+  algBet, algDao, alg22, alg33, alg121, alg123, alg321, algDiamond,
+  algWave, algZigzag, algButterfly, algTornado, algCopy, algMeanRev,
+  algMarkov, algMonteCarlo, algLinearReg, algTrend, algVolatility, algBayesian
 ];
 
 // ==================== DỰ ĐOÁN ====================
 function getPrediction(data) {
   if (!data || data.length < 5) {
-    return { prediction: 'Tài', confidence: 60, algorithms: 0 };
+    return { prediction: 'Tài', confidence: 60, algorithms: 0, methods: [] };
   }
   
   const results = data.map(d => d.Ket_qua);
@@ -273,7 +268,7 @@ function getPrediction(data) {
   
   if (predictions.length === 0) {
     let tai = results.slice(0, 5).filter(r => r === 'Tài').length;
-    return { prediction: tai >= 3 ? 'Tài' : 'Xỉu', confidence: 60, algorithms: 0 };
+    return { prediction: tai >= 3 ? 'Tài' : 'Xỉu', confidence: 60, algorithms: 0, methods: [] };
   }
   
   let taiScore = 0, xiuScore = 0;
@@ -285,7 +280,6 @@ function getPrediction(data) {
   let finalPred = taiScore >= xiuScore ? 'Tài' : 'Xỉu';
   let finalConf = Math.max(taiScore, xiuScore) / (taiScore + xiuScore) * 100;
   finalConf = Math.min(96, Math.max(60, Math.round(finalConf)));
-  
   let topMethods = predictions.slice(0, 5).map(p => p.name);
   
   return {
@@ -296,7 +290,24 @@ function getPrediction(data) {
   };
 }
 
-// ==================== HÀM XỬ LÝ ====================
+// ==================== CẬP NHẬT THỐNG KÊ ====================
+function updateStats(type, wasCorrect) {
+  const stats = statistics[type];
+  stats.total++;
+  if (wasCorrect) {
+    stats.wins++;
+    stats.currentStreak++;
+    if (stats.currentStreak > stats.maxStreak) {
+      stats.maxStreak = stats.currentStreak;
+    }
+  } else {
+    stats.losses++;
+    stats.currentStreak = 0;
+  }
+  stats.accuracy = (stats.wins / stats.total * 100).toFixed(2);
+}
+
+// ==================== HÀM GỌI API ====================
 function transformData(apiData) {
   if (!apiData || !apiData.list) return null;
   return apiData.list.map(item => ({
@@ -314,7 +325,7 @@ async function fetchHu() {
     const res = await axios.get(API_URL_HU, { timeout: 10000 });
     return transformData(res.data);
   } catch (error) {
-    console.error('HU error:', error.message);
+    console.error('HU fetch error:', error.message);
     return null;
   }
 }
@@ -324,33 +335,17 @@ async function fetchMd5() {
     const res = await axios.get(API_URL_MD5, { timeout: 10000 });
     return transformData(res.data);
   } catch (error) {
-    console.error('MD5 error:', error.message);
+    console.error('MD5 fetch error:', error.message);
     return null;
   }
-}
-
-// ==================== UPDATE STATS ====================
-function updateStats(type, wasCorrect) {
-  const stats = statistics[type];
-  stats.total++;
-  if (wasCorrect) {
-    stats.wins++;
-    stats.currentStreak++;
-    if (stats.currentStreak > stats.maxStreak) {
-      stats.maxStreak = stats.currentStreak;
-    }
-  } else {
-    stats.losses++;
-    stats.currentStreak = 0;
-  }
-  stats.accuracy = (stats.wins / stats.total * 100).toFixed(2);
 }
 
 // ==================== ENDPOINTS ====================
 app.get('/', (req, res) => {
   res.json({ 
-    name: 'ABSOLUTE BRAIN', 
-    version: '5.0', 
+    name: 'LC79 Prediction Server',
+    version: '1.0.0',
+    author: '@AnhKhoi',
     algorithms: 20,
     status: 'running'
   });
@@ -360,22 +355,24 @@ app.get('/hu', async (req, res) => {
   try {
     const data = await fetchHu();
     if (!data || data.length === 0) {
-      return res.status(500).json({ error: 'Cannot fetch data' });
+      return res.status(500).json({ error: 'Cannot fetch data from API' });
     }
     
     const currentPhien = data[0].Phien;
     const result = getPrediction(data);
     
-    // Lưu lịch sử
     const record = {
       Phien: currentPhien,
       Ket_qua: data[0].Ket_qua,
       Xuc_xac: `${data[0].Xuc_xac_1}-${data[0].Xuc_xac_2}-${data[0].Xuc_xac_3}`,
       Tong: data[0].Tong,
       Do_tin_cay: `${result.confidence}%`,
+      Phien_hien_tai: (currentPhien + 1).toString(),
       Du_doan: result.prediction,
-      Phuong_phap: result.methods?.[0] || 'ABSOLUTE',
-      result: ''
+      Phuong_phap: result.methods[0] || 'ABSOLUTE',
+      ket_qua_du_doan: '',
+      id: '@AnhKhoi',
+      timestamp: new Date().toISOString()
     };
     
     predictionHistory.hu.unshift(record);
@@ -386,9 +383,9 @@ app.get('/hu', async (req, res) => {
       const checkData = await fetchHu();
       if (checkData && checkData.length > 0) {
         const actual = checkData.find(d => d.Phien === currentPhien);
-        if (actual && record.result === '') {
+        if (actual && record.ket_qua_du_doan === '') {
           const wasCorrect = record.Du_doan === actual.Ket_qua;
-          record.result = wasCorrect ? 'CORRECT' : 'WRONG';
+          record.ket_qua_du_doan = wasCorrect ? 'Đúng ✅' : 'Sai ❌';
           updateStats('hu', wasCorrect);
         }
       }
@@ -400,11 +397,13 @@ app.get('/hu', async (req, res) => {
       phien_hien_tai: currentPhien + 1,
       du_doan: result.prediction,
       do_tin_cay: `${result.confidence}%`,
-      thuat_toan: result.methods?.slice(0, 5),
-      tong_thuat_toan: result.totalAlgorithms
+      cac_cau: result.methods,
+      yeu_to: result.methods,
+      id: '@AnhKhoi'
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('HU endpoint error:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
   }
 });
 
@@ -412,7 +411,7 @@ app.get('/md5', async (req, res) => {
   try {
     const data = await fetchMd5();
     if (!data || data.length === 0) {
-      return res.status(500).json({ error: 'Cannot fetch data' });
+      return res.status(500).json({ error: 'Cannot fetch data from API' });
     }
     
     const currentPhien = data[0].Phien;
@@ -424,9 +423,12 @@ app.get('/md5', async (req, res) => {
       Xuc_xac: `${data[0].Xuc_xac_1}-${data[0].Xuc_xac_2}-${data[0].Xuc_xac_3}`,
       Tong: data[0].Tong,
       Do_tin_cay: `${result.confidence}%`,
+      Phien_hien_tai: (currentPhien + 1).toString(),
       Du_doan: result.prediction,
-      Phuong_phap: result.methods?.[0] || 'ABSOLUTE',
-      result: ''
+      Phuong_phap: result.methods[0] || 'ABSOLUTE',
+      ket_qua_du_doan: '',
+      id: '@AnhKhoi',
+      timestamp: new Date().toISOString()
     };
     
     predictionHistory.md5.unshift(record);
@@ -436,9 +438,9 @@ app.get('/md5', async (req, res) => {
       const checkData = await fetchMd5();
       if (checkData && checkData.length > 0) {
         const actual = checkData.find(d => d.Phien === currentPhien);
-        if (actual && record.result === '') {
+        if (actual && record.ket_qua_du_doan === '') {
           const wasCorrect = record.Du_doan === actual.Ket_qua;
-          record.result = wasCorrect ? 'CORRECT' : 'WRONG';
+          record.ket_qua_du_doan = wasCorrect ? 'Đúng ✅' : 'Sai ❌';
           updateStats('md5', wasCorrect);
         }
       }
@@ -450,24 +452,47 @@ app.get('/md5', async (req, res) => {
       phien_hien_tai: currentPhien + 1,
       du_doan: result.prediction,
       do_tin_cay: `${result.confidence}%`,
-      thuat_toan: result.methods?.slice(0, 5),
-      tong_thuat_toan: result.totalAlgorithms
+      cac_cau: result.methods,
+      yeu_to: result.methods,
+      id: '@AnhKhoi'
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('MD5 endpoint error:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
   }
 });
 
-app.get('/stats', (req, res) => {
-  res.json({ success: true, statistics });
+app.get('/thongke', (req, res) => {
+  res.json({ 
+    success: true, 
+    statistics: statistics,
+    predictor: {
+      activeAlgorithms: 20,
+      version: '1.0.0'
+    },
+    lastUpdated: new Date().toISOString(),
+    id: '@AnhKhoi'
+  });
 });
 
-app.get('/hu/history', (req, res) => {
-  res.json({ history: predictionHistory.hu, total: predictionHistory.hu.length, stats: statistics.hu });
+app.get('/hu/lichsu', (req, res) => {
+  res.json({ 
+    type: 'Lau Cua 79 - Tai Xiu Prediction',
+    history: predictionHistory.hu,
+    total: predictionHistory.hu.length,
+    stats: statistics.hu,
+    id: '@AnhKhoi'
+  });
 });
 
-app.get('/md5/history', (req, res) => {
-  res.json({ history: predictionHistory.md5, total: predictionHistory.md5.length, stats: statistics.md5 });
+app.get('/md5/lichsu', (req, res) => {
+  res.json({ 
+    type: 'Lau Cua 79 - Tai Xiu MD5',
+    history: predictionHistory.md5,
+    total: predictionHistory.md5.length,
+    stats: statistics.md5,
+    id: '@AnhKhoi'
+  });
 });
 
 app.get('/reset', (req, res) => {
@@ -476,68 +501,81 @@ app.get('/reset', (req, res) => {
     hu: { total: 0, wins: 0, losses: 0, accuracy: 0, currentStreak: 0, maxStreak: 0 },
     md5: { total: 0, wins: 0, losses: 0, accuracy: 0, currentStreak: 0, maxStreak: 0 }
   };
-  res.json({ message: 'RESET COMPLETE' });
+  res.json({ message: 'Data reset successfully', id: '@AnhKhoi' });
 });
 
-// GIAO DIỆN ĐƠN GIẢN
+// Dashboard HTML
 app.get('/dashboard', (req, res) => {
   const html = `<!DOCTYPE html>
-<html>
+<html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ABSOLUTE BRAIN</title>
+    <title>LC79 - AI Prediction Dashboard</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; background: linear-gradient(135deg, #0a0a2a, #000); color: #fff; padding: 20px; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #0a0a2a, #000); color: #fff; padding: 20px; }
         .container { max-width: 1200px; margin: 0 auto; }
         .header { text-align: center; padding: 40px; background: rgba(255,255,255,0.05); border-radius: 20px; margin-bottom: 30px; }
-        h1 { font-size: 48px; background: linear-gradient(135deg, #fff, #8080ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+        h1 { font-size: 48px; background: linear-gradient(135deg, #fff, #00aaff); -webkit-background-clip: text; background-clip: text; color: transparent; }
         .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px; }
-        .card { background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; text-align: center; }
-        .value { font-size: 36px; font-weight: bold; color: #8080ff; }
+        .card { background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; text-align: center; transition: 0.3s; }
+        .card:hover { transform: translateY(-5px); background: rgba(255,255,255,0.1); }
+        .value { font-size: 36px; font-weight: bold; color: #00aaff; }
         .label { font-size: 12px; color: #888; margin-top: 10px; }
         .servers { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 30px; }
         .server { background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; }
-        .server h3 { color: #8080ff; margin-bottom: 15px; }
+        .server h3 { color: #00aaff; margin-bottom: 15px; }
         .row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        .win { color: #80ffaa; }
-        .loss { color: #ff8080; }
+        .win { color: #00ff88; }
+        .loss { color: #ff4444; }
         .history { background: rgba(255,255,255,0.05); border-radius: 15px; overflow: hidden; }
-        .history-header { display: flex; justify-content: space-between; padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .history-header { display: flex; justify-content: space-between; padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); flex-wrap: wrap; gap: 10px; }
         .tabs { display: flex; gap: 10px; }
-        .tab { padding: 8px 20px; background: transparent; border: 1px solid #8080ff; border-radius: 20px; cursor: pointer; color: #fff; }
-        .tab.active { background: #8080ff; color: #000; }
-        .refresh { padding: 8px 20px; background: rgba(128,128,255,0.2); border: 1px solid #8080ff; border-radius: 20px; cursor: pointer; color: #8080ff; }
+        .tab { padding: 8px 20px; background: transparent; border: 1px solid #00aaff; border-radius: 20px; cursor: pointer; color: #fff; transition: 0.3s; }
+        .tab.active { background: #00aaff; color: #000; }
+        .refresh { padding: 8px 20px; background: rgba(0,170,255,0.2); border: 1px solid #00aaff; border-radius: 20px; cursor: pointer; color: #00aaff; transition: 0.3s; }
+        .refresh:hover { background: rgba(0,170,255,0.4); }
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .correct { color: #80ffaa; }
-        .wrong { color: #ff8080; }
+        .correct { color: #00ff88; }
+        .wrong { color: #ff4444; }
+        .pending { color: #ffaa00; }
         @media (max-width: 768px) { .stats { grid-template-columns: repeat(2, 1fr); } .servers { grid-template-columns: 1fr; } h1 { font-size: 32px; } }
+        .footer { text-align: center; padding: 30px; color: #666; font-size: 12px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header"><h1>ABSOLUTE BRAIN</h1><p style="margin-top: 10px;">20 ALGORITHMS | ULTIMATE AI PREDICTOR</p></div>
+        <div class="header"><h1>LC79 AI PREDICTOR</h1><p style="margin-top: 10px;">20 ALGORITHMS | ULTIMATE ACCURACY</p></div>
         <div class="stats" id="stats"></div>
         <div class="servers" id="servers"></div>
-        <div class="history"><div class="history-header"><div class="tabs"><button class="tab active" onclick="switchTab('hu')">HU SERVER</button><button class="tab" onclick="switchTab('md5')">MD5 SERVER</button></div><button class="refresh" onclick="loadData()">SYNC</button></div><div style="overflow-x: auto;"><table><thead><tr><th>SESSION</th><th>RESULT</th><th>PREDICTION</th><th>CONFIDENCE</th><th>METHOD</th><th>STATUS</th></tr></thead><tbody id="historyBody"><tr><td colspan="6" style="text-align:center;">LOADING...</td></tr></tbody></table></div></div>
+        <div class="history">
+            <div class="history-header">
+                <div class="tabs"><button class="tab active" onclick="switchTab('hu')">HU SERVER</button><button class="tab" onclick="switchTab('md5')">MD5 SERVER</button></div>
+                <button class="refresh" onclick="loadData()">SYNC DATA</button>
+            </div>
+            <div style="overflow-x: auto;">
+                <table><thead><tr><th>SESSION</th><th>RESULT</th><th>PREDICTION</th><th>CONFIDENCE</th><th>METHOD</th><th>STATUS</th></tr></thead><tbody id="historyBody"><tr><td colspan="6" style="text-align:center;">LOADING...</td></tr></tbody></table>
+            </div>
+        </div>
+        <div class="footer">© 2026 @AnhKhoi | LC79 Prediction Server | 20 Active Algorithms</div>
     </div>
     <script>
         let currentTab = 'hu';
         async function loadData() {
             try {
-                const statsRes = await fetch('/stats');
+                const statsRes = await fetch('/thongke');
                 const statsData = await statsRes.json();
                 if(statsData.success) {
                     document.getElementById('stats').innerHTML = '<div class="card"><div class="value">20</div><div class="label">ALGORITHMS</div></div><div class="card"><div class="value">'+statsData.statistics.hu.accuracy+'%</div><div class="label">ACCURACY</div></div><div class="card"><div class="value">'+statsData.statistics.hu.currentStreak+'</div><div class="label">STREAK</div></div><div class="card"><div class="value">'+statsData.statistics.hu.total+'</div><div class="label">TOTAL</div></div>';
                     document.getElementById('servers').innerHTML = '<div class="server"><h3>HU SERVER</h3><div class="row"><span>WINS</span><span class="win">'+statsData.statistics.hu.wins+'</span></div><div class="row"><span>LOSSES</span><span class="loss">'+statsData.statistics.hu.losses+'</span></div><div class="row"><span>MAX STREAK</span><span>'+statsData.statistics.hu.maxStreak+'</span></div><div class="row"><span>TOTAL</span><span>'+statsData.statistics.hu.total+'</span></div></div><div class="server"><h3>MD5 SERVER</h3><div class="row"><span>WINS</span><span class="win">'+statsData.statistics.md5.wins+'</span></div><div class="row"><span>LOSSES</span><span class="loss">'+statsData.statistics.md5.losses+'</span></div><div class="row"><span>MAX STREAK</span><span>'+statsData.statistics.md5.maxStreak+'</span></div><div class="row"><span>TOTAL</span><span>'+statsData.statistics.md5.total+'</span></div></div>';
                 }
-                const historyRes = await fetch(`/${currentTab}/history`);
+                const historyRes = await fetch(`/${currentTab}/lichsu`);
                 const historyData = await historyRes.json();
                 const tbody = document.getElementById('historyBody');
                 if(historyData.history && historyData.history.length > 0) {
-                    tbody.innerHTML = historyData.history.slice(0, 30).map(h => '<tr><td>#'+h.Phien+'</td><td class="'+(h.Ket_qua === 'Tài' ? 'loss' : 'win')+'">'+h.Ket_qua+'</td><td class="'+(h.Du_doan === 'Tài' ? 'loss' : 'win')+'">'+h.Du_doan+'</td><td>'+h.Do_tin_cay+'</td><td><span style="background:rgba(128,128,255,0.2);padding:4px 8px;border-radius:12px;font-size:11px;">'+h.Phuong_phap+'</span></td><td class="'+(h.result === 'CORRECT' ? 'correct' : 'wrong')+'">'+(h.result || 'PENDING')+'</td></tr>').join('');
+                    tbody.innerHTML = historyData.history.slice(0, 30).map(h => '<tr><td>#'+h.Phien+'</td><td class="'+(h.Ket_qua === 'Tài' ? 'loss' : 'win')+'">'+h.Ket_qua+'</td><td class="'+(h.Du_doan === 'Tài' ? 'loss' : 'win')+'">'+h.Du_doan+'</td><td>'+h.Do_tin_cay+'</td><td><span style="background:rgba(0,170,255,0.2);padding:4px 8px;border-radius:12px;font-size:11px;">'+h.Phuong_phap+'</span></td><td class="'+(h.ket_qua_du_doan === 'Đúng ✅' ? 'correct' : (h.ket_qua_du_doan === 'Sai ❌' ? 'wrong' : 'pending'))+'">'+(h.ket_qua_du_doan || 'PENDING')+'</td></tr>').join('');
                 } else {
                     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">NO DATA</td></tr>';
                 }
@@ -554,9 +592,11 @@ app.get('/dashboard', (req, res) => {
 // KHỞI ĐỘNG SERVER
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n========================================`);
-  console.log(`ABSOLUTE BRAIN v5.0`);
+  console.log(`LC79 PREDICTION SERVER`);
+  console.log(`Author: @AnhKhoi`);
   console.log(`PORT: ${PORT}`);
-  console.log(`ALGORITHMS: 20`);
-  console.log(`DASHBOARD: http://0.0.0.0:${PORT}/dashboard`);
+  console.log(`Algorithms: 20 Active`);
+  console.log(`Dashboard: http://0.0.0.0:${PORT}/dashboard`);
+  console.log(`API: http://0.0.0.0:${PORT}/hu`);
   console.log(`========================================\n`);
 });
