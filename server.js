@@ -2,7 +2,10 @@ const express = require('express');
 const axios = require('axios');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
+
+console.log('Starting LC79 Super Real Predictor...');
+console.log('PORT:', PORT);
 
 const API_URL_HU = 'https://wtx.tele68.com/v1/tx/sessions';
 const API_URL_MD5 = 'https://wtxmd52.tele68.com/v1/txmd5/sessions';
@@ -16,38 +19,46 @@ let processedMd5 = new Set();
 
 // ==================== 30+ THUẬT TOÁN THỰC CHIẾN ====================
 
+// === CẦU BỆT ===
 function bet3(r) { let s = 1; for (let i = 1; i < 3 && i < r.length; i++) { if (r[i] === r[0]) s++; else break; } if (s === 3) return { p: r[0], c: 74, n: 'BET3' }; return null; }
 function bet4(r) { let s = 1; for (let i = 1; i < 4 && i < r.length; i++) { if (r[i] === r[0]) s++; else break; } if (s === 4) return { p: r[0], c: 78, n: 'BET4' }; return null; }
 function bet5(r) { let s = 1; for (let i = 1; i < 5 && i < r.length; i++) { if (r[i] === r[0]) s++; else break; } if (s === 5) return { p: r[0] === 'Tài' ? 'Xỉu' : 'Tài', c: 76, n: 'BET5_BREAK' }; return null; }
 function bet6(r) { let s = 1; for (let i = 1; i < 6 && i < r.length; i++) { if (r[i] === r[0]) s++; else break; } if (s === 6) return { p: r[0] === 'Tài' ? 'Xỉu' : 'Tài', c: 82, n: 'BET6_BREAK' }; return null; }
 function bet7(r) { let s = 1; for (let i = 1; i < r.length; i++) { if (r[i] === r[0]) s++; else break; } if (s >= 7) return { p: r[0] === 'Tài' ? 'Xỉu' : 'Tài', c: Math.min(92, 84 + (s - 7) * 2), n: 'BET7_BREAK' }; return null; }
 
+// === CẦU ĐẢO ===
 function dao4(r) { let a = 1; for (let i = 1; i < 4 && i < r.length; i++) { if (r[i] !== r[i-1]) a++; else break; } if (a === 4) return { p: r[0] === 'Tài' ? 'Xỉu' : 'Tài', c: 70, n: 'DAO4' }; return null; }
 function dao5(r) { let a = 1; for (let i = 1; i < 5 && i < r.length; i++) { if (r[i] !== r[i-1]) a++; else break; } if (a === 5) return { p: r[0] === 'Tài' ? 'Xỉu' : 'Tài', c: 74, n: 'DAO5' }; return null; }
 function dao6(r) { let a = 1; for (let i = 1; i < 6 && i < r.length; i++) { if (r[i] !== r[i-1]) a++; else break; } if (a === 6) return { p: r[0] === 'Tài' ? 'Xỉu' : 'Tài', c: 78, n: 'DAO6' }; return null; }
 function dao7(r) { let a = 1; for (let i = 1; i < Math.min(10, r.length); i++) { if (r[i] !== r[i-1]) a++; else break; } if (a >= 7) return { p: r[0] === 'Tài' ? 'Xỉu' : 'Tài', c: Math.min(86, 80 + (a - 6) * 2), n: 'DAO7' }; return null; }
 
+// === CẦU CẶP ===
 function pair22(r) { if (r.length < 6) return null; if (r[0] === r[1] && r[2] === r[3] && r[0] !== r[2]) return { p: r[2] === 'Tài' ? 'Xỉu' : 'Tài', c: 76, n: 'PAIR22' }; return null; }
 function pair33(r) { if (r.length < 9) return null; if (r[0] === r[1] && r[1] === r[2] && r[3] === r[4] && r[4] === r[5] && r[0] !== r[3]) return { p: r[3] === 'Tài' ? 'Xỉu' : 'Tài', c: 80, n: 'PAIR33' }; return null; }
 function pair44(r) { if (r.length < 12) return null; let ok1 = true, ok2 = true; for (let i = 1; i < 4; i++) { if (r[i] !== r[0]) ok1 = false; if (r[4+i] !== r[4]) ok2 = false; } if (ok1 && ok2 && r[0] !== r[4]) return { p: r[4] === 'Tài' ? 'Xỉu' : 'Tài', c: 82, n: 'PAIR44' }; return null; }
 
+// === CẦU ĐẶC BIỆT ===
 function oneTwoOne(r) { if (r.length < 4) return null; if (r[0] !== r[1] && r[1] === r[2] && r[2] !== r[3] && r[0] === r[3]) return { p: r[0], c: 78, n: '121' }; return null; }
 function oneTwoThree(r) { if (r.length < 6) return null; if (r[0] === r[1] && r[1] === r[2] && r[3] === r[4] && r[0] !== r[3]) return { p: r[5], c: 76, n: '123' }; return null; }
 function threeTwoOne(r) { if (r.length < 6) return null; if (r[3] === r[4] && r[4] === r[5] && r[1] === r[2] && r[3] !== r[1] && r[0] !== r[1]) return { p: r[1], c: 76, n: '321' }; return null; }
 function twoOneTwo(r) { if (r.length < 5) return null; if (r[0] !== r[1] && r[1] === r[2] && r[2] !== r[3] && r[3] === r[4]) return { p: r[0] === 'Tài' ? 'Xỉu' : 'Tài', c: 74, n: '212' }; return null; }
 
+// === CẦU HÌNH HỌC ===
 function diamond(r) { if (r.length < 7) return null; if (r[0] !== r[1] && r[1] === r[2] && r[2] !== r[3] && r[3] === r[4] && r[4] !== r[5] && r[5] === r[6]) return { p: r[6] === 'Tài' ? 'Xỉu' : 'Tài', c: 76, n: 'DIAMOND' }; return null; }
 function wave(r) { if (r.length < 8) return null; let up = 0, down = 0; for (let i = 1; i < 8; i++) { if (r[i] !== r[i-1]) { if (r[i] === 'Tài') up++; else down++; } } if (Math.abs(up - down) <= 1 && up + down >= 5) return { p: r[0] === 'Tài' ? 'Xỉu' : 'Tài', c: 72, n: 'WAVE' }; return null; }
 function zigzag(r) { if (r.length < 5) return null; let ok = true; for (let i = 1; i < 5; i++) { if (r[i] === r[i-1]) ok = false; } if (ok) return { p: r[0] === 'Tài' ? 'Xỉu' : 'Tài', c: 72, n: 'ZIGZAG' }; return null; }
 
-function goldenRatio(r) { if (r.length < 10) return null; let tai = 0; for (let i = 0; i < 10; i++) if (r[i] === 'Tài') tai++; if (tai >= 8) return { p: 'Xỉu', c: 72, n: 'GOLDEN' }; if (tai <= 2) return { p: 'Tài', c: 72, n: 'GOLDEN' }; if (tai === 7) return { p: 'Xỉu', c: 68, n: 'GOLDEN' }; if (tai === 3) return { p: 'Tài', c: 68, n: 'GOLDEN' }; return null; }
+// === PHÂN TÍCH THÔNG MINH ===
+function goldenRatio(r) { if (r.length < 10) return null; let tai = 0; for (let i = 0; i < 10; i++) if (r[i] === 'Tài') tai++; if (tai >= 8) return { p: 'Xỉu', c: 72, n: 'GOLDEN' }; if (tai <= 2) return { p: 'Tài', c: 72, n: 'GOLDEN' }; return null; }
 function trendAnalysis(r) { if (r.length < 8) return null; let trend = 0; for (let i = 1; i < 8; i++) { if (r[i] === r[i-1]) trend++; else trend--; } if (trend >= 4) return { p: r[0], c: 72, n: 'TREND' }; if (trend <= -4) return { p: r[0] === 'Tài' ? 'Xỉu' : 'Tài', c: 74, n: 'TREND' }; return null; }
 function reversalAnalysis(r) { if (r.length < 5) return null; if (r[0] !== r[1] && r[1] === r[2] && r[2] !== r[3]) return { p: r[0], c: 78, n: 'REVERSAL' }; if (r[0] === r[1] && r[1] !== r[2] && r[2] === r[3]) return { p: r[2], c: 76, n: 'REVERSAL' }; return null; }
 function probabilityAnalysis(r) { if (r.length < 10) return null; let tai = 0; for (let i = 0; i < 10; i++) if (r[i] === 'Tài') tai++; let prob = tai / 10; if (prob >= 0.7) return { p: 'Xỉu', c: 66, n: 'PROB' }; if (prob <= 0.3) return { p: 'Tài', c: 66, n: 'PROB' }; return null; }
 function volatilityAnalysis(r) { if (r.length < 10) return null; let vol = 0; for (let i = 1; i < 10; i++) if (r[i] !== r[i-1]) vol++; vol = vol / 9; if (vol > 0.7) return { p: r[0] === 'Tài' ? 'Xỉu' : 'Tài', c: 68, n: 'VOL' }; if (vol < 0.3) return { p: r[0], c: 70, n: 'VOL' }; return null; }
 
+// Danh sách 24 thuật toán
 const algorithms = [bet3, bet4, bet5, bet6, bet7, dao4, dao5, dao6, dao7, pair22, pair33, pair44, oneTwoOne, oneTwoThree, threeTwoOne, twoOneTwo, diamond, wave, zigzag, goldenRatio, trendAnalysis, reversalAnalysis, probabilityAnalysis, volatilityAnalysis];
 
+// Dự đoán chính
 function predict(data) {
   if (!data || data.length < 3) {
     return { prediction: 'Tài', confidence: 60, probability: '60%', methods: ['BASIC'], totalAlgos: 0 };
@@ -124,7 +135,7 @@ async function fetchAPI(url) {
 
 // ==================== ENDPOINTS ====================
 app.get('/', (req, res) => {
-  res.json({ name: 'LC79 Super Real Predictor', version: '2.0', algorithms: 24, author: '@AnhKhoi' });
+  res.json({ name: 'LC79 Super Real Predictor', version: '2.0', algorithms: 24, author: '@AnhKhoi', status: 'running' });
 });
 
 app.get('/hu', async (req, res) => {
@@ -213,7 +224,7 @@ app.get('/hu/history', (req, res) => { res.json({ history: historyHu, total: his
 app.get('/md5/history', (req, res) => { res.json({ history: historyMd5, total: historyMd5.length }); });
 app.get('/reset', (req, res) => { historyHu = []; historyMd5 = []; statsHu = { total: 0, wins: 0, losses: 0, streak: 0, maxStreak: 0 }; statsMd5 = { total: 0, wins: 0, losses: 0, streak: 0, maxStreak: 0 }; processedHu.clear(); processedMd5.clear(); res.json({ message: 'Reset complete' }); });
 
-// GIAO DIỆN PHÒNG THÍ NGHIỆM CÔNG NGHỆ CAO
+// GIAO DIỆN SIÊU ĐẸP - PHÒNG THÍ NGHIỆM CÔNG NGHỆ CAO
 app.get('/dashboard', (req, res) => {
   res.send(`
 <!DOCTYPE html>
@@ -223,6 +234,7 @@ app.get('/dashboard', (req, res) => {
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>LC79 | SUPER REAL PREDICTOR LAB</title>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -231,7 +243,6 @@ app.get('/dashboard', (req, res) => {
             min-height: 100vh;
             color: #fff;
             padding: 20px;
-            position: relative;
         }
         .noise {
             position: fixed;
@@ -242,7 +253,7 @@ app.get('/dashboard', (req, res) => {
         }
         .container { position: relative; z-index: 1; max-width: 1400px; margin: 0 auto; }
         
-        /* Header Lab */
+        /* Header */
         .lab-header {
             text-align: center;
             padding: 40px 20px;
@@ -344,7 +355,7 @@ app.get('/dashboard', (req, res) => {
         .win { color: #00ff88; }
         .loss { color: #ff4466; }
         
-        /* History Table - Lab Style */
+        /* History Table */
         .history-section {
             background: rgba(10, 10, 42, 0.6);
             backdrop-filter: blur(10px);
@@ -423,7 +434,6 @@ app.get('/dashboard', (req, res) => {
         ::-webkit-scrollbar-track { background: rgba(0, 255, 255, 0.05); }
         ::-webkit-scrollbar-thumb { background: linear-gradient(135deg, #00ffff, #ff00ff); border-radius: 10px; }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
 <div class="noise"></div>
@@ -448,7 +458,7 @@ app.get('/dashboard', (req, res) => {
             <div class="tabs"><button class="tab active" onclick="switchTab('hu')">HU SERVER</button><button class="tab" onclick="switchTab('md5')">MD5 SERVER</button></div>
             <button class="refresh-btn" onclick="loadData()">⟳ SYNC DATA</button>
         </div>
-        <div class="table-container"><table><thead><tr><th>SESSION</th><th>RESULT</th><th>PREDICTION</th><th>CONFIDENCE</th><th>METHOD</th><th>STATUS</th></tr></thead><tbody id="historyBody"><tr><td colspan="6" style="text-align:center;">LOADING...</td></tr></tbody></table></div>
+        <div class="table-container"><table><thead><tr><th>SESSION</th><th>RESULT</th><th>PREDICTION</th><th>CONFIDENCE</th><th>METHOD</th><th>STATUS</th></tr></thead><tbody id="historyBody"><tr><td colspan="6" style="text-align:center;">LOADING...</tr></tr></tbody></table></div>
     </div>
     
     <div class="footer">© 2026 @AnhKhoi | LC79 SUPER REAL PREDICTOR v2.0 | 24 ACTIVE ALGORITHMS | LAB GRADE</div>
