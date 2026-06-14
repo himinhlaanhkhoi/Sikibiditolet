@@ -77,7 +77,7 @@ class BasePatternDetector {
   detectOneTwoThree(results) {
     if (results.length < 6) return null;
     if (results[0] === results[1] && results[1] === results[2] && results[3] === results[4] && results[0] !== results[3]) {
-      return { pred: results[5], conf: 74, name: 'ONE_TWO_THREE' };
+      return { pred: results[5] || results[0], conf: 74, name: 'ONE_TWO_THREE' };
     }
     return null;
   }
@@ -323,7 +323,8 @@ class SmartEnsemble {
   
   finalFusion(predictions, results) {
     if (predictions.length === 0) {
-      return { prediction: results[0] || 'Tài', confidence: 60, method: 'FALLBACK', totalAlgos: 0 };
+      let defaultPred = (results && results[0]) ? results[0] : 'Tài';
+      return { prediction: defaultPred, confidence: 60, method: 'FALLBACK', totalAlgos: 0 };
     }
     
     let taiScore = 0, xiuScore = 0;
@@ -979,7 +980,7 @@ async function loadData() {
             }
         }
         
-        const historyRes = await fetch(`/${currentTab}/history`);
+        const historyRes = await fetch('/'+currentTab+'/history');
         const historyData = await historyRes.json();
         const tbody = document.getElementById('historyBody');
         if(historyData.history && historyData.history.length > 0) {
