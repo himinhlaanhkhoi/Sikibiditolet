@@ -1,15 +1,15 @@
 {
-  "name": "anhkhoi-supreme-predictor",
-  "version": "3.0.0",
-  "description": "🔥 ANH KHOI SUPREME - Hệ thống dự đoán Tài Xỉu siêu chính xác với AI và thuật toán lượng tử",
+  "name": "anhkhoi-supreme-v3",
+  "version": "3.1.0",
+  "description": "🔥 ANH KHOI SUPREME - Hệ thống dự đoán Tài Xỉu siêu chính xác với AI + Quantum + Deep Learning",
   "main": "AnhKhoiSupreme.js",
   "scripts": {
     "start": "node AnhKhoiSupreme.js",
     "dev": "nodemon AnhKhoiSupreme.js",
     "test": "node test_system.js",
-    "optimize": "node optimizer.js",
     "train": "node train_model.js",
-    "dashboard": "node dashboard.js"
+    "dashboard": "node dashboard.js",
+    "optimize": "node optimizer.js"
   },
   "keywords": [
     "anhkhoi",
@@ -21,27 +21,39 @@
     "quantum",
     "neural-network",
     "deep-learning",
-    "advanced-algorithms"
+    "advanced-algorithms",
+    "cha-code"
   ],
   "author": "Anh Khoi - Cha Code Supreme",
   "license": "MIT",
   "dependencies": {
     "express": "^4.18.2",
-    "axios": "^1.6.0",
-    "node-cron": "^3.0.2",
+    "axios": "^1.6.5",
+    "node-cron": "^3.0.3",
     "winston": "^3.11.0",
-    "chart.js": "^4.4.0",
     "moment": "^2.29.4",
     "mathjs": "^12.2.0",
-    "tensorflow": "^4.20.0",
-    "node-fetch": "^3.3.2"
+    "@tensorflow/tfjs-node": "^4.15.0",
+    "node-fetch": "^3.3.2",
+    "chart.js": "^4.4.1",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "compression": "^1.7.4"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1",
-    "eslint": "^8.52.0",
-    "prettier": "^3.1.0"
+    "nodemon": "^3.0.2",
+    "eslint": "^8.55.0",
+    "prettier": "^3.1.1"
   },
   "engines": {
     "node": ">=18.0.0"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anhkhoi/supreme-predictor"
+  },
+  "bugs": {
+    "url": "https://github.com/anhkhoi/supreme-predictor/issues"
+  },
+  "homepage": "https://github.com/anhkhoi/supreme-predictor#readme"
 }
