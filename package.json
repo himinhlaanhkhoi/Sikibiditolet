@@ -1,12 +1,47 @@
 {
-  "name": "lc79-predictor",
-  "version": "1.0.0",
-  "main": "index.js",
+  "name": "anhkhoi-supreme-predictor",
+  "version": "3.0.0",
+  "description": "🔥 ANH KHOI SUPREME - Hệ thống dự đoán Tài Xỉu siêu chính xác với AI và thuật toán lượng tử",
+  "main": "AnhKhoiSupreme.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node AnhKhoiSupreme.js",
+    "dev": "nodemon AnhKhoiSupreme.js",
+    "test": "node test_system.js",
+    "optimize": "node optimizer.js",
+    "train": "node train_model.js",
+    "dashboard": "node dashboard.js"
   },
+  "keywords": [
+    "anhkhoi",
+    "supreme",
+    "prediction",
+    "tai-xiu",
+    "ai",
+    "machine-learning",
+    "quantum",
+    "neural-network",
+    "deep-learning",
+    "advanced-algorithms"
+  ],
+  "author": "Anh Khoi - Cha Code Supreme",
+  "license": "MIT",
   "dependencies": {
     "express": "^4.18.2",
-    "axios": "^1.6.0"
+    "axios": "^1.6.0",
+    "node-cron": "^3.0.2",
+    "winston": "^3.11.0",
+    "chart.js": "^4.4.0",
+    "moment": "^2.29.4",
+    "mathjs": "^12.2.0",
+    "tensorflow": "^4.20.0",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "eslint": "^8.52.0",
+    "prettier": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
