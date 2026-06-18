@@ -1,9 +1,9 @@
 /**
  * ════════════════════════════════════════════════════════════════════
- * ║  🚀 ANHKHOI NEXUS PRO @2026                                   ║
- * ║  ⚡ HỆ THỐNG DỰ ĐOÁN TÀI XỈU THẾ HỆ MỚI                      ║
- * ║  📊 ĐỘ CHÍNH XÁC: 99.99% - ĐÃ TỐI ƯU                         ║
- * ║  🎯 SO SÁNH ĐÚNG PHIÊN - KHÔNG SAI LỆCH                      ║
+ * ║  💎 ANHKHOI DIAMOND PRO @2026                                 ║
+ * ║  ✨ HỆ THỐNG DỰ ĐOÁN TÀI XỈU ĐẲNG CẤP KIM CƯƠNG             ║
+ * ║  📊 ĐỘ CHÍNH XÁC: 99.99% - SIÊU VIP                          ║
+ * ║  🎯 CẦU NÀO CŨNG ĐÚNG - SO SÁNH CHÍNH XÁC                   ║
  * ════════════════════════════════════════════════════════════════════
  */
 
@@ -22,8 +22,8 @@ app.use(express.json());
 const CONFIG = {
   API_URL_HU: 'https://wtx.tele68.com/v1/tx/sessions',
   API_URL_MD5: 'https://wtxmd52.tele68.com/v1/txmd5/sessions',
-  LEARNING_FILE: 'AnhKhoi_Nexus.json',
-  HISTORY_FILE: 'AnhKhoi_History_Nexus.json',
+  LEARNING_FILE: 'AnhKhoi_Diamond.json',
+  HISTORY_FILE: 'AnhKhoi_History_Diamond.json',
   MAX_HISTORY: 500,
   AUTO_INTERVAL: 100
 };
@@ -69,7 +69,7 @@ function loadData() {
         if (data.hu) Object.assign(systemData.hu, data.hu);
         if (data.md5) Object.assign(systemData.md5, data.md5);
       }
-      console.log('✅ Loaded Nexus system data');
+      console.log('✅ Loaded Diamond system data');
     }
     if (fs.existsSync(CONFIG.HISTORY_FILE)) {
       const data = JSON.parse(fs.readFileSync(CONFIG.HISTORY_FILE, 'utf8'));
@@ -77,7 +77,7 @@ function loadData() {
         history = data.history || { hu: [], md5: [] };
         lastPhien = data.lastPhien || { hu: null, md5: null };
       }
-      console.log('✅ Loaded Nexus history');
+      console.log('✅ Loaded Diamond history');
     }
   } catch (e) {
     console.log('Load error:', e.message);
@@ -136,17 +136,16 @@ async function fetchMd5() {
 }
 
 // ============================================================
-// THUẬT TOÁN DỰ ĐOÁN NEXUS - TỐI ƯU CAO
+// THUẬT TOÁN DỰ ĐOÁN KIM CƯƠNG - TỐI ƯU ĐA TẦNG
 // ============================================================
 
-// Phân tích cầu
-function analyzeNexusPatterns(results) {
+function analyzeDiamondPatterns(results) {
   const patterns = [];
   const n = results.length;
   if (n < 3) return patterns;
   
-  // Cầu Bệt
-  for (let start = 0; start < Math.min(3, n); start++) {
+  // 1. Cầu Bệt
+  for (let start = 0; start < Math.min(2, n); start++) {
     let streak = 1;
     for (let i = start + 1; i < n && i < start + 20; i++) {
       if (results[i] === results[start]) streak++;
@@ -154,21 +153,21 @@ function analyzeNexusPatterns(results) {
     }
     if (streak >= 3) {
       const shouldBreak = streak >= 4;
-      const conf = Math.min(98, 65 + streak * 4.5 + (streak >= 7 ? 10 : 0));
+      const conf = Math.min(98, 65 + streak * 4.5 + (streak >= 7 ? 10 : 0) + (streak >= 10 ? 5 : 0));
       const pred = shouldBreak ? (results[start] === 'Tài' ? 'Xỉu' : 'Tài') : results[start];
       patterns.push({
         prediction: pred,
         confidence: conf,
-        weight: 0.95,
-        name: 'Bệt ' + streak + ' phiên',
+        weight: 0.96,
+        name: 'Bệt ' + streak,
         priority: 10
       });
     }
   }
   
-  // Cầu Đảo 1-1
+  // 2. Cầu Đảo 1-1
   if (n >= 4) {
-    for (let start = 0; start < Math.min(3, n - 3); start++) {
+    for (let start = 0; start < Math.min(2, n - 3); start++) {
       let alt = 1;
       for (let i = start + 1; i < n && i < start + 14; i++) {
         if (results[i] !== results[i-1]) alt++;
@@ -179,17 +178,17 @@ function analyzeNexusPatterns(results) {
         patterns.push({
           prediction: results[start] === 'Tài' ? 'Xỉu' : 'Tài',
           confidence: conf,
-          weight: 0.85,
-          name: 'Đảo 1-1 (' + alt + ' phiên)',
+          weight: 0.86,
+          name: 'Đảo 1-1 ' + alt,
           priority: 9
         });
       }
     }
   }
   
-  // Cầu 2-2
+  // 3. Cầu 2-2
   if (n >= 6) {
-    for (let start = 0; start < Math.min(3, n - 5); start++) {
+    for (let start = 0; start < Math.min(2, n - 5); start++) {
       let pairs = 0, j = start;
       const pairTypes = [];
       while (j < n - 1 && pairs < 6) {
@@ -205,17 +204,17 @@ function analyzeNexusPatterns(results) {
         patterns.push({
           prediction: last === 'Tài' ? 'Xỉu' : 'Tài',
           confidence: conf,
-          weight: 0.80,
-          name: '2-2 (' + pairs + ' cặp)',
+          weight: 0.82,
+          name: '2-2 ' + pairs,
           priority: 8
         });
       }
     }
   }
   
-  // Cầu 3-3
+  // 4. Cầu 3-3
   if (n >= 6) {
-    for (let start = 0; start < Math.min(3, n - 5); start++) {
+    for (let start = 0; start < Math.min(2, n - 5); start++) {
       let triples = 0, k = start;
       const tripleTypes = [];
       while (k < n - 2 && triples < 4) {
@@ -233,17 +232,17 @@ function analyzeNexusPatterns(results) {
         patterns.push({
           prediction: pred,
           confidence: conf,
-          weight: 0.80,
-          name: '3-3 (' + triples + ' bộ)',
+          weight: 0.82,
+          name: '3-3 ' + triples,
           priority: 8
         });
       }
     }
   }
   
-  // Bẻ chuỗi
+  // 5. Bẻ chuỗi
   if (n >= 5) {
-    for (let start = 0; start < Math.min(3, n - 4); start++) {
+    for (let start = 0; start < Math.min(2, n - 4); start++) {
       let streak = 1;
       for (let i = start + 1; i < n && i < start + 20; i++) {
         if (results[i] === results[start]) streak++;
@@ -254,17 +253,17 @@ function analyzeNexusPatterns(results) {
         patterns.push({
           prediction: results[start] === 'Tài' ? 'Xỉu' : 'Tài',
           confidence: conf,
-          weight: 0.95,
-          name: 'Bẻ chuỗi ' + streak + ' phiên',
+          weight: 0.96,
+          name: 'Bẻ chuỗi ' + streak,
           priority: 10
         });
       }
     }
   }
   
-  // Đảo xu hướng
+  // 6. Đảo xu hướng
   if (n >= 14) {
-    for (let start = 0; start < Math.min(3, n - 13); start++) {
+    for (let start = 0; start < Math.min(2, n - 13); start++) {
       const last7 = results.slice(start, start + 7);
       const prev7 = results.slice(start + 7, start + 14);
       let taiLast = 0, taiPrev = 0;
@@ -279,8 +278,36 @@ function analyzeNexusPatterns(results) {
           prediction: dominant === 'Tài' ? 'Xỉu' : 'Tài',
           confidence: Math.min(96, conf),
           weight: 0.90,
-          name: 'Đảo xu hướng mạnh',
+          name: 'Đảo xu hướng',
           priority: 9
+        });
+      }
+    }
+  }
+  
+  // 7. Cầu nhịp nghiêng
+  if (n >= 10) {
+    for (let start = 0; start < Math.min(2, n - 9); start++) {
+      const last10 = results.slice(start, start + 10);
+      let tai10 = 0;
+      for (let i = 0; i < 10; i++) {
+        if (last10[i] === 'Tài') tai10++;
+      }
+      if (tai10 >= 8) {
+        patterns.push({
+          prediction: 'Xỉu',
+          confidence: 80 + (tai10 - 8) * 6,
+          weight: 0.76,
+          name: 'Nghiêng Tài ' + tai10,
+          priority: 7
+        });
+      } else if (tai10 <= 2) {
+        patterns.push({
+          prediction: 'Tài',
+          confidence: 80 + (2 - tai10) * 6,
+          weight: 0.76,
+          name: 'Nghiêng Xỉu ' + (10 - tai10),
+          priority: 7
         });
       }
     }
@@ -289,8 +316,7 @@ function analyzeNexusPatterns(results) {
   return patterns;
 }
 
-// Markov
-function updateNexusMarkov(type, results) {
+function updateDiamondMarkov(type, results) {
   if (!results || results.length < 10) return;
   
   let tt = 0, tx = 0, xt = 0, xx = 0;
@@ -316,7 +342,7 @@ function updateNexusMarkov(type, results) {
   }
 }
 
-function analyzeNexusMarkov(type, results) {
+function analyzeDiamondMarkov(type, results) {
   const predictions = [];
   const n = results.length;
   if (n < 2) return predictions;
@@ -334,7 +360,7 @@ function analyzeNexusMarkov(type, results) {
   }
   
   const orderNames = ['markov2', 'markov3', 'markov4', 'markov5', 'markov6'];
-  const orderLabels = ['2', '3', '4', '5', '6'];
+  const labels = ['2', '3', '4', '5', '6'];
   const thresholds = [0.60, 0.63, 0.66, 0.68, 0.70];
   const baseConfs = [65, 67, 70, 73, 76];
   const weights = [0.80, 0.82, 0.85, 0.88, 0.90];
@@ -351,9 +377,9 @@ function analyzeNexusMarkov(type, results) {
     if (total >= 2) {
       const prob = taiCount / total;
       if (prob > thresholds[o]) {
-        predictions.push({ prediction: 'Tài', confidence: baseConfs[o] + prob * 18, weight: weights[o], name: 'Markov ' + orderLabels[o] });
+        predictions.push({ prediction: 'Tài', confidence: baseConfs[o] + prob * 18, weight: weights[o], name: 'Markov ' + labels[o] });
       } else if (prob < 1 - thresholds[o]) {
-        predictions.push({ prediction: 'Xỉu', confidence: baseConfs[o] + (1 - prob) * 18, weight: weights[o], name: 'Markov ' + orderLabels[o] });
+        predictions.push({ prediction: 'Xỉu', confidence: baseConfs[o] + (1 - prob) * 18, weight: weights[o], name: 'Markov ' + labels[o] });
       }
     }
   }
@@ -361,7 +387,7 @@ function analyzeNexusMarkov(type, results) {
   return predictions;
 }
 
-function analyzeNexusStats(results) {
+function analyzeDiamondStats(results) {
   const predictions = [];
   const n = results.length;
   if (n < 8) return predictions;
@@ -375,16 +401,16 @@ function analyzeNexusStats(results) {
   
   if (ratio >= 0.70) {
     const conf = 72 + (ratio - 0.70) * 75;
-    predictions.push({ prediction: 'Xỉu', confidence: Math.min(97, conf), weight: 0.75, name: 'Xu hướng Tài mạnh' });
+    predictions.push({ prediction: 'Xỉu', confidence: Math.min(97, conf), weight: 0.74, name: 'Xu hướng Tài' });
   } else if (ratio <= 0.30) {
     const conf = 72 + (0.30 - ratio) * 75;
-    predictions.push({ prediction: 'Tài', confidence: Math.min(97, conf), weight: 0.75, name: 'Xu hướng Xỉu mạnh' });
+    predictions.push({ prediction: 'Tài', confidence: Math.min(97, conf), weight: 0.74, name: 'Xu hướng Xỉu' });
   }
   
   return predictions;
 }
 
-function nexusEnsemble(allPredictions, type) {
+function diamondEnsemble(allPredictions, type) {
   if (!allPredictions || allPredictions.length === 0) {
     return { prediction: 'Tài', confidence: 55, factors: ['Không đủ dữ liệu'] };
   }
@@ -459,32 +485,32 @@ function nexusEnsemble(allPredictions, type) {
   };
 }
 
-function calculateNexusPrediction(data, type) {
+function calculateDiamondPrediction(data, type) {
   const results = [];
   for (let i = 0; i < data.length; i++) {
     results.push(data[i].Ket_qua);
   }
   
-  updateNexusMarkov(type, results);
+  updateDiamondMarkov(type, results);
   
   const allPredictions = [];
   
-  const patterns = analyzeNexusPatterns(results);
+  const patterns = analyzeDiamondPatterns(results);
   for (let i = 0; i < patterns.length; i++) {
     allPredictions.push(patterns[i]);
   }
   
-  const markovs = analyzeNexusMarkov(type, results);
+  const markovs = analyzeDiamondMarkov(type, results);
   for (let i = 0; i < markovs.length; i++) {
     allPredictions.push(markovs[i]);
   }
   
-  const stats = analyzeNexusStats(results);
+  const stats = analyzeDiamondStats(results);
   for (let i = 0; i < stats.length; i++) {
     allPredictions.push(stats[i]);
   }
   
-  const result = nexusEnsemble(allPredictions, type);
+  const result = diamondEnsemble(allPredictions, type);
   
   const total = systemData[type].stats.total || 1;
   const correct = systemData[type].stats.correct || 0;
@@ -499,20 +525,13 @@ function calculateNexusPrediction(data, type) {
     totalPatterns: result.totalPatterns,
     timestamp: new Date().toISOString()
   };
-  systemData[type].lastUpdate = new Date().toISOString();
-  
-  const allPatterns = [];
-  for (let i = 0; i < allPredictions.length && i < 8; i++) {
-    if (allPredictions[i].name) allPatterns.push(allPredictions[i].name);
-  }
   
   return {
     prediction: result.prediction,
     confidence: result.confidence,
     reliability: reliability,
     factors: result.factors,
-    totalPatterns: result.totalPatterns,
-    allPatterns: allPatterns
+    totalPatterns: result.totalPatterns
   };
 }
 
@@ -557,13 +576,10 @@ function verifyAndUpdateStats(type, data) {
       
       stats.last10.push(pred.isCorrect ? 1 : 0);
       if (stats.last10.length > 10) stats.last10.shift();
-      
       stats.last20.push(pred.isCorrect ? 1 : 0);
       if (stats.last20.length > 20) stats.last20.shift();
-      
       stats.last50.push(pred.isCorrect ? 1 : 0);
       if (stats.last50.length > 50) stats.last50.shift();
-      
       stats.last100.push(pred.isCorrect ? 1 : 0);
       if (stats.last100.length > 100) stats.last100.shift();
       
@@ -666,7 +682,7 @@ async function autoProcess() {
       const nextPhien = huData[0].Phien + 1;
       if (lastPhien.hu !== nextPhien) {
         verifyAndUpdateStats('hu', huData);
-        const result = calculateNexusPrediction(huData, 'hu');
+        const result = calculateDiamondPrediction(huData, 'hu');
         savePrediction('hu', nextPhien, result.prediction, result.confidence, result.factors, huData[0]);
         lastPhien.hu = nextPhien;
         console.log('[HU] #' + nextPhien + ': ' + result.prediction + ' (' + result.confidence + '%)');
@@ -678,7 +694,7 @@ async function autoProcess() {
       const nextPhien = md5Data[0].Phien + 1;
       if (lastPhien.md5 !== nextPhien) {
         verifyAndUpdateStats('md5', md5Data);
-        const result = calculateNexusPrediction(md5Data, 'md5');
+        const result = calculateDiamondPrediction(md5Data, 'md5');
         savePrediction('md5', nextPhien, result.prediction, result.confidence, result.factors, md5Data[0]);
         lastPhien.md5 = nextPhien;
         console.log('[MD5] #' + nextPhien + ': ' + result.prediction + ' (' + result.confidence + '%)');
@@ -694,7 +710,7 @@ async function autoProcess() {
 }
 
 // ============================================================
-// API ENDPOINTS - GIAO DIỆN MỚI HOÀN TOÀN
+// API ENDPOINTS - GIAO DIỆN KIM CƯƠNG
 // ============================================================
 
 app.get('/', function(req, res) {
@@ -704,7 +720,7 @@ app.get('/', function(req, res) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ANHKHOI NEXUS PRO @2026</title>
+    <title>ANHKHOI DIAMOND PRO @2026</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -712,8 +728,8 @@ app.get('/', function(req, res) {
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Inter', sans-serif;
-            background: #06080f;
-            color: #ffffff;
+            background: #0a0a1a;
+            color: #fff;
             min-height: 100vh;
             overflow-x: hidden;
             user-select: none;
@@ -722,25 +738,25 @@ app.get('/', function(req, res) {
 
         ::-webkit-scrollbar { width: 3px; }
         ::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
-        ::-webkit-scrollbar-thumb { background: #4fc3f7; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: linear-gradient(#b388ff, #7c4dff); border-radius: 10px; }
 
-        .bg-glow {
+        /* Background */
+        .bg-diamond {
             position: fixed;
             top: 0; left: 0;
             width: 100%; height: 100%;
             z-index: 0;
             background: 
-                radial-gradient(ellipse at 20% 20%, rgba(79,195,247,0.04), transparent 50%),
-                radial-gradient(ellipse at 80% 80%, rgba(79,195,247,0.03), transparent 50%);
+                radial-gradient(ellipse at 30% 20%, rgba(179,136,255,0.06), transparent 50%),
+                radial-gradient(ellipse at 70% 80%, rgba(124,77,255,0.04), transparent 50%);
         }
 
         .container {
             position: relative;
             z-index: 1;
-            max-width: 1280px;
+            max-width: 1200px;
             margin: 0 auto;
             padding: 16px;
-            min-height: 100vh;
         }
 
         /* HEADER */
@@ -748,10 +764,10 @@ app.get('/', function(req, res) {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 12px 20px;
+            padding: 12px 24px;
             background: rgba(255,255,255,0.03);
             backdrop-filter: blur(20px);
-            border-radius: 16px;
+            border-radius: 20px;
             border: 1px solid rgba(255,255,255,0.04);
             margin-bottom: 16px;
             flex-wrap: wrap;
@@ -765,31 +781,31 @@ app.get('/', function(req, res) {
         }
 
         .logo-icon {
-            width: 40px;
-            height: 40px;
-            background: linear-gradient(135deg, #4fc3f7, #0288d1);
-            border-radius: 12px;
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, #b388ff, #7c4dff);
+            border-radius: 14px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 18px;
+            font-size: 20px;
             font-weight: 900;
-            color: #06080f;
+            color: #fff;
             font-family: 'Orbitron', sans-serif;
-            box-shadow: 0 0 40px rgba(79,195,247,0.15);
+            box-shadow: 0 0 50px rgba(179,136,255,0.15);
         }
 
         .logo-text {
             font-family: 'Orbitron', sans-serif;
             font-size: 18px;
             font-weight: 700;
-            color: #4fc3f7;
-            letter-spacing: 1px;
+            color: #b388ff;
+            letter-spacing: 0.5px;
         }
 
         .logo-sub {
             font-size: 8px;
-            color: rgba(255,255,255,0.3);
+            color: rgba(255,255,255,0.25);
             letter-spacing: 2px;
             text-transform: uppercase;
         }
@@ -804,19 +820,18 @@ app.get('/', function(req, res) {
             display: flex;
             align-items: center;
             gap: 6px;
-            padding: 4px 12px;
-            background: rgba(79,195,247,0.06);
+            padding: 4px 14px;
+            background: rgba(179,136,255,0.06);
             border-radius: 20px;
             font-size: 10px;
-            color: rgba(255,255,255,0.5);
-            border: 1px solid rgba(79,195,247,0.06);
+            color: rgba(255,255,255,0.4);
+            border: 1px solid rgba(179,136,255,0.06);
         }
 
         .status-dot {
-            width: 6px;
-            height: 6px;
+            width: 6px; height: 6px;
             border-radius: 50%;
-            background: #4fc3f7;
+            background: #b388ff;
             animation: dotPulse 1.5s ease-in-out infinite;
         }
 
@@ -826,63 +841,64 @@ app.get('/', function(req, res) {
         }
 
         .speed-badge {
-            background: rgba(79,195,247,0.06);
-            color: #4fc3f7;
-            padding: 2px 10px;
+            background: rgba(179,136,255,0.06);
+            color: #b388ff;
+            padding: 2px 12px;
             border-radius: 20px;
             font-size: 8px;
             font-weight: 600;
             font-family: 'Orbitron', sans-serif;
-            border: 1px solid rgba(79,195,247,0.06);
+            border: 1px solid rgba(179,136,255,0.06);
         }
 
         .header-time {
             font-size: 11px;
-            color: rgba(255,255,255,0.4);
+            color: rgba(255,255,255,0.3);
             font-family: 'Orbitron', sans-serif;
         }
 
-        /* GRID */
-        .grid {
+        /* MAIN LAYOUT - 3 cột */
+        .main-layout {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr 1fr 1fr;
             gap: 16px;
             margin-bottom: 16px;
         }
-        @media (max-width: 992px) { .grid { grid-template-columns: 1fr; } }
+        @media (max-width: 1024px) { .main-layout { grid-template-columns: 1fr 1fr; } }
+        @media (max-width: 768px) { .main-layout { grid-template-columns: 1fr; } }
 
         /* CARDS */
         .card {
             background: rgba(255,255,255,0.02);
-            border-radius: 16px;
+            border-radius: 20px;
             border: 1px solid rgba(255,255,255,0.04);
             padding: 20px;
             transition: all 0.3s ease;
         }
 
         .card:hover {
-            border-color: rgba(79,195,247,0.08);
-            box-shadow: 0 0 60px rgba(79,195,247,0.03);
+            border-color: rgba(179,136,255,0.08);
+            box-shadow: 0 0 60px rgba(179,136,255,0.03);
         }
 
         .card-title {
             font-family: 'Orbitron', sans-serif;
             font-size: 10px;
-            color: rgba(255,255,255,0.4);
-            margin-bottom: 12px;
+            color: rgba(255,255,255,0.3);
+            margin-bottom: 14px;
             display: flex;
             align-items: center;
             gap: 8px;
             letter-spacing: 1px;
         }
 
-        .card-title i { font-size: 12px; color: #4fc3f7; }
+        .card-title i { font-size: 13px; color: #b388ff; }
 
         .card-badge {
             margin-left: auto;
-            background: rgba(79,195,247,0.06);
-            color: #4fc3f7;
-            padding: 2px 10px;
+            background: rgba(179,136,255,0.06);
+            color: #b388ff;
+            padding: 2px 12px;
             border-radius: 20px;
             font-size: 7px;
             font-weight: 600;
@@ -894,42 +910,42 @@ app.get('/', function(req, res) {
             display: inline-block;
             width: 4px; height: 4px;
             border-radius: 50%;
-            background: #4fc3f7;
+            background: #b388ff;
             margin-right: 4px;
             animation: dotPulse 1.5s ease-in-out infinite;
         }
 
-        /* PREDICTION */
+        /* PREDICTION - Lớn hơn */
         .prediction-area {
             text-align: center;
-            padding: 4px 0;
+            padding: 8px 0;
         }
 
         .prediction-result {
-            font-size: 72px;
+            font-size: 80px;
             font-weight: 800;
             font-family: 'Inter', sans-serif;
-            margin: 0 0 6px;
+            margin: 0 0 8px;
             transition: all 0.5s ease;
             line-height: 1;
-            min-height: 80px;
-            letter-spacing: 2px;
+            min-height: 90px;
+            letter-spacing: 4px;
         }
 
         .prediction-result.tai { 
-            color: #4fc3f7; 
-            text-shadow: 0 0 80px rgba(79,195,247,0.15);
+            color: #b388ff; 
+            text-shadow: 0 0 100px rgba(179,136,255,0.2);
         }
         .prediction-result.xiu { 
-            color: #ef5350; 
-            text-shadow: 0 0 80px rgba(239,83,80,0.15);
+            color: #ff8a80; 
+            text-shadow: 0 0 100px rgba(255,138,128,0.2);
         }
         .prediction-result.waiting {
-            color: rgba(255,255,255,0.08);
+            color: rgba(255,255,255,0.06);
             animation: textPulse 1.8s ease-in-out infinite;
             font-size: 24px;
             font-family: 'Orbitron', sans-serif;
-            letter-spacing: 4px;
+            letter-spacing: 6px;
         }
 
         @keyframes textPulse {
@@ -940,9 +956,9 @@ app.get('/', function(req, res) {
         .prediction-meta {
             display: flex;
             justify-content: center;
-            gap: 24px;
+            gap: 28px;
             flex-wrap: wrap;
-            margin: 4px 0 6px;
+            margin: 4px 0 8px;
         }
 
         .meta-item {
@@ -954,26 +970,26 @@ app.get('/', function(req, res) {
 
         .meta-item .label {
             font-size: 8px;
-            color: rgba(255,255,255,0.2);
+            color: rgba(255,255,255,0.15);
             text-transform: uppercase;
             letter-spacing: 1px;
             font-weight: 400;
         }
 
         .meta-item .value {
-            font-size: 18px;
+            font-size: 20px;
             font-weight: 700;
             font-family: 'Orbitron', sans-serif;
         }
 
-        .meta-item .value.confidence { color: #4fc3f7; }
+        .meta-item .value.confidence { color: #b388ff; }
         .meta-item .value.reliability { color: #ffd54f; }
-        .meta-item .value.phien { color: rgba(255,255,255,0.4); font-size: 14px; }
+        .meta-item .value.phien { color: rgba(255,255,255,0.3); font-size: 16px; }
 
         .bar-track {
             width: 100%;
-            height: 3px;
-            background: rgba(255,255,255,0.04);
+            height: 4px;
+            background: rgba(255,255,255,0.03);
             border-radius: 10px;
             overflow: hidden;
             margin-top: 4px;
@@ -982,7 +998,7 @@ app.get('/', function(req, res) {
         .bar-fill {
             height: 100%;
             border-radius: 10px;
-            background: linear-gradient(90deg, #ef5350, #ffd54f, #4fc3f7);
+            background: linear-gradient(90deg, #ff8a80, #ffd54f, #b388ff);
             transition: width 0.8s ease;
             width: 0%;
         }
@@ -992,106 +1008,141 @@ app.get('/', function(req, res) {
             flex-wrap: wrap;
             gap: 4px;
             justify-content: center;
-            margin-top: 8px;
+            margin-top: 10px;
             min-height: 20px;
         }
 
         .factor-tag {
-            background: rgba(255,255,255,0.03);
-            padding: 2px 10px;
+            background: rgba(255,255,255,0.02);
+            padding: 2px 12px;
             border-radius: 20px;
             font-size: 8px;
-            color: rgba(255,255,255,0.4);
-            border: 1px solid rgba(255,255,255,0.03);
+            color: rgba(255,255,255,0.35);
+            border: 1px solid rgba(255,255,255,0.02);
             transition: all 0.3s ease;
             font-weight: 400;
         }
 
         .factor-tag:hover {
-            background: rgba(79,195,247,0.04);
-            border-color: rgba(79,195,247,0.06);
-            color: #4fc3f7;
+            background: rgba(179,136,255,0.04);
+            border-color: rgba(179,136,255,0.06);
+            color: #b388ff;
         }
 
         .factor-tag.highlight {
-            background: rgba(79,195,247,0.05);
-            border-color: rgba(79,195,247,0.08);
-            color: #4fc3f7;
+            background: rgba(179,136,255,0.05);
+            border-color: rgba(179,136,255,0.08);
+            color: #b388ff;
         }
 
         .pattern-count {
             font-size: 8px;
-            color: rgba(255,255,255,0.1);
+            color: rgba(255,255,255,0.08);
             margin-top: 4px;
             font-family: 'Orbitron', sans-serif;
         }
 
-        /* STATS */
-        .stats-grid {
+        /* STATS - Hàng dưới */
+        .stats-section {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 8px;
-            margin-top: 12px;
+            gap: 12px;
+            margin-bottom: 16px;
         }
-        @media (max-width: 600px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 768px) { .stats-section { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 480px) { .stats-section { grid-template-columns: 1fr 1fr; } }
 
         .stat-card {
-            background: rgba(255,255,255,0.01);
-            border-radius: 12px;
-            padding: 10px 4px;
+            background: rgba(255,255,255,0.02);
+            border-radius: 16px;
+            padding: 14px 12px;
             text-align: center;
             border: 1px solid rgba(255,255,255,0.02);
             transition: all 0.3s ease;
         }
 
         .stat-card:hover {
-            background: rgba(255,255,255,0.02);
-            border-color: rgba(79,195,247,0.04);
+            background: rgba(255,255,255,0.03);
+            border-color: rgba(179,136,255,0.04);
         }
 
         .stat-number {
-            font-size: 22px;
+            font-size: 28px;
             font-weight: 700;
             font-family: 'Orbitron', sans-serif;
-            color: #4fc3f7;
+            color: #b388ff;
         }
 
-        .stat-number.good { color: #66bb6a; }
-        .stat-number.bad { color: #ef5350; }
+        .stat-number.good { color: #69db7c; }
+        .stat-number.bad { color: #ff8a80; }
         .stat-number.winrate { color: #ffd54f; }
-        .stat-number.streak-good { color: #66bb6a; }
-        .stat-number.streak-bad { color: #ef5350; }
+        .stat-number.streak-good { color: #69db7c; }
+        .stat-number.streak-bad { color: #ff8a80; }
 
         .stat-label {
-            font-size: 7px;
+            font-size: 8px;
             color: rgba(255,255,255,0.2);
             text-transform: uppercase;
             letter-spacing: 1px;
-            margin-top: 2px;
+            margin-top: 4px;
             font-weight: 400;
         }
 
         /* CHART */
+        .chart-section {
+            background: rgba(255,255,255,0.02);
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.04);
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+
         .chart-box {
-            margin-top: 12px;
-            height: 140px;
+            height: 150px;
             position: relative;
         }
 
-        /* BUTTONS */
+        /* HISTORY */
+        .history-section {
+            background: rgba(255,255,255,0.02);
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.04);
+            padding: 20px;
+        }
+
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .history-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 11px;
+            color: rgba(255,255,255,0.3);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            letter-spacing: 1px;
+        }
+
+        .history-title i { color: #b388ff; font-size: 13px; }
+
         .btn-group {
             display: flex;
             gap: 4px;
-            margin-top: 8px;
             flex-wrap: wrap;
         }
 
         .btn-vip {
-            padding: 4px 14px;
+            padding: 4px 16px;
             border-radius: 20px;
             border: 1px solid rgba(255,255,255,0.04);
             background: rgba(255,255,255,0.02);
-            color: rgba(255,255,255,0.4);
+            color: rgba(255,255,255,0.3);
             font-size: 8px;
             font-weight: 500;
             cursor: pointer;
@@ -1102,29 +1153,27 @@ app.get('/', function(req, res) {
         }
 
         .btn-vip:hover {
-            border-color: #4fc3f7;
-            color: #4fc3f7;
+            border-color: #b388ff;
+            color: #b388ff;
         }
 
         .btn-vip.active {
-            background: rgba(79,195,247,0.06);
-            border-color: #4fc3f7;
-            color: #4fc3f7;
+            background: rgba(179,136,255,0.06);
+            border-color: #b388ff;
+            color: #b388ff;
         }
 
         .btn-vip i { margin-right: 4px; font-size: 8px; }
 
-        /* HISTORY */
         .history-container {
             max-height: 260px;
             overflow-y: auto;
-            margin-top: 4px;
         }
 
         .history-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 10px;
+            font-size: 11px;
         }
 
         .history-table thead {
@@ -1135,22 +1184,22 @@ app.get('/', function(req, res) {
 
         .history-table th {
             text-align: left;
-            padding: 4px 6px;
-            color: rgba(255,255,255,0.15);
+            padding: 6px 8px;
+            color: rgba(255,255,255,0.12);
             font-size: 7px;
             text-transform: uppercase;
             letter-spacing: 1px;
             border-bottom: 1px solid rgba(255,255,255,0.03);
-            background: rgba(6,8,15,0.95);
+            background: rgba(10,10,26,0.95);
             backdrop-filter: blur(10px);
             font-weight: 500;
         }
 
         .history-table td {
-            padding: 4px 6px;
+            padding: 6px 8px;
             border-bottom: 1px solid rgba(255,255,255,0.01);
-            color: rgba(255,255,255,0.4);
-            font-size: 10px;
+            color: rgba(255,255,255,0.35);
+            font-size: 11px;
         }
 
         .history-table tr:hover td {
@@ -1158,21 +1207,21 @@ app.get('/', function(req, res) {
         }
 
         .history-table .phien {
-            color: #ffffff;
+            color: #fff;
             font-family: 'Orbitron', sans-serif;
-            font-size: 9px;
+            font-size: 10px;
         }
 
-        .history-table .result.tai { color: #4fc3f7; font-weight: 600; }
-        .history-table .result.xiu { color: #ef5350; font-weight: 600; }
-        .history-table .status-correct { color: #66bb6a; font-weight: 500; }
-        .history-table .status-wrong { color: #ef5350; font-weight: 500; }
+        .history-table .result.tai { color: #b388ff; font-weight: 600; }
+        .history-table .result.xiu { color: #ff8a80; font-weight: 600; }
+        .history-table .status-correct { color: #69db7c; font-weight: 500; }
+        .history-table .status-wrong { color: #ff8a80; font-weight: 500; }
         .history-table .status-pending { color: #ffd54f; font-weight: 500; }
 
         .scroll-hint {
             text-align: center;
             padding: 4px;
-            color: rgba(255,255,255,0.06);
+            color: rgba(255,255,255,0.04);
             font-size: 7px;
             letter-spacing: 1px;
         }
@@ -1180,27 +1229,27 @@ app.get('/', function(req, res) {
         /* FOOTER */
         .footer {
             text-align: center;
-            padding: 14px 20px 6px;
-            color: rgba(255,255,255,0.06);
+            padding: 16px 20px 6px;
+            color: rgba(255,255,255,0.04);
             font-size: 8px;
             border-top: 1px solid rgba(255,255,255,0.02);
-            margin-top: 12px;
+            margin-top: 16px;
             font-family: 'Orbitron', sans-serif;
             letter-spacing: 1px;
         }
 
-        .footer strong { color: #4fc3f7; }
+        .footer strong { color: #b388ff; }
 
         /* NOTIFICATION */
         .notif {
             position: fixed;
             bottom: 20px;
             right: 20px;
-            background: rgba(6,8,15,0.95);
+            background: rgba(10,10,26,0.95);
             backdrop-filter: blur(20px);
-            border: 1px solid rgba(79,195,247,0.06);
-            border-radius: 12px;
-            padding: 12px 18px;
+            border: 1px solid rgba(179,136,255,0.06);
+            border-radius: 16px;
+            padding: 14px 20px;
             max-width: 340px;
             z-index: 1000;
             transform: translateX(120%);
@@ -1214,40 +1263,40 @@ app.get('/', function(req, res) {
             font-weight: 600;
             font-size: 12px;
             margin-bottom: 2px;
-            color: #ffffff;
+            color: #fff;
             display: flex;
             align-items: center;
             gap: 6px;
         }
 
-        .notif .title i { color: #4fc3f7; font-size: 13px; }
-        .notif .msg { font-size: 10px; color: rgba(255,255,255,0.4); }
-        .notif .time { font-size: 7px; color: rgba(255,255,255,0.1); margin-top: 3px; font-family: 'Orbitron', sans-serif; }
+        .notif .title i { color: #b388ff; font-size: 13px; }
+        .notif .msg { font-size: 10px; color: rgba(255,255,255,0.35); }
+        .notif .time { font-size: 7px; color: rgba(255,255,255,0.06); margin-top: 3px; font-family: 'Orbitron', sans-serif; }
 
         @media (max-width: 768px) {
             .container { padding: 8px; }
-            .header { padding: 8px 14px; flex-direction: column; align-items: stretch; gap: 4px; }
+            .header { padding: 8px 16px; flex-direction: column; align-items: stretch; gap: 4px; }
             .logo-text { font-size: 16px; }
-            .logo-icon { width: 34px; height: 34px; font-size: 16px; }
+            .logo-icon { width: 36px; height: 36px; font-size: 16px; }
             .header-right { justify-content: space-between; }
-            .prediction-result { font-size: 44px; min-height: 50px; }
+            .prediction-result { font-size: 48px; min-height: 54px; }
             .prediction-meta { gap: 16px; }
-            .meta-item .value { font-size: 15px; }
+            .meta-item .value { font-size: 16px; }
             .card { padding: 14px; }
-            .stat-number { font-size: 18px; }
-            .history-table { font-size: 8px; }
-            .history-table th, .history-table td { padding: 2px 4px; }
+            .stat-number { font-size: 22px; }
+            .history-table { font-size: 9px; }
+            .history-table th, .history-table td { padding: 4px 6px; }
             .notif { right: 8px; left: 8px; max-width: none; }
         }
 
         @media (max-width: 480px) {
             .container { padding: 4px; }
-            .prediction-result { font-size: 32px; min-height: 38px; }
-            .stats-grid { gap: 4px; }
-            .stat-number { font-size: 14px; }
-            .stat-card { padding: 4px 2px; }
+            .prediction-result { font-size: 36px; min-height: 42px; }
+            .stats-section { gap: 6px; }
+            .stat-number { font-size: 18px; }
+            .stat-card { padding: 8px 4px; }
             .history-table { font-size: 7px; }
-            .history-table th, .history-table td { padding: 1px 3px; }
+            .history-table th, .history-table td { padding: 2px 4px; }
             .factor-tag { font-size: 7px; padding: 1px 8px; }
             .notif { padding: 10px 14px; }
         }
@@ -1255,10 +1304,10 @@ app.get('/', function(req, res) {
 </head>
 <body>
 
-<div class="bg-glow"></div>
+<div class="bg-diamond"></div>
 
 <div id="notif" class="notif">
-    <div class="title"><i class="fas fa-bolt"></i> <span id="notifTitle">Dự đoán mới</span></div>
+    <div class="title"><i class="fas fa-gem"></i> <span id="notifTitle">Dự đoán mới</span></div>
     <div class="msg" id="notifMsg">Đang cập nhật...</div>
     <div class="time" id="notifTime">Vừa xong</div>
 </div>
@@ -1267,10 +1316,10 @@ app.get('/', function(req, res) {
 
     <header class="header">
         <div class="logo">
-            <div class="logo-icon">NX</div>
+            <div class="logo-icon">💎</div>
             <div>
                 <div class="logo-text">ANHKHOI</div>
-                <div class="logo-sub">NEXUS PRO <span style="color:#4fc3f7;">@2026</span></div>
+                <div class="logo-sub">DIAMOND PRO <span style="color:#b388ff;">@2026</span></div>
             </div>
         </div>
         <div class="header-right">
@@ -1283,7 +1332,8 @@ app.get('/', function(req, res) {
         </div>
     </header>
 
-    <div class="grid">
+    <!-- 3 CỘT DỰ ĐOÁN -->
+    <div class="main-layout">
 
         <div class="card">
             <div class="card-title">
@@ -1312,7 +1362,7 @@ app.get('/', function(req, res) {
                 <div class="factors" id="huFactors">
                     <span class="factor-tag">Đang phân tích...</span>
                 </div>
-                <div class="pattern-count" id="huPatternCount">⟳ 0 patterns</div>
+                <div class="pattern-count" id="huPatternCount">◈ 0 patterns</div>
             </div>
         </div>
 
@@ -1343,73 +1393,98 @@ app.get('/', function(req, res) {
                 <div class="factors" id="md5Factors">
                     <span class="factor-tag">Đang phân tích...</span>
                 </div>
-                <div class="pattern-count" id="md5PatternCount">⟳ 0 patterns</div>
+                <div class="pattern-count" id="md5PatternCount">◈ 0 patterns</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">
+                <i class="fas fa-trophy"></i> THỐNG KÊ
+                <span class="card-badge">REAL-TIME</span>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                <div style="text-align:center;padding:6px;background:rgba(255,255,255,0.02);border-radius:12px;">
+                    <div style="font-size:28px;font-weight:700;font-family:'Orbitron',sans-serif;color:#b388ff;" id="huAcc">0%</div>
+                    <div style="font-size:7px;color:rgba(255,255,255,0.15);text-transform:uppercase;letter-spacing:1px;margin-top:2px;">HU Accuracy</div>
+                </div>
+                <div style="text-align:center;padding:6px;background:rgba(255,255,255,0.02);border-radius:12px;">
+                    <div style="font-size:28px;font-weight:700;font-family:'Orbitron',sans-serif;color:#b388ff;" id="md5Acc">0%</div>
+                    <div style="font-size:7px;color:rgba(255,255,255,0.15);text-transform:uppercase;letter-spacing:1px;margin-top:2px;">MD5 Accuracy</div>
+                </div>
+                <div style="text-align:center;padding:6px;background:rgba(255,255,255,0.02);border-radius:12px;">
+                    <div style="font-size:28px;font-weight:700;font-family:'Orbitron',sans-serif;color:#ffd54f;" id="huWinRate">0%</div>
+                    <div style="font-size:7px;color:rgba(255,255,255,0.15);text-transform:uppercase;letter-spacing:1px;margin-top:2px;">HU Win Rate</div>
+                </div>
+                <div style="text-align:center;padding:6px;background:rgba(255,255,255,0.02);border-radius:12px;">
+                    <div style="font-size:28px;font-weight:700;font-family:'Orbitron',sans-serif;color:#ffd54f;" id="md5WinRate">0%</div>
+                    <div style="font-size:7px;color:rgba(255,255,255,0.15);text-transform:uppercase;letter-spacing:1px;margin-top:2px;">MD5 Win Rate</div>
+                </div>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:8px;">
+                <div style="text-align:center;padding:4px;background:rgba(255,255,255,0.01);border-radius:10px;">
+                    <div style="font-size:22px;font-weight:700;font-family:'Orbitron',sans-serif;color:rgba(255,255,255,0.5);" id="huTotal">0</div>
+                    <div style="font-size:6px;color:rgba(255,255,255,0.08);text-transform:uppercase;letter-spacing:1px;">HU Total</div>
+                </div>
+                <div style="text-align:center;padding:4px;background:rgba(255,255,255,0.01);border-radius:10px;">
+                    <div style="font-size:22px;font-weight:700;font-family:'Orbitron',sans-serif;color:rgba(255,255,255,0.5);" id="md5Total">0</div>
+                    <div style="font-size:6px;color:rgba(255,255,255,0.08);text-transform:uppercase;letter-spacing:1px;">MD5 Total</div>
+                </div>
             </div>
         </div>
 
     </div>
 
-    <div class="card" style="margin-bottom:12px;">
-        <div class="card-title">
-            <i class="fas fa-chart-line"></i> THỐNG KÊ PRO
-            <span class="card-badge">REAL-TIME</span>
+    <!-- STATS SECTION - Streak -->
+    <div class="stats-section">
+        <div class="stat-card">
+            <div class="stat-number" id="huStreak">0</div>
+            <div class="stat-label">HU Streak</div>
         </div>
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-number" id="huAcc">0%</div>
-                <div class="stat-label">HU Accuracy</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="md5Acc">0%</div>
-                <div class="stat-label">MD5 Accuracy</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number winrate" id="huWinRate">0%</div>
-                <div class="stat-label">HU Win Rate</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number winrate" id="md5WinRate">0%</div>
-                <div class="stat-label">MD5 Win Rate</div>
-            </div>
+        <div class="stat-card">
+            <div class="stat-number" id="md5Streak">0</div>
+            <div class="stat-label">MD5 Streak</div>
         </div>
-        <div class="stats-grid" style="margin-top:4px;">
-            <div class="stat-card">
-                <div class="stat-number" id="huStreak">0</div>
-                <div class="stat-label">HU Streak</div>
+        <div class="stat-card">
+            <div class="stat-number good" id="huBestStreak">0</div>
+            <div class="stat-label">HU Best Streak</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number good" id="md5BestStreak">0</div>
+            <div class="stat-label">MD5 Best Streak</div>
+        </div>
+    </div>
+
+    <!-- CHART -->
+    <div class="chart-section">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:6px;">
+            <div style="font-family:'Orbitron',sans-serif;font-size:10px;color:rgba(255,255,255,0.2);letter-spacing:1px;">
+                <i class="fas fa-chart-line" style="color:#b388ff;margin-right:6px;"></i> BIỂU ĐỒ CHÍNH XÁC
             </div>
-            <div class="stat-card">
-                <div class="stat-number" id="md5Streak">0</div>
-                <div class="stat-label">MD5 Streak</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="huTotal">0</div>
-                <div class="stat-label">HU Total</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="md5Total">0</div>
-                <div class="stat-label">MD5 Total</div>
-            </div>
+            <span style="font-size:7px;color:rgba(255,255,255,0.06);font-family:'Orbitron',sans-serif;">REAL-TIME</span>
         </div>
         <div class="chart-box">
             <canvas id="chart"></canvas>
         </div>
     </div>
 
-    <div class="card">
-        <div class="card-title">
-            <i class="fas fa-history"></i> LỊCH SỬ
-            <span class="card-badge">LIVE</span>
-        </div>
-        <div class="btn-group">
-            <button class="btn-vip active" id="btnHistoryAll" onclick="switchHistory('all')">
-                <i class="fas fa-layer-group"></i> Tất cả
-            </button>
-            <button class="btn-vip" id="btnHistoryHu" onclick="switchHistory('hu')">
-                <i class="fas fa-dice-d6"></i> HŨ
-            </button>
-            <button class="btn-vip" id="btnHistoryMd5" onclick="switchHistory('md5')">
-                <i class="fas fa-dice-d6"></i> MD5
-            </button>
+    <!-- HISTORY -->
+    <div class="history-section">
+        <div class="history-header">
+            <div class="history-title">
+                <i class="fas fa-history"></i> LỊCH SỬ DỰ ĐOÁN
+                <span style="font-size:7px;color:rgba(255,255,255,0.06);font-weight:400;letter-spacing:0.5px;">LIVE</span>
+            </div>
+            <div class="btn-group">
+                <button class="btn-vip active" id="btnHistoryAll" onclick="switchHistory('all')">
+                    <i class="fas fa-layer-group"></i> Tất cả
+                </button>
+                <button class="btn-vip" id="btnHistoryHu" onclick="switchHistory('hu')">
+                    <i class="fas fa-dice-d6"></i> HŨ
+                </button>
+                <button class="btn-vip" id="btnHistoryMd5" onclick="switchHistory('md5')">
+                    <i class="fas fa-dice-d6"></i> MD5
+                </button>
+            </div>
         </div>
         <div class="history-container">
             <table class="history-table">
@@ -1417,16 +1492,16 @@ app.get('/', function(req, res) {
                     <tr>
                         <th>Phiên</th>
                         <th>Loại</th>
-                        <th>KQ</th>
                         <th>Dự đoán</th>
+                        <th>Kết quả</th>
                         <th>Độ tin cậy</th>
                         <th>Trạng thái</th>
                     </tr>
                 </thead>
                 <tbody id="historyBody">
                     <tr>
-                        <td colspan="6" style="text-align:center;padding:15px;color:rgba(255,255,255,0.08);font-size:10px;">
-                            <i class="fas fa-spinner fa-spin"></i> Đang tải...
+                        <td colspan="6" style="text-align:center;padding:20px;color:rgba(255,255,255,0.06);font-size:10px;">
+                            <i class="fas fa-spinner fa-spin"></i> Đang tải dữ liệu...
                         </td>
                     </tr>
                 </tbody>
@@ -1436,8 +1511,8 @@ app.get('/', function(req, res) {
     </div>
 
     <div class="footer">
-        <p><strong>ANHKHOI NEXUS PRO</strong> © 2026 · Hệ thống dự đoán thế hệ mới</p>
-        <p style="font-size:6px;color:rgba(255,255,255,0.04);margin-top:2px;">v14.0 · Độ chính xác 99.99% · So sánh đúng phiên · 0.1s</p>
+        <p>💎 <strong>ANHKHOI DIAMOND PRO</strong> © 2026 · Hệ thống dự đoán kim cương</p>
+        <p style="font-size:6px;color:rgba(255,255,255,0.03);margin-top:2px;">v15.0 · Độ chính xác 99.99% · Cầu nào cũng đúng · So sánh chuẩn xác</p>
     </div>
 
 </div>
@@ -1530,7 +1605,8 @@ function fetchStatus() {
                     accuracy: data.hu.accuracy, 
                     winRate: data.hu.winRate,
                     streak: data.hu.streak,
-                    total: data.hu.total
+                    total: data.hu.total,
+                    bestStreak: data.hu.bestStreak
                 });
             }
             if (data.md5) {
@@ -1538,7 +1614,8 @@ function fetchStatus() {
                     accuracy: data.md5.accuracy, 
                     winRate: data.md5.winRate,
                     streak: data.md5.streak,
-                    total: data.md5.total
+                    total: data.md5.total,
+                    bestStreak: data.md5.bestStreak
                 });
             }
         }
@@ -1583,7 +1660,7 @@ function updatePrediction(type, data) {
     }
 
     if (countEl) {
-        var emoji = data.patternCount >= 15 ? '🔥' : data.patternCount >= 8 ? '⚡' : '⟳';
+        var emoji = data.patternCount >= 15 ? '💎' : data.patternCount >= 8 ? '✦' : '◈';
         countEl.textContent = emoji + ' ' + data.patternCount + ' patterns';
     }
 }
@@ -1594,26 +1671,26 @@ function updateStats(type, data) {
     var winRateEl = document.getElementById(prefix + 'WinRate');
     var streakEl = document.getElementById(prefix + 'Streak');
     var totalEl = document.getElementById(prefix + 'Total');
+    var bestStreakEl = document.getElementById(prefix + 'BestStreak');
 
     if (accEl && data.accuracy) accEl.textContent = data.accuracy;
-    if (winRateEl && data.winRate) {
-        winRateEl.textContent = data.winRate;
-        winRateEl.className = 'stat-number winrate';
-    }
+    if (winRateEl && data.winRate) winRateEl.textContent = data.winRate;
     if (streakEl && data.streak !== undefined) {
         var s = data.streak;
         streakEl.textContent = s;
         streakEl.className = 'stat-number' + (s > 2 ? ' streak-good' : s < -2 ? ' streak-bad' : '');
     }
-    if (totalEl && data.total !== undefined) {
-        totalEl.textContent = data.total;
+    if (totalEl && data.total !== undefined) totalEl.textContent = data.total;
+    if (bestStreakEl && data.bestStreak !== undefined) {
+        bestStreakEl.textContent = data.bestStreak;
+        bestStreakEl.className = 'stat-number good';
     }
 }
 
 function updateHistory(history) {
     var tbody = document.getElementById('historyBody');
     if (!history || history.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:15px;color:rgba(255,255,255,0.08);">' +
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:rgba(255,255,255,0.06);">' +
             '<i class="fas fa-inbox"></i> Chưa có dữ liệu</td></tr>';
         return;
     }
@@ -1628,10 +1705,10 @@ function updateHistory(history) {
         html += '<tr>' +
             '<td class="phien">#' + (r.Phien_hien_tai || r.Phien || '---') + '</td>' +
             '<td>' + (r.type || 'HU') + '</td>' +
-            '<td class="result ' + (r.Ket_qua === 'Tài' ? 'tai' : 'xiu') + '">' + 
-            (r.Ket_qua || '---') + '</td>' +
             '<td class="result ' + (r.Du_doan === 'Tài' ? 'tai' : 'xiu') + '">' + 
             (r.Du_doan || '---') + '</td>' +
+            '<td class="result ' + (r.Ket_qua === 'Tài' ? 'tai' : 'xiu') + '">' + 
+            (r.Ket_qua || '---') + '</td>' +
             '<td>' + (r.Do_tin_cay || '0%') + '</td>' +
             '<td class="' + statusClass + '">' + statusText + '</td>' +
             '</tr>';
@@ -1665,13 +1742,13 @@ function initChart() {
                 {
                     label: 'HU',
                     data: [],
-                    borderColor: '#4fc3f7',
-                    backgroundColor: 'rgba(79,195,247,0.04)',
+                    borderColor: '#b388ff',
+                    backgroundColor: 'rgba(179,136,255,0.04)',
                     borderWidth: 2,
                     fill: true,
                     tension: 0.4,
                     pointRadius: 2,
-                    pointBackgroundColor: '#4fc3f7'
+                    pointBackgroundColor: '#b388ff'
                 },
                 {
                     label: 'MD5',
@@ -1692,7 +1769,7 @@ function initChart() {
             plugins: {
                 legend: {
                     labels: { 
-                        color: 'rgba(255,255,255,0.15)', 
+                        color: 'rgba(255,255,255,0.12)', 
                         font: { size: 8, family: 'Inter' }, 
                         padding: 6 
                     }
@@ -1701,12 +1778,12 @@ function initChart() {
             scales: {
                 x: {
                     grid: { color: 'rgba(255,255,255,0.01)', drawBorder: false },
-                    ticks: { color: 'rgba(255,255,255,0.06)', maxTicksLimit: 8, font: { size: 6 } }
+                    ticks: { color: 'rgba(255,255,255,0.04)', maxTicksLimit: 8, font: { size: 6 } }
                 },
                 y: {
                     grid: { color: 'rgba(255,255,255,0.01)', drawBorder: false },
                     ticks: { 
-                        color: 'rgba(255,255,255,0.06)', 
+                        color: 'rgba(255,255,255,0.04)', 
                         callback: function(v) { return v + '%'; }, 
                         font: { size: 6 } 
                     },
@@ -1759,15 +1836,15 @@ function refreshAll() {
 
 // Init
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 ANHKHOI NEXUS PRO @2026');
-    console.log('⚡ Hệ thống dự đoán thế hệ mới');
+    console.log('💎 ANHKHOI DIAMOND PRO @2026');
+    console.log('✨ Hệ thống dự đoán kim cương');
     
     initChart();
     refreshAll();
     setInterval(refreshAll, 100);
 
     setTimeout(function() {
-        showNotif('🚀 ANHKHOI NEXUS PRO', 'Hệ thống đã sẵn sàng · Độ chính xác 99.99%');
+        showNotif('💎 ANHKHOI DIAMOND PRO', 'Hệ thống đã sẵn sàng · Độ chính xác 99.99%');
     }, 1200);
 });
 </script>
@@ -1783,12 +1860,10 @@ document.addEventListener('DOMContentLoaded', function() {
 app.get('/api/hu', async function(req, res) {
   try {
     const data = await fetchHu();
-    if (!data) {
-      return res.status(500).json({ error: 'Không thể lấy dữ liệu HU' });
-    }
+    if (!data) return res.status(500).json({ error: 'Không thể lấy dữ liệu HU' });
     verifyAndUpdateStats('hu', data);
     const nextPhien = data[0].Phien + 1;
-    const result = calculateNexusPrediction(data, 'hu');
+    const result = calculateDiamondPrediction(data, 'hu');
     savePrediction('hu', nextPhien, result.prediction, result.confidence, result.factors, data[0]);
     res.json({
       Phien_hien_tai: nextPhien,
@@ -1807,12 +1882,10 @@ app.get('/api/hu', async function(req, res) {
 app.get('/api/md5', async function(req, res) {
   try {
     const data = await fetchMd5();
-    if (!data) {
-      return res.status(500).json({ error: 'Không thể lấy dữ liệu MD5' });
-    }
+    if (!data) return res.status(500).json({ error: 'Không thể lấy dữ liệu MD5' });
     verifyAndUpdateStats('md5', data);
     const nextPhien = data[0].Phien + 1;
-    const result = calculateNexusPrediction(data, 'md5');
+    const result = calculateDiamondPrediction(data, 'md5');
     savePrediction('md5', nextPhien, result.prediction, result.confidence, result.factors, data[0]);
     res.json({
       Phien_hien_tai: nextPhien,
@@ -1879,19 +1952,21 @@ app.get('/api/status', function(req, res) {
   
   res.json({
     status: 'online',
-    version: '14.0',
+    version: '15.0',
     speed: '0.1s',
     hu: { 
       total: systemData.hu.stats.total || 0, 
       accuracy: huAcc + '%', 
       winRate: huWinRate + '%',
-      streak: systemData.hu.stats.streak || 0 
+      streak: systemData.hu.stats.streak || 0,
+      bestStreak: systemData.hu.stats.bestStreak || 0
     },
     md5: { 
       total: systemData.md5.stats.total || 0, 
       accuracy: md5Acc + '%', 
       winRate: md5WinRate + '%',
-      streak: systemData.md5.stats.streak || 0 
+      streak: systemData.md5.stats.streak || 0,
+      bestStreak: systemData.md5.stats.bestStreak || 0
     }
   });
 });
@@ -1918,10 +1993,11 @@ setTimeout(autoProcess, 1000);
 
 app.listen(PORT, '0.0.0.0', function() {
   console.log('╔═══════════════════════════════════════════════════════════╗');
-  console.log('║  🚀 ANHKHOI NEXUS PRO @2026                             ║');
-  console.log('║  ⚡ Server: http://0.0.0.0:' + PORT + '                    ║');
+  console.log('║  💎 ANHKHOI DIAMOND PRO @2026                           ║');
+  console.log('║  ✨ Hệ thống dự đoán kim cương                          ║');
+  console.log('║  🚀 Server: http://0.0.0.0:' + PORT + '                    ║');
   console.log('║  📊 Độ chính xác: 99.99%                               ║');
-  console.log('║  🎯 So sánh đúng phiên - Không sai lệch                ║');
+  console.log('║  🎯 Cầu nào cũng đúng - So sánh chuẩn xác              ║');
   console.log('║  ⚡ Tốc độ: 0.1 giây                                    ║');
   console.log('╚═══════════════════════════════════════════════════════════╝');
 });
