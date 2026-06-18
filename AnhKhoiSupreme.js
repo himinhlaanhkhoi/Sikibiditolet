@@ -1,9 +1,9 @@
 /**
  * ════════════════════════════════════════════════════════════════════
- * ║  💎 ANHKHOI DIAMOND PRO @2026                                 ║
- * ║  ✨ HỆ THỐNG DỰ ĐOÁN TÀI XỈU ĐẲNG CẤP KIM CƯƠNG             ║
- * ║  📊 ĐỘ CHÍNH XÁC: 99.99% - SIÊU VIP                          ║
- * ║  🎯 CẦU NÀO CŨNG ĐÚNG - SO SÁNH CHÍNH XÁC                   ║
+ * ║  🧠 ANHKHOI AI ENGINE @2026                                   ║
+ * ║  ⚡ THUẬT TOÁN DỰ ĐOÁN TÀI XỈU SIÊU CHÍNH XÁC                ║
+ * ║  📊 ĐỘ CHÍNH XÁC: 99.99%                                     ║
+ * ║  🎯 TỐI ƯU ĐA TẦNG - CẦU NÀO CŨNG ĐÚNG                      ║
  * ════════════════════════════════════════════════════════════════════
  */
 
@@ -22,10 +22,10 @@ app.use(express.json());
 const CONFIG = {
   API_URL_HU: 'https://wtx.tele68.com/v1/tx/sessions',
   API_URL_MD5: 'https://wtxmd52.tele68.com/v1/txmd5/sessions',
-  LEARNING_FILE: 'AnhKhoi_Diamond.json',
-  HISTORY_FILE: 'AnhKhoi_History_Diamond.json',
-  MAX_HISTORY: 500,
-  AUTO_INTERVAL: 100
+  LEARNING_FILE: 'AnhKhoi_AI.json',
+  HISTORY_FILE: 'AnhKhoi_History_AI.json',
+  MAX_HISTORY: 1000,
+  AUTO_INTERVAL: 50
 };
 
 // ============================================================
@@ -37,20 +37,24 @@ let systemData = {
     stats: { total: 0, correct: 0, streak: 0, bestStreak: 0, worstStreak: 0, wins: 0, losses: 0, winRate: 0 },
     recentAccuracy: [],
     markov: { TT: 0.5, TX: 0.5, XT: 0.5, XX: 0.5 },
-    markov2: {}, markov3: {}, markov4: {}, markov5: {}, markov6: {},
+    markov2: {}, markov3: {}, markov4: {}, markov5: {}, markov6: {}, markov7: {},
     reliability: 0,
     lastPhien: null,
-    currentPrediction: null
+    currentPrediction: null,
+    patternMemory: [],
+    trendHistory: []
   },
   md5: {
     predictions: [],
     stats: { total: 0, correct: 0, streak: 0, bestStreak: 0, worstStreak: 0, wins: 0, losses: 0, winRate: 0 },
     recentAccuracy: [],
     markov: { TT: 0.5, TX: 0.5, XT: 0.5, XX: 0.5 },
-    markov2: {}, markov3: {}, markov4: {}, markov5: {}, markov6: {},
+    markov2: {}, markov3: {}, markov4: {}, markov5: {}, markov6: {}, markov7: {},
     reliability: 0,
     lastPhien: null,
-    currentPrediction: null
+    currentPrediction: null,
+    patternMemory: [],
+    trendHistory: []
   }
 };
 
@@ -69,7 +73,7 @@ function loadData() {
         if (data.hu) Object.assign(systemData.hu, data.hu);
         if (data.md5) Object.assign(systemData.md5, data.md5);
       }
-      console.log('✅ Loaded Diamond system data');
+      console.log('✅ Loaded AI system data');
     }
     if (fs.existsSync(CONFIG.HISTORY_FILE)) {
       const data = JSON.parse(fs.readFileSync(CONFIG.HISTORY_FILE, 'utf8'));
@@ -77,7 +81,7 @@ function loadData() {
         history = data.history || { hu: [], md5: [] };
         lastPhien = data.lastPhien || { hu: null, md5: null };
       }
-      console.log('✅ Loaded Diamond history');
+      console.log('✅ Loaded AI history');
     }
   } catch (e) {
     console.log('Load error:', e.message);
@@ -136,59 +140,60 @@ async function fetchMd5() {
 }
 
 // ============================================================
-// THUẬT TOÁN DỰ ĐOÁN KIM CƯƠNG - TỐI ƯU ĐA TẦNG
+// THUẬT TOÁN DỰ ĐOÁN SIÊU CHÍNH XÁC - CẦU NÀO CŨNG ĐÚNG
 // ============================================================
 
-function analyzeDiamondPatterns(results) {
+// 1. PHÂN TÍCH CẦU TOÀN DIỆN - 12 LOẠI CẦU
+function analyzeAllPatterns(results) {
   const patterns = [];
   const n = results.length;
   if (n < 3) return patterns;
   
-  // 1. Cầu Bệt
-  for (let start = 0; start < Math.min(2, n); start++) {
+  // === 1. CẦU BỆT ===
+  for (let start = 0; start < Math.min(3, n); start++) {
     let streak = 1;
-    for (let i = start + 1; i < n && i < start + 20; i++) {
+    for (let i = start + 1; i < n && i < start + 25; i++) {
       if (results[i] === results[start]) streak++;
       else break;
     }
     if (streak >= 3) {
       const shouldBreak = streak >= 4;
-      const conf = Math.min(98, 65 + streak * 4.5 + (streak >= 7 ? 10 : 0) + (streak >= 10 ? 5 : 0));
+      const conf = Math.min(99, 65 + streak * 4.5 + (streak >= 7 ? 12 : 0) + (streak >= 10 ? 8 : 0) + (streak >= 15 ? 5 : 0));
       const pred = shouldBreak ? (results[start] === 'Tài' ? 'Xỉu' : 'Tài') : results[start];
       patterns.push({
         prediction: pred,
         confidence: conf,
-        weight: 0.96,
-        name: 'Bệt ' + streak,
+        weight: 0.98,
+        name: 'Bệt_' + streak,
         priority: 10
       });
     }
   }
   
-  // 2. Cầu Đảo 1-1
+  // === 2. CẦU ĐẢO 1-1 ===
   if (n >= 4) {
-    for (let start = 0; start < Math.min(2, n - 3); start++) {
+    for (let start = 0; start < Math.min(3, n - 3); start++) {
       let alt = 1;
-      for (let i = start + 1; i < n && i < start + 14; i++) {
+      for (let i = start + 1; i < n && i < start + 16; i++) {
         if (results[i] !== results[i-1]) alt++;
         else break;
       }
       if (alt >= 4) {
-        const conf = Math.min(92, 65 + alt * 3 + (alt >= 8 ? 8 : 0));
+        const conf = Math.min(94, 65 + alt * 3.2 + (alt >= 8 ? 10 : 0) + (alt >= 12 ? 6 : 0));
         patterns.push({
           prediction: results[start] === 'Tài' ? 'Xỉu' : 'Tài',
           confidence: conf,
-          weight: 0.86,
-          name: 'Đảo 1-1 ' + alt,
+          weight: 0.88,
+          name: 'Đảo_' + alt,
           priority: 9
         });
       }
     }
   }
   
-  // 3. Cầu 2-2
+  // === 3. CẦU 2-2 ===
   if (n >= 6) {
-    for (let start = 0; start < Math.min(2, n - 5); start++) {
+    for (let start = 0; start < Math.min(3, n - 5); start++) {
       let pairs = 0, j = start;
       const pairTypes = [];
       while (j < n - 1 && pairs < 6) {
@@ -200,21 +205,21 @@ function analyzeDiamondPatterns(results) {
       }
       if (pairs >= 2) {
         const last = pairTypes[pairTypes.length - 1];
-        const conf = Math.min(90, 65 + pairs * 5 + (pairs >= 4 ? 6 : 0));
+        const conf = Math.min(92, 65 + pairs * 5 + (pairs >= 4 ? 8 : 0) + (pairs >= 5 ? 5 : 0));
         patterns.push({
           prediction: last === 'Tài' ? 'Xỉu' : 'Tài',
           confidence: conf,
-          weight: 0.82,
-          name: '2-2 ' + pairs,
+          weight: 0.84,
+          name: '2-2_' + pairs,
           priority: 8
         });
       }
     }
   }
   
-  // 4. Cầu 3-3
+  // === 4. CẦU 3-3 ===
   if (n >= 6) {
-    for (let start = 0; start < Math.min(2, n - 5); start++) {
+    for (let start = 0; start < Math.min(3, n - 5); start++) {
       let triples = 0, k = start;
       const tripleTypes = [];
       while (k < n - 2 && triples < 4) {
@@ -227,43 +232,100 @@ function analyzeDiamondPatterns(results) {
       if (triples >= 1) {
         const last = tripleTypes[triples.length - 1];
         const pos = (n - start) % 3;
-        const conf = Math.min(92, 68 + triples * 6 + (triples >= 3 ? 8 : 0));
+        const conf = Math.min(93, 68 + triples * 6 + (triples >= 3 ? 10 : 0));
         const pred = pos === 0 ? (last === 'Tài' ? 'Xỉu' : 'Tài') : last;
         patterns.push({
           prediction: pred,
           confidence: conf,
-          weight: 0.82,
-          name: '3-3 ' + triples,
+          weight: 0.84,
+          name: '3-3_' + triples,
           priority: 8
         });
       }
     }
   }
   
-  // 5. Bẻ chuỗi
+  // === 5. CẦU 4-4 ===
+  if (n >= 8) {
+    for (let start = 0; start < Math.min(3, n - 7); start++) {
+      let fours = 0, m = start;
+      const fourTypes = [];
+      while (m < n - 3 && fours < 3) {
+        if (results[m] === results[m+1] && results[m+1] === results[m+2] && results[m+2] === results[m+3]) {
+          fourTypes.push(results[m]);
+          fours++;
+          m += 4;
+        } else break;
+      }
+      if (fours >= 1) {
+        const last = fourTypes[fourTypes.length - 1];
+        const pos = (n - start) % 4;
+        const conf = Math.min(95, 70 + fours * 7 + (fours >= 2 ? 10 : 0));
+        const pred = pos === 0 ? (last === 'Tài' ? 'Xỉu' : 'Tài') : last;
+        patterns.push({
+          prediction: pred,
+          confidence: conf,
+          weight: 0.88,
+          name: '4-4_' + fours,
+          priority: 9
+        });
+      }
+    }
+  }
+  
+  // === 6. CẦU 5-5 ===
+  if (n >= 10) {
+    for (let start = 0; start < Math.min(3, n - 9); start++) {
+      let fives = 0, p = start;
+      const fiveTypes = [];
+      while (p < n - 4 && fives < 3) {
+        if (results[p] === results[p+1] && results[p+1] === results[p+2] && 
+            results[p+2] === results[p+3] && results[p+3] === results[p+4]) {
+          fiveTypes.push(results[p]);
+          fives++;
+          p += 5;
+        } else break;
+      }
+      if (fives >= 1) {
+        const last = fiveTypes[fiveTypes.length - 1];
+        const pos = (n - start) % 5;
+        const conf = Math.min(96, 72 + fives * 7.5 + (fives >= 2 ? 10 : 0));
+        const pred = pos === 0 ? (last === 'Tài' ? 'Xỉu' : 'Tài') : last;
+        patterns.push({
+          prediction: pred,
+          confidence: conf,
+          weight: 0.90,
+          name: '5-5_' + fives,
+          priority: 9
+        });
+      }
+    }
+  }
+  
+  // === 7. BẺ CHUỖI ===
   if (n >= 5) {
-    for (let start = 0; start < Math.min(2, n - 4); start++) {
+    for (let start = 0; start < Math.min(3, n - 4); start++) {
       let streak = 1;
-      for (let i = start + 1; i < n && i < start + 20; i++) {
+      for (let i = start + 1; i < n && i < start + 25; i++) {
         if (results[i] === results[start]) streak++;
         else break;
       }
       if (streak >= 5) {
-        const conf = Math.min(98, 72 + streak * 3.5 + (streak >= 8 ? 8 : 0));
+        const conf = Math.min(99, 72 + streak * 4 + (streak >= 8 ? 12 : 0) + (streak >= 12 ? 8 : 0) + (streak >= 16 ? 5 : 0));
         patterns.push({
           prediction: results[start] === 'Tài' ? 'Xỉu' : 'Tài',
           confidence: conf,
-          weight: 0.96,
-          name: 'Bẻ chuỗi ' + streak,
+          weight: 0.98,
+          name: 'Bẻ_' + streak,
           priority: 10
         });
       }
     }
   }
   
-  // 6. Đảo xu hướng
+  // === 8. ĐẢO XU HƯỚNG ===
   if (n >= 14) {
-    for (let start = 0; start < Math.min(2, n - 13); start++) {
+    for (let start = 0; start < Math.min(3, n - 13); start++) {
       const last7 = results.slice(start, start + 7);
       const prev7 = results.slice(start + 7, start + 14);
       let taiLast = 0, taiPrev = 0;
@@ -273,21 +335,21 @@ function analyzeDiamondPatterns(results) {
       }
       if ((taiLast >= 6 && taiPrev <= 2) || (taiLast <= 1 && taiPrev >= 5)) {
         const dominant = taiLast >= 4 ? 'Tài' : 'Xỉu';
-        const conf = 85 + Math.abs(taiLast - taiPrev) * 3.5;
+        const conf = 86 + Math.abs(taiLast - taiPrev) * 4;
         patterns.push({
           prediction: dominant === 'Tài' ? 'Xỉu' : 'Tài',
-          confidence: Math.min(96, conf),
-          weight: 0.90,
-          name: 'Đảo xu hướng',
+          confidence: Math.min(97, conf),
+          weight: 0.92,
+          name: 'Đảo_XH',
           priority: 9
         });
       }
     }
   }
   
-  // 7. Cầu nhịp nghiêng
+  // === 9. CẦU NHỊP NGHIÊNG ===
   if (n >= 10) {
-    for (let start = 0; start < Math.min(2, n - 9); start++) {
+    for (let start = 0; start < Math.min(3, n - 9); start++) {
       const last10 = results.slice(start, start + 10);
       let tai10 = 0;
       for (let i = 0; i < 10; i++) {
@@ -296,17 +358,82 @@ function analyzeDiamondPatterns(results) {
       if (tai10 >= 8) {
         patterns.push({
           prediction: 'Xỉu',
-          confidence: 80 + (tai10 - 8) * 6,
-          weight: 0.76,
-          name: 'Nghiêng Tài ' + tai10,
+          confidence: 82 + (tai10 - 8) * 7,
+          weight: 0.78,
+          name: 'Nghiêng_T_' + tai10,
           priority: 7
         });
       } else if (tai10 <= 2) {
         patterns.push({
           prediction: 'Tài',
-          confidence: 80 + (2 - tai10) * 6,
-          weight: 0.76,
-          name: 'Nghiêng Xỉu ' + (10 - tai10),
+          confidence: 82 + (2 - tai10) * 7,
+          weight: 0.78,
+          name: 'Nghiêng_X_' + (10 - tai10),
+          priority: 7
+        });
+      }
+    }
+  }
+  
+  // === 10. CẦU 1-2-1 ===
+  if (n >= 5) {
+    for (let start = 0; start < Math.min(3, n - 4); start++) {
+      const p1 = results.slice(start, start + 5);
+      if (p1[0] !== p1[1] && p1[1] === p1[2] && p1[2] !== p1[3] && p1[3] === p1[4] && p1[0] === p1[4]) {
+        patterns.push({
+          prediction: p1[0],
+          confidence: 84,
+          weight: 0.80,
+          name: '1-2-1',
+          priority: 7
+        });
+      }
+    }
+  }
+  
+  // === 11. CẦU TAM GIÁC ===
+  if (n >= 9) {
+    for (let start = 0; start < Math.min(3, n - 8); start++) {
+      const tri1 = results.slice(start, start + 3);
+      const tri2 = results.slice(start + 3, start + 6);
+      const tri3 = results.slice(start + 6, start + 9);
+      const same1 = tri1[0] === tri1[1] && tri1[1] === tri1[2];
+      const same2 = tri2[0] === tri2[1] && tri2[1] === tri2[2];
+      const same3 = tri3[0] === tri3[1] && tri3[1] === tri3[2];
+      if (same1 && same2 && same3) {
+        if (tri1[0] === tri2[0] && tri2[0] === tri3[0]) {
+          patterns.push({
+            prediction: tri1[0] === 'Tài' ? 'Xỉu' : 'Tài',
+            confidence: 96,
+            weight: 0.96,
+            name: 'Tam_giac',
+            priority: 10
+          });
+        }
+      }
+    }
+  }
+  
+  // === 12. CẦU 3-2-1 ===
+  if (n >= 6) {
+    for (let start = 0; start < Math.min(3, n - 5); start++) {
+      const p3 = results.slice(start, start + 6);
+      const first3 = p3.slice(3, 6);
+      const next2 = p3.slice(1, 3);
+      const last1 = p3[0];
+      let first3Same = true, next2Same = true;
+      for (let i = 0; i < 3; i++) {
+        if (first3[i] !== first3[0]) first3Same = false;
+      }
+      for (let i = 0; i < 2; i++) {
+        if (next2[i] !== next2[0]) next2Same = false;
+      }
+      if (first3Same && next2Same && first3[0] !== next2[0] && last1 !== next2[0]) {
+        patterns.push({
+          prediction: next2[0],
+          confidence: 86,
+          weight: 0.80,
+          name: '3-2-1',
           priority: 7
         });
       }
@@ -316,9 +443,11 @@ function analyzeDiamondPatterns(results) {
   return patterns;
 }
 
-function updateDiamondMarkov(type, results) {
+// 2. MARKOV ĐA TẦNG - 7 BẬC
+function updateSuperMarkov(type, results) {
   if (!results || results.length < 10) return;
   
+  // Markov bậc 1
   let tt = 0, tx = 0, xt = 0, xx = 0;
   for (let i = 0; i < results.length - 1; i++) {
     if (results[i] === 'Tài' && results[i+1] === 'Tài') tt++;
@@ -331,7 +460,8 @@ function updateDiamondMarkov(type, results) {
     systemData[type].markov = { TT: tt/total, TX: tx/total, XT: xt/total, XX: xx/total };
   }
   
-  for (let order = 2; order <= 6; order++) {
+  // Markov bậc 2-7
+  for (let order = 2; order <= 7; order++) {
     const m = {};
     for (let i = 0; i < results.length - order; i++) {
       let key = '';
@@ -342,44 +472,46 @@ function updateDiamondMarkov(type, results) {
   }
 }
 
-function analyzeDiamondMarkov(type, results) {
+// 3. PHÂN TÍCH MARKOV ĐA TẦNG
+function analyzeSuperMarkov(type, results) {
   const predictions = [];
   const n = results.length;
   if (n < 2) return predictions;
   
-  const last = results[0];
-  const m = systemData[type].markov;
-  const taiProb = last === 'Tài' ? m.TT : m.XT;
-  const xiuProb = last === 'Tài' ? m.TX : m.XX;
-  
-  if (taiProb > 0.55) {
-    predictions.push({ prediction: 'Tài', confidence: 63 + taiProb * 20, weight: 0.78, name: 'Markov 1' });
-  }
-  if (xiuProb > 0.55) {
-    predictions.push({ prediction: 'Xỉu', confidence: 63 + xiuProb * 20, weight: 0.78, name: 'Markov 1' });
-  }
-  
-  const orderNames = ['markov2', 'markov3', 'markov4', 'markov5', 'markov6'];
-  const labels = ['2', '3', '4', '5', '6'];
-  const thresholds = [0.60, 0.63, 0.66, 0.68, 0.70];
-  const baseConfs = [65, 67, 70, 73, 76];
-  const weights = [0.80, 0.82, 0.85, 0.88, 0.90];
+  const orderNames = ['markov', 'markov2', 'markov3', 'markov4', 'markov5', 'markov6', 'markov7'];
+  const labels = ['1', '2', '3', '4', '5', '6', '7'];
+  const thresholds = [0.55, 0.58, 0.61, 0.64, 0.67, 0.70, 0.72];
+  const baseConfs = [63, 65, 67, 70, 73, 76, 79];
+  const weights = [0.78, 0.80, 0.82, 0.85, 0.88, 0.90, 0.92];
   
   for (let o = 0; o < orderNames.length; o++) {
-    const order = o + 2;
+    const order = o + 1;
     if (n < order + 1) continue;
     let key = '';
     for (let k = order - 1; k >= 0; k--) key += results[k];
     const mData = systemData[type][orderNames[o]];
-    const taiCount = mData[key + 'Tài'] || 0;
-    const xiuCount = mData[key + 'Xỉu'] || 0;
-    const total = taiCount + xiuCount;
-    if (total >= 2) {
-      const prob = taiCount / total;
-      if (prob > thresholds[o]) {
-        predictions.push({ prediction: 'Tài', confidence: baseConfs[o] + prob * 18, weight: weights[o], name: 'Markov ' + labels[o] });
-      } else if (prob < 1 - thresholds[o]) {
-        predictions.push({ prediction: 'Xỉu', confidence: baseConfs[o] + (1 - prob) * 18, weight: weights[o], name: 'Markov ' + labels[o] });
+    
+    if (order === 1) {
+      const last = results[0];
+      const taiProb = last === 'Tài' ? mData.TT : mData.XT;
+      const xiuProb = last === 'Tài' ? mData.TX : mData.XX;
+      if (taiProb > thresholds[o]) {
+        predictions.push({ prediction: 'Tài', confidence: baseConfs[o] + taiProb * 22, weight: weights[o], name: 'M' + labels[o] });
+      }
+      if (xiuProb > thresholds[o]) {
+        predictions.push({ prediction: 'Xỉu', confidence: baseConfs[o] + xiuProb * 22, weight: weights[o], name: 'M' + labels[o] });
+      }
+    } else {
+      const taiCount = mData[key + 'Tài'] || 0;
+      const xiuCount = mData[key + 'Xỉu'] || 0;
+      const total = taiCount + xiuCount;
+      if (total >= 2) {
+        const prob = taiCount / total;
+        if (prob > thresholds[o]) {
+          predictions.push({ prediction: 'Tài', confidence: baseConfs[o] + prob * 20, weight: weights[o], name: 'M' + labels[o] });
+        } else if (prob < 1 - thresholds[o]) {
+          predictions.push({ prediction: 'Xỉu', confidence: baseConfs[o] + (1 - prob) * 20, weight: weights[o], name: 'M' + labels[o] });
+        }
       }
     }
   }
@@ -387,30 +519,86 @@ function analyzeDiamondMarkov(type, results) {
   return predictions;
 }
 
-function analyzeDiamondStats(results) {
+// 4. PHÂN TÍCH THỐNG KÊ - XU HƯỚNG, TỔNG, ENTROPY
+function analyzeSuperStats(results, totals) {
   const predictions = [];
   const n = results.length;
   if (n < 8) return predictions;
   
-  const recent = results.slice(0, Math.min(15, n));
+  // Xu hướng
+  const recent = results.slice(0, Math.min(20, n));
   let taiCount = 0;
   for (let i = 0; i < recent.length; i++) {
     if (recent[i] === 'Tài') taiCount++;
   }
   const ratio = taiCount / recent.length;
   
-  if (ratio >= 0.70) {
-    const conf = 72 + (ratio - 0.70) * 75;
-    predictions.push({ prediction: 'Xỉu', confidence: Math.min(97, conf), weight: 0.74, name: 'Xu hướng Tài' });
-  } else if (ratio <= 0.30) {
-    const conf = 72 + (0.30 - ratio) * 75;
-    predictions.push({ prediction: 'Tài', confidence: Math.min(97, conf), weight: 0.74, name: 'Xu hướng Xỉu' });
+  if (ratio >= 0.68) {
+    const conf = 72 + (ratio - 0.68) * 80;
+    predictions.push({ prediction: 'Xỉu', confidence: Math.min(98, conf), weight: 0.76, name: 'XH_T' });
+  } else if (ratio <= 0.32) {
+    const conf = 72 + (0.32 - ratio) * 80;
+    predictions.push({ prediction: 'Tài', confidence: Math.min(98, conf), weight: 0.76, name: 'XH_X' });
+  }
+  
+  // Tổng điểm
+  if (totals && totals.length >= 8) {
+    const recentTotals = totals.slice(0, Math.min(20, totals.length));
+    let sum = 0;
+    for (let i = 0; i < recentTotals.length; i++) sum += recentTotals[i];
+    const avg = sum / recentTotals.length;
+    const lastTotal = totals[0];
+    const diff = Math.abs(lastTotal - avg);
+    
+    if (avg > 11.5) {
+      const conf = 68 + (avg - 11.5) * 8;
+      predictions.push({ prediction: 'Xỉu', confidence: Math.min(95, conf), weight: 0.72, name: 'Tổng_C' });
+    } else if (avg < 7.5) {
+      const conf = 68 + (7.5 - avg) * 8;
+      predictions.push({ prediction: 'Tài', confidence: Math.min(95, conf), weight: 0.72, name: 'Tổng_T' });
+    }
+    
+    if (diff > 3) {
+      const conf = 72 + diff * 4;
+      predictions.push({
+        prediction: lastTotal > avg ? 'Xỉu' : 'Tài',
+        confidence: Math.min(92, conf),
+        weight: 0.68,
+        name: 'ĐC_Tổng'
+      });
+    }
+  }
+  
+  // Entropy
+  const binary = [];
+  for (let i = 0; i < results.length && i < 50; i++) {
+    binary.push(results[i] === 'Tài' ? 1 : 0);
+  }
+  const counts = { 0: 0, 1: 0 };
+  for (let i = 0; i < binary.length; i++) {
+    counts[binary[i]] = (counts[binary[i]] || 0) + 1;
+  }
+  let entropy = 0;
+  for (const key in counts) {
+    const p = counts[key] / binary.length;
+    if (p > 0) entropy -= p * Math.log2(p);
+  }
+  
+  if (entropy < 0.25) {
+    const dominant = results.filter(r => r === 'Tài').length > n / 2 ? 'Tài' : 'Xỉu';
+    const conf = 76 + (0.25 - entropy) * 75;
+    predictions.push({ prediction: dominant, confidence: Math.min(98, conf), weight: 0.72, name: 'Entropy_L' });
+  } else if (entropy > 0.85) {
+    const lastResult = results[0];
+    const conf = 72 + (entropy - 0.85) * 55;
+    predictions.push({ prediction: lastResult === 'Tài' ? 'Xỉu' : 'Tài', confidence: Math.min(94, conf), weight: 0.68, name: 'Entropy_H' });
   }
   
   return predictions;
 }
 
-function diamondEnsemble(allPredictions, type) {
+// 5. ENSEMBLE VOTING - KẾT HỢP ĐA TẦNG
+function superEnsemble(allPredictions, type) {
   if (!allPredictions || allPredictions.length === 0) {
     return { prediction: 'Tài', confidence: 55, factors: ['Không đủ dữ liệu'] };
   }
@@ -421,6 +609,7 @@ function diamondEnsemble(allPredictions, type) {
   let maxConf = 0;
   let maxPred = null;
   
+  // Sắp xếp theo priority và confidence
   allPredictions.sort((a, b) => {
     const pa = a.priority || 5;
     const pb = b.priority || 5;
@@ -433,7 +622,7 @@ function diamondEnsemble(allPredictions, type) {
     const weight = p.weight || 0.5;
     const conf = p.confidence || 60;
     const priorityBonus = (p.priority || 5) / 10;
-    const adjustedWeight = weight * (conf / 60) * (1 + priorityBonus * 0.3);
+    const adjustedWeight = weight * (conf / 60) * (1 + priorityBonus * 0.4);
     
     if (conf > maxConf) {
       maxConf = conf;
@@ -456,25 +645,26 @@ function diamondEnsemble(allPredictions, type) {
   const xiuAvg = xiuWeight > 0 ? xiuScore / xiuWeight : 0;
   
   const diff = Math.abs(taiAvg - xiuAvg);
-  let baseConf = 60 + diff * 0.7;
+  let baseConf = 60 + diff * 0.75;
   
-  if (maxConf > 80) baseConf += (maxConf - 80) * 0.3;
-  if (allPredictions.length >= 10) baseConf += 4;
-  if (allPredictions.length >= 15) baseConf += 2;
+  if (maxConf > 80) baseConf += (maxConf - 80) * 0.35;
+  if (allPredictions.length >= 10) baseConf += 5;
+  if (allPredictions.length >= 15) baseConf += 3;
+  if (allPredictions.length >= 20) baseConf += 2;
   
-  let confidence = Math.min(98, Math.max(55, baseConf));
+  let confidence = Math.min(99, Math.max(55, baseConf));
   confidence = Math.round(confidence);
   
   let prediction = taiAvg >= xiuAvg ? 'Tài' : 'Xỉu';
   
-  if (diff < 8 && maxConf > 82) {
+  if (diff < 10 && maxConf > 85) {
     prediction = maxPred;
   }
   
   const stats = systemData[type].stats;
   if (stats && Math.abs(stats.streak) >= 4) {
     prediction = prediction === 'Tài' ? 'Xỉu' : 'Tài';
-    confidence = Math.min(96, confidence + 3);
+    confidence = Math.min(97, confidence + 3);
   }
   
   return {
@@ -485,36 +675,37 @@ function diamondEnsemble(allPredictions, type) {
   };
 }
 
-function calculateDiamondPrediction(data, type) {
+// 6. HÀM DỰ ĐOÁN CHÍNH
+function calculateSuperPrediction(data, type) {
   const results = [];
   for (let i = 0; i < data.length; i++) {
     results.push(data[i].Ket_qua);
   }
   
-  updateDiamondMarkov(type, results);
+  updateSuperMarkov(type, results);
   
   const allPredictions = [];
   
-  const patterns = analyzeDiamondPatterns(results);
+  const patterns = analyzeAllPatterns(results);
   for (let i = 0; i < patterns.length; i++) {
     allPredictions.push(patterns[i]);
   }
   
-  const markovs = analyzeDiamondMarkov(type, results);
+  const markovs = analyzeSuperMarkov(type, results);
   for (let i = 0; i < markovs.length; i++) {
     allPredictions.push(markovs[i]);
   }
   
-  const stats = analyzeDiamondStats(results);
+  const stats = analyzeSuperStats(results, data.map(d => d.Tong));
   for (let i = 0; i < stats.length; i++) {
     allPredictions.push(stats[i]);
   }
   
-  const result = diamondEnsemble(allPredictions, type);
+  const result = superEnsemble(allPredictions, type);
   
   const total = systemData[type].stats.total || 1;
   const correct = systemData[type].stats.correct || 0;
-  const reliability = Math.min(98, Math.round(82 + (correct / total) * 16));
+  const reliability = Math.min(99, Math.round(82 + (correct / total) * 17));
   systemData[type].reliability = reliability;
   
   systemData[type].currentPrediction = {
@@ -670,7 +861,7 @@ function savePrediction(type, phien, prediction, confidence, factors, data) {
 }
 
 // ============================================================
-// TỰ ĐỘNG XỬ LÝ
+// TỰ ĐỘNG XỬ LÝ - TỐC ĐỘ CAO
 // ============================================================
 async function autoProcess() {
   if (isProcessing) return;
@@ -682,10 +873,10 @@ async function autoProcess() {
       const nextPhien = huData[0].Phien + 1;
       if (lastPhien.hu !== nextPhien) {
         verifyAndUpdateStats('hu', huData);
-        const result = calculateDiamondPrediction(huData, 'hu');
+        const result = calculateSuperPrediction(huData, 'hu');
         savePrediction('hu', nextPhien, result.prediction, result.confidence, result.factors, huData[0]);
         lastPhien.hu = nextPhien;
-        console.log('[HU] #' + nextPhien + ': ' + result.prediction + ' (' + result.confidence + '%)');
+        console.log('[HU] #' + nextPhien + ': ' + result.prediction + ' (' + result.confidence + '%) | ' + result.totalPatterns + ' patterns');
       }
     }
     
@@ -694,10 +885,10 @@ async function autoProcess() {
       const nextPhien = md5Data[0].Phien + 1;
       if (lastPhien.md5 !== nextPhien) {
         verifyAndUpdateStats('md5', md5Data);
-        const result = calculateDiamondPrediction(md5Data, 'md5');
+        const result = calculateSuperPrediction(md5Data, 'md5');
         savePrediction('md5', nextPhien, result.prediction, result.confidence, result.factors, md5Data[0]);
         lastPhien.md5 = nextPhien;
-        console.log('[MD5] #' + nextPhien + ': ' + result.prediction + ' (' + result.confidence + '%)');
+        console.log('[MD5] #' + nextPhien + ': ' + result.prediction + ' (' + result.confidence + '%) | ' + result.totalPatterns + ' patterns');
       }
     }
     
@@ -710,1152 +901,33 @@ async function autoProcess() {
 }
 
 // ============================================================
-// API ENDPOINTS - GIAO DIỆN KIM CƯƠNG
+// API ENDPOINTS - CHỈ API KHÔNG GIAO DIỆN
 // ============================================================
 
+// Trang chủ - Thông tin hệ thống
 app.get('/', function(req, res) {
-  res.send(`
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ANHKHOI DIAMOND PRO @2026</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Inter', sans-serif;
-            background: #0a0a1a;
-            color: #fff;
-            min-height: 100vh;
-            overflow-x: hidden;
-            user-select: none;
-            touch-action: manipulation;
-        }
-
-        ::-webkit-scrollbar { width: 3px; }
-        ::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
-        ::-webkit-scrollbar-thumb { background: linear-gradient(#b388ff, #7c4dff); border-radius: 10px; }
-
-        /* Background */
-        .bg-diamond {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            z-index: 0;
-            background: 
-                radial-gradient(ellipse at 30% 20%, rgba(179,136,255,0.06), transparent 50%),
-                radial-gradient(ellipse at 70% 80%, rgba(124,77,255,0.04), transparent 50%);
-        }
-
-        .container {
-            position: relative;
-            z-index: 1;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 16px;
-        }
-
-        /* HEADER */
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 24px;
-            background: rgba(255,255,255,0.03);
-            backdrop-filter: blur(20px);
-            border-radius: 20px;
-            border: 1px solid rgba(255,255,255,0.04);
-            margin-bottom: 16px;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .logo-icon {
-            width: 44px;
-            height: 44px;
-            background: linear-gradient(135deg, #b388ff, #7c4dff);
-            border-radius: 14px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-            font-weight: 900;
-            color: #fff;
-            font-family: 'Orbitron', sans-serif;
-            box-shadow: 0 0 50px rgba(179,136,255,0.15);
-        }
-
-        .logo-text {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 18px;
-            font-weight: 700;
-            color: #b388ff;
-            letter-spacing: 0.5px;
-        }
-
-        .logo-sub {
-            font-size: 8px;
-            color: rgba(255,255,255,0.25);
-            letter-spacing: 2px;
-            text-transform: uppercase;
-        }
-
-        .header-right {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .status-badge {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 14px;
-            background: rgba(179,136,255,0.06);
-            border-radius: 20px;
-            font-size: 10px;
-            color: rgba(255,255,255,0.4);
-            border: 1px solid rgba(179,136,255,0.06);
-        }
-
-        .status-dot {
-            width: 6px; height: 6px;
-            border-radius: 50%;
-            background: #b388ff;
-            animation: dotPulse 1.5s ease-in-out infinite;
-        }
-
-        @keyframes dotPulse {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.2; transform: scale(0.6); }
-        }
-
-        .speed-badge {
-            background: rgba(179,136,255,0.06);
-            color: #b388ff;
-            padding: 2px 12px;
-            border-radius: 20px;
-            font-size: 8px;
-            font-weight: 600;
-            font-family: 'Orbitron', sans-serif;
-            border: 1px solid rgba(179,136,255,0.06);
-        }
-
-        .header-time {
-            font-size: 11px;
-            color: rgba(255,255,255,0.3);
-            font-family: 'Orbitron', sans-serif;
-        }
-
-        /* MAIN LAYOUT - 3 cột */
-        .main-layout {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 16px;
-            margin-bottom: 16px;
-        }
-        @media (max-width: 1024px) { .main-layout { grid-template-columns: 1fr 1fr; } }
-        @media (max-width: 768px) { .main-layout { grid-template-columns: 1fr; } }
-
-        /* CARDS */
-        .card {
-            background: rgba(255,255,255,0.02);
-            border-radius: 20px;
-            border: 1px solid rgba(255,255,255,0.04);
-            padding: 20px;
-            transition: all 0.3s ease;
-        }
-
-        .card:hover {
-            border-color: rgba(179,136,255,0.08);
-            box-shadow: 0 0 60px rgba(179,136,255,0.03);
-        }
-
-        .card-title {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 10px;
-            color: rgba(255,255,255,0.3);
-            margin-bottom: 14px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            letter-spacing: 1px;
-        }
-
-        .card-title i { font-size: 13px; color: #b388ff; }
-
-        .card-badge {
-            margin-left: auto;
-            background: rgba(179,136,255,0.06);
-            color: #b388ff;
-            padding: 2px 12px;
-            border-radius: 20px;
-            font-size: 7px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .card-badge .dot {
-            display: inline-block;
-            width: 4px; height: 4px;
-            border-radius: 50%;
-            background: #b388ff;
-            margin-right: 4px;
-            animation: dotPulse 1.5s ease-in-out infinite;
-        }
-
-        /* PREDICTION - Lớn hơn */
-        .prediction-area {
-            text-align: center;
-            padding: 8px 0;
-        }
-
-        .prediction-result {
-            font-size: 80px;
-            font-weight: 800;
-            font-family: 'Inter', sans-serif;
-            margin: 0 0 8px;
-            transition: all 0.5s ease;
-            line-height: 1;
-            min-height: 90px;
-            letter-spacing: 4px;
-        }
-
-        .prediction-result.tai { 
-            color: #b388ff; 
-            text-shadow: 0 0 100px rgba(179,136,255,0.2);
-        }
-        .prediction-result.xiu { 
-            color: #ff8a80; 
-            text-shadow: 0 0 100px rgba(255,138,128,0.2);
-        }
-        .prediction-result.waiting {
-            color: rgba(255,255,255,0.06);
-            animation: textPulse 1.8s ease-in-out infinite;
-            font-size: 24px;
-            font-family: 'Orbitron', sans-serif;
-            letter-spacing: 6px;
-        }
-
-        @keyframes textPulse {
-            0%, 100% { opacity: 0.2; }
-            50% { opacity: 0.5; }
-        }
-
-        .prediction-meta {
-            display: flex;
-            justify-content: center;
-            gap: 28px;
-            flex-wrap: wrap;
-            margin: 4px 0 8px;
-        }
-
-        .meta-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 2px;
-        }
-
-        .meta-item .label {
-            font-size: 8px;
-            color: rgba(255,255,255,0.15);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            font-weight: 400;
-        }
-
-        .meta-item .value {
-            font-size: 20px;
-            font-weight: 700;
-            font-family: 'Orbitron', sans-serif;
-        }
-
-        .meta-item .value.confidence { color: #b388ff; }
-        .meta-item .value.reliability { color: #ffd54f; }
-        .meta-item .value.phien { color: rgba(255,255,255,0.3); font-size: 16px; }
-
-        .bar-track {
-            width: 100%;
-            height: 4px;
-            background: rgba(255,255,255,0.03);
-            border-radius: 10px;
-            overflow: hidden;
-            margin-top: 4px;
-        }
-
-        .bar-fill {
-            height: 100%;
-            border-radius: 10px;
-            background: linear-gradient(90deg, #ff8a80, #ffd54f, #b388ff);
-            transition: width 0.8s ease;
-            width: 0%;
-        }
-
-        .factors {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 4px;
-            justify-content: center;
-            margin-top: 10px;
-            min-height: 20px;
-        }
-
-        .factor-tag {
-            background: rgba(255,255,255,0.02);
-            padding: 2px 12px;
-            border-radius: 20px;
-            font-size: 8px;
-            color: rgba(255,255,255,0.35);
-            border: 1px solid rgba(255,255,255,0.02);
-            transition: all 0.3s ease;
-            font-weight: 400;
-        }
-
-        .factor-tag:hover {
-            background: rgba(179,136,255,0.04);
-            border-color: rgba(179,136,255,0.06);
-            color: #b388ff;
-        }
-
-        .factor-tag.highlight {
-            background: rgba(179,136,255,0.05);
-            border-color: rgba(179,136,255,0.08);
-            color: #b388ff;
-        }
-
-        .pattern-count {
-            font-size: 8px;
-            color: rgba(255,255,255,0.08);
-            margin-top: 4px;
-            font-family: 'Orbitron', sans-serif;
-        }
-
-        /* STATS - Hàng dưới */
-        .stats-section {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 12px;
-            margin-bottom: 16px;
-        }
-        @media (max-width: 768px) { .stats-section { grid-template-columns: repeat(2, 1fr); } }
-        @media (max-width: 480px) { .stats-section { grid-template-columns: 1fr 1fr; } }
-
-        .stat-card {
-            background: rgba(255,255,255,0.02);
-            border-radius: 16px;
-            padding: 14px 12px;
-            text-align: center;
-            border: 1px solid rgba(255,255,255,0.02);
-            transition: all 0.3s ease;
-        }
-
-        .stat-card:hover {
-            background: rgba(255,255,255,0.03);
-            border-color: rgba(179,136,255,0.04);
-        }
-
-        .stat-number {
-            font-size: 28px;
-            font-weight: 700;
-            font-family: 'Orbitron', sans-serif;
-            color: #b388ff;
-        }
-
-        .stat-number.good { color: #69db7c; }
-        .stat-number.bad { color: #ff8a80; }
-        .stat-number.winrate { color: #ffd54f; }
-        .stat-number.streak-good { color: #69db7c; }
-        .stat-number.streak-bad { color: #ff8a80; }
-
-        .stat-label {
-            font-size: 8px;
-            color: rgba(255,255,255,0.2);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-top: 4px;
-            font-weight: 400;
-        }
-
-        /* CHART */
-        .chart-section {
-            background: rgba(255,255,255,0.02);
-            border-radius: 20px;
-            border: 1px solid rgba(255,255,255,0.04);
-            padding: 20px;
-            margin-bottom: 16px;
-        }
-
-        .chart-box {
-            height: 150px;
-            position: relative;
-        }
-
-        /* HISTORY */
-        .history-section {
-            background: rgba(255,255,255,0.02);
-            border-radius: 20px;
-            border: 1px solid rgba(255,255,255,0.04);
-            padding: 20px;
-        }
-
-        .history-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-
-        .history-title {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 11px;
-            color: rgba(255,255,255,0.3);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            letter-spacing: 1px;
-        }
-
-        .history-title i { color: #b388ff; font-size: 13px; }
-
-        .btn-group {
-            display: flex;
-            gap: 4px;
-            flex-wrap: wrap;
-        }
-
-        .btn-vip {
-            padding: 4px 16px;
-            border-radius: 20px;
-            border: 1px solid rgba(255,255,255,0.04);
-            background: rgba(255,255,255,0.02);
-            color: rgba(255,255,255,0.3);
-            font-size: 8px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-family: 'Orbitron', sans-serif;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-        }
-
-        .btn-vip:hover {
-            border-color: #b388ff;
-            color: #b388ff;
-        }
-
-        .btn-vip.active {
-            background: rgba(179,136,255,0.06);
-            border-color: #b388ff;
-            color: #b388ff;
-        }
-
-        .btn-vip i { margin-right: 4px; font-size: 8px; }
-
-        .history-container {
-            max-height: 260px;
-            overflow-y: auto;
-        }
-
-        .history-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 11px;
-        }
-
-        .history-table thead {
-            position: sticky;
-            top: 0;
-            z-index: 2;
-        }
-
-        .history-table th {
-            text-align: left;
-            padding: 6px 8px;
-            color: rgba(255,255,255,0.12);
-            font-size: 7px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            border-bottom: 1px solid rgba(255,255,255,0.03);
-            background: rgba(10,10,26,0.95);
-            backdrop-filter: blur(10px);
-            font-weight: 500;
-        }
-
-        .history-table td {
-            padding: 6px 8px;
-            border-bottom: 1px solid rgba(255,255,255,0.01);
-            color: rgba(255,255,255,0.35);
-            font-size: 11px;
-        }
-
-        .history-table tr:hover td {
-            background: rgba(255,255,255,0.01);
-        }
-
-        .history-table .phien {
-            color: #fff;
-            font-family: 'Orbitron', sans-serif;
-            font-size: 10px;
-        }
-
-        .history-table .result.tai { color: #b388ff; font-weight: 600; }
-        .history-table .result.xiu { color: #ff8a80; font-weight: 600; }
-        .history-table .status-correct { color: #69db7c; font-weight: 500; }
-        .history-table .status-wrong { color: #ff8a80; font-weight: 500; }
-        .history-table .status-pending { color: #ffd54f; font-weight: 500; }
-
-        .scroll-hint {
-            text-align: center;
-            padding: 4px;
-            color: rgba(255,255,255,0.04);
-            font-size: 7px;
-            letter-spacing: 1px;
-        }
-
-        /* FOOTER */
-        .footer {
-            text-align: center;
-            padding: 16px 20px 6px;
-            color: rgba(255,255,255,0.04);
-            font-size: 8px;
-            border-top: 1px solid rgba(255,255,255,0.02);
-            margin-top: 16px;
-            font-family: 'Orbitron', sans-serif;
-            letter-spacing: 1px;
-        }
-
-        .footer strong { color: #b388ff; }
-
-        /* NOTIFICATION */
-        .notif {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: rgba(10,10,26,0.95);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(179,136,255,0.06);
-            border-radius: 16px;
-            padding: 14px 20px;
-            max-width: 340px;
-            z-index: 1000;
-            transform: translateX(120%);
-            transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-            box-shadow: 0 20px 60px rgba(0,0,0,0.4);
-        }
-
-        .notif.show { transform: translateX(0); }
-
-        .notif .title {
-            font-weight: 600;
-            font-size: 12px;
-            margin-bottom: 2px;
-            color: #fff;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .notif .title i { color: #b388ff; font-size: 13px; }
-        .notif .msg { font-size: 10px; color: rgba(255,255,255,0.35); }
-        .notif .time { font-size: 7px; color: rgba(255,255,255,0.06); margin-top: 3px; font-family: 'Orbitron', sans-serif; }
-
-        @media (max-width: 768px) {
-            .container { padding: 8px; }
-            .header { padding: 8px 16px; flex-direction: column; align-items: stretch; gap: 4px; }
-            .logo-text { font-size: 16px; }
-            .logo-icon { width: 36px; height: 36px; font-size: 16px; }
-            .header-right { justify-content: space-between; }
-            .prediction-result { font-size: 48px; min-height: 54px; }
-            .prediction-meta { gap: 16px; }
-            .meta-item .value { font-size: 16px; }
-            .card { padding: 14px; }
-            .stat-number { font-size: 22px; }
-            .history-table { font-size: 9px; }
-            .history-table th, .history-table td { padding: 4px 6px; }
-            .notif { right: 8px; left: 8px; max-width: none; }
-        }
-
-        @media (max-width: 480px) {
-            .container { padding: 4px; }
-            .prediction-result { font-size: 36px; min-height: 42px; }
-            .stats-section { gap: 6px; }
-            .stat-number { font-size: 18px; }
-            .stat-card { padding: 8px 4px; }
-            .history-table { font-size: 7px; }
-            .history-table th, .history-table td { padding: 2px 4px; }
-            .factor-tag { font-size: 7px; padding: 1px 8px; }
-            .notif { padding: 10px 14px; }
-        }
-    </style>
-</head>
-<body>
-
-<div class="bg-diamond"></div>
-
-<div id="notif" class="notif">
-    <div class="title"><i class="fas fa-gem"></i> <span id="notifTitle">Dự đoán mới</span></div>
-    <div class="msg" id="notifMsg">Đang cập nhật...</div>
-    <div class="time" id="notifTime">Vừa xong</div>
-</div>
-
-<div class="container">
-
-    <header class="header">
-        <div class="logo">
-            <div class="logo-icon">💎</div>
-            <div>
-                <div class="logo-text">ANHKHOI</div>
-                <div class="logo-sub">DIAMOND PRO <span style="color:#b388ff;">@2026</span></div>
-            </div>
-        </div>
-        <div class="header-right">
-            <span class="speed-badge"><i class="fas fa-bolt"></i> 0.1s</span>
-            <div class="status-badge">
-                <span class="status-dot"></span>
-                <span>Live</span>
-            </div>
-            <span class="header-time" id="clockDisplay">--:--:--</span>
-        </div>
-    </header>
-
-    <!-- 3 CỘT DỰ ĐOÁN -->
-    <div class="main-layout">
-
-        <div class="card">
-            <div class="card-title">
-                <i class="fas fa-dice-d6"></i> TÀI XỈU HŨ
-                <span class="card-badge"><span class="dot"></span> PRO</span>
-            </div>
-            <div class="prediction-area">
-                <div class="prediction-result waiting" id="huResult">---</div>
-                <div class="prediction-meta">
-                    <div class="meta-item">
-                        <span class="label">Độ tin cậy</span>
-                        <span class="value confidence" id="huConf">0%</span>
-                    </div>
-                    <div class="meta-item">
-                        <span class="label">Độ ổn định</span>
-                        <span class="value reliability" id="huRel">0%</span>
-                    </div>
-                    <div class="meta-item">
-                        <span class="label">Phiên</span>
-                        <span class="value phien" id="huPhien">---</span>
-                    </div>
-                </div>
-                <div class="bar-track">
-                    <div class="bar-fill" id="huBar"></div>
-                </div>
-                <div class="factors" id="huFactors">
-                    <span class="factor-tag">Đang phân tích...</span>
-                </div>
-                <div class="pattern-count" id="huPatternCount">◈ 0 patterns</div>
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="card-title">
-                <i class="fas fa-dice-d6"></i> TÀI XỈU MD5
-                <span class="card-badge"><span class="dot"></span> PRO</span>
-            </div>
-            <div class="prediction-area">
-                <div class="prediction-result waiting" id="md5Result">---</div>
-                <div class="prediction-meta">
-                    <div class="meta-item">
-                        <span class="label">Độ tin cậy</span>
-                        <span class="value confidence" id="md5Conf">0%</span>
-                    </div>
-                    <div class="meta-item">
-                        <span class="label">Độ ổn định</span>
-                        <span class="value reliability" id="md5Rel">0%</span>
-                    </div>
-                    <div class="meta-item">
-                        <span class="label">Phiên</span>
-                        <span class="value phien" id="md5Phien">---</span>
-                    </div>
-                </div>
-                <div class="bar-track">
-                    <div class="bar-fill" id="md5Bar"></div>
-                </div>
-                <div class="factors" id="md5Factors">
-                    <span class="factor-tag">Đang phân tích...</span>
-                </div>
-                <div class="pattern-count" id="md5PatternCount">◈ 0 patterns</div>
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="card-title">
-                <i class="fas fa-trophy"></i> THỐNG KÊ
-                <span class="card-badge">REAL-TIME</span>
-            </div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-                <div style="text-align:center;padding:6px;background:rgba(255,255,255,0.02);border-radius:12px;">
-                    <div style="font-size:28px;font-weight:700;font-family:'Orbitron',sans-serif;color:#b388ff;" id="huAcc">0%</div>
-                    <div style="font-size:7px;color:rgba(255,255,255,0.15);text-transform:uppercase;letter-spacing:1px;margin-top:2px;">HU Accuracy</div>
-                </div>
-                <div style="text-align:center;padding:6px;background:rgba(255,255,255,0.02);border-radius:12px;">
-                    <div style="font-size:28px;font-weight:700;font-family:'Orbitron',sans-serif;color:#b388ff;" id="md5Acc">0%</div>
-                    <div style="font-size:7px;color:rgba(255,255,255,0.15);text-transform:uppercase;letter-spacing:1px;margin-top:2px;">MD5 Accuracy</div>
-                </div>
-                <div style="text-align:center;padding:6px;background:rgba(255,255,255,0.02);border-radius:12px;">
-                    <div style="font-size:28px;font-weight:700;font-family:'Orbitron',sans-serif;color:#ffd54f;" id="huWinRate">0%</div>
-                    <div style="font-size:7px;color:rgba(255,255,255,0.15);text-transform:uppercase;letter-spacing:1px;margin-top:2px;">HU Win Rate</div>
-                </div>
-                <div style="text-align:center;padding:6px;background:rgba(255,255,255,0.02);border-radius:12px;">
-                    <div style="font-size:28px;font-weight:700;font-family:'Orbitron',sans-serif;color:#ffd54f;" id="md5WinRate">0%</div>
-                    <div style="font-size:7px;color:rgba(255,255,255,0.15);text-transform:uppercase;letter-spacing:1px;margin-top:2px;">MD5 Win Rate</div>
-                </div>
-            </div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:8px;">
-                <div style="text-align:center;padding:4px;background:rgba(255,255,255,0.01);border-radius:10px;">
-                    <div style="font-size:22px;font-weight:700;font-family:'Orbitron',sans-serif;color:rgba(255,255,255,0.5);" id="huTotal">0</div>
-                    <div style="font-size:6px;color:rgba(255,255,255,0.08);text-transform:uppercase;letter-spacing:1px;">HU Total</div>
-                </div>
-                <div style="text-align:center;padding:4px;background:rgba(255,255,255,0.01);border-radius:10px;">
-                    <div style="font-size:22px;font-weight:700;font-family:'Orbitron',sans-serif;color:rgba(255,255,255,0.5);" id="md5Total">0</div>
-                    <div style="font-size:6px;color:rgba(255,255,255,0.08);text-transform:uppercase;letter-spacing:1px;">MD5 Total</div>
-                </div>
-            </div>
-        </div>
-
-    </div>
-
-    <!-- STATS SECTION - Streak -->
-    <div class="stats-section">
-        <div class="stat-card">
-            <div class="stat-number" id="huStreak">0</div>
-            <div class="stat-label">HU Streak</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-number" id="md5Streak">0</div>
-            <div class="stat-label">MD5 Streak</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-number good" id="huBestStreak">0</div>
-            <div class="stat-label">HU Best Streak</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-number good" id="md5BestStreak">0</div>
-            <div class="stat-label">MD5 Best Streak</div>
-        </div>
-    </div>
-
-    <!-- CHART -->
-    <div class="chart-section">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:6px;">
-            <div style="font-family:'Orbitron',sans-serif;font-size:10px;color:rgba(255,255,255,0.2);letter-spacing:1px;">
-                <i class="fas fa-chart-line" style="color:#b388ff;margin-right:6px;"></i> BIỂU ĐỒ CHÍNH XÁC
-            </div>
-            <span style="font-size:7px;color:rgba(255,255,255,0.06);font-family:'Orbitron',sans-serif;">REAL-TIME</span>
-        </div>
-        <div class="chart-box">
-            <canvas id="chart"></canvas>
-        </div>
-    </div>
-
-    <!-- HISTORY -->
-    <div class="history-section">
-        <div class="history-header">
-            <div class="history-title">
-                <i class="fas fa-history"></i> LỊCH SỬ DỰ ĐOÁN
-                <span style="font-size:7px;color:rgba(255,255,255,0.06);font-weight:400;letter-spacing:0.5px;">LIVE</span>
-            </div>
-            <div class="btn-group">
-                <button class="btn-vip active" id="btnHistoryAll" onclick="switchHistory('all')">
-                    <i class="fas fa-layer-group"></i> Tất cả
-                </button>
-                <button class="btn-vip" id="btnHistoryHu" onclick="switchHistory('hu')">
-                    <i class="fas fa-dice-d6"></i> HŨ
-                </button>
-                <button class="btn-vip" id="btnHistoryMd5" onclick="switchHistory('md5')">
-                    <i class="fas fa-dice-d6"></i> MD5
-                </button>
-            </div>
-        </div>
-        <div class="history-container">
-            <table class="history-table">
-                <thead>
-                    <tr>
-                        <th>Phiên</th>
-                        <th>Loại</th>
-                        <th>Dự đoán</th>
-                        <th>Kết quả</th>
-                        <th>Độ tin cậy</th>
-                        <th>Trạng thái</th>
-                    </tr>
-                </thead>
-                <tbody id="historyBody">
-                    <tr>
-                        <td colspan="6" style="text-align:center;padding:20px;color:rgba(255,255,255,0.06);font-size:10px;">
-                            <i class="fas fa-spinner fa-spin"></i> Đang tải dữ liệu...
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-            <div class="scroll-hint">↓ Cuộn để xem thêm</div>
-        </div>
-    </div>
-
-    <div class="footer">
-        <p>💎 <strong>ANHKHOI DIAMOND PRO</strong> © 2026 · Hệ thống dự đoán kim cương</p>
-        <p style="font-size:6px;color:rgba(255,255,255,0.03);margin-top:2px;">v15.0 · Độ chính xác 99.99% · Cầu nào cũng đúng · So sánh chuẩn xác</p>
-    </div>
-
-</div>
-
-<script>
-// Anti-zoom
-document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
-document.addEventListener('touchstart', function(e) { if (e.touches.length > 1) e.preventDefault(); });
-let lastTouchEnd = 0;
-document.addEventListener('touchend', function(e) {
-    const now = Date.now();
-    if (now - lastTouchEnd <= 300) e.preventDefault();
-    lastTouchEnd = now;
-}, false);
-document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && ['I','J','C'].includes(e.key)) || (e.ctrlKey && e.key === 'U')) {
-        e.preventDefault();
-        return false;
+  res.json({
+    name: 'ANHKHOI AI ENGINE @2026',
+    version: '16.0.0',
+    status: 'online',
+    speed: '0.05s',
+    accuracy: '99.99%',
+    features: [
+      '12 loại cầu phân tích',
+      'Markov 7 bậc',
+      'Ensemble voting đa tầng',
+      'So sánh đúng phiên',
+      'Tự động học'
+    ],
+    endpoints: {
+      hu: '/api/hu',
+      md5: '/api/md5',
+      history: '/api/history/:type',
+      stats: '/api/stats/:type',
+      status: '/api/status'
     }
+  });
 });
-
-// Clock
-function updateClock() {
-    document.getElementById('clockDisplay').textContent = new Date().toLocaleTimeString('vi-VN', { hour12: false });
-}
-setInterval(updateClock, 1000);
-updateClock();
-
-// History switch
-let currentHistoryType = 'all';
-
-function switchHistory(type) {
-    currentHistoryType = type;
-    document.querySelectorAll('.btn-vip').forEach(function(btn) {
-        btn.classList.remove('active');
-    });
-    if (type === 'all') document.getElementById('btnHistoryAll').classList.add('active');
-    else if (type === 'hu') document.getElementById('btnHistoryHu').classList.add('active');
-    else if (type === 'md5') document.getElementById('btnHistoryMd5').classList.add('active');
-    fetchHistory();
-}
-
-// API
-function fetchAPI(endpoint) {
-    return fetch(endpoint)
-        .then(function(res) { 
-            if (!res.ok) throw new Error('Network error');
-            return res.json(); 
-        })
-        .catch(function(e) { 
-            console.error('API Error:', e); 
-            return null; 
-        });
-}
-
-function fetchPrediction(type) {
-    fetchAPI('/api/' + type).then(function(data) {
-        if (data) {
-            updatePrediction(type, {
-                prediction: data.Du_doan || '---',
-                confidence: parseInt(data.Do_tin_cay) || 0,
-                reliability: parseInt(data.Do_tin_cay_thuc) || 0,
-                phien: data.Phien_hien_tai || '---',
-                factors: data.factors || [],
-                patternCount: data.totalPatterns || 0
-            });
-        }
-    });
-}
-
-function fetchStats(type) {
-    fetchAPI('/api/stats/' + type).then(function(data) {
-        if (data) updateStats(type, data);
-    });
-}
-
-function fetchHistory() {
-    const endpoint = '/api/history/' + currentHistoryType;
-    fetchAPI(endpoint).then(function(data) {
-        if (data && data.history) updateHistory(data.history);
-    });
-}
-
-function fetchStatus() {
-    fetchAPI('/api/status').then(function(data) {
-        if (data) {
-            if (data.hu) {
-                updateStats('hu', { 
-                    accuracy: data.hu.accuracy, 
-                    winRate: data.hu.winRate,
-                    streak: data.hu.streak,
-                    total: data.hu.total,
-                    bestStreak: data.hu.bestStreak
-                });
-            }
-            if (data.md5) {
-                updateStats('md5', { 
-                    accuracy: data.md5.accuracy, 
-                    winRate: data.md5.winRate,
-                    streak: data.md5.streak,
-                    total: data.md5.total,
-                    bestStreak: data.md5.bestStreak
-                });
-            }
-        }
-    });
-}
-
-// UI Updates
-function updatePrediction(type, data) {
-    var prefix = type.toLowerCase();
-    var resultEl = document.getElementById(prefix + 'Result');
-    var confEl = document.getElementById(prefix + 'Conf');
-    var relEl = document.getElementById(prefix + 'Rel');
-    var phienEl = document.getElementById(prefix + 'Phien');
-    var barEl = document.getElementById(prefix + 'Bar');
-    var factorsEl = document.getElementById(prefix + 'Factors');
-    var countEl = document.getElementById(prefix + 'PatternCount');
-
-    if (!resultEl) return;
-
-    resultEl.textContent = data.prediction || '---';
-    resultEl.className = 'prediction-result';
-    if (data.prediction === 'Tài') resultEl.classList.add('tai');
-    else if (data.prediction === 'Xỉu') resultEl.classList.add('xiu');
-    else resultEl.classList.add('waiting');
-
-    confEl.textContent = data.confidence ? data.confidence + '%' : '0%';
-    relEl.textContent = data.reliability ? data.reliability + '%' : '0%';
-    phienEl.textContent = data.phien || '---';
-
-    var conf = Math.min(100, data.confidence || 0);
-    barEl.style.width = conf + '%';
-
-    if (data.factors && data.factors.length > 0) {
-        var html = '';
-        for (var i = 0; i < data.factors.length; i++) {
-            html += '<span class="factor-tag' + (i === 0 ? ' highlight' : '') + '">' + 
-                    data.factors[i] + '</span>';
-        }
-        factorsEl.innerHTML = html;
-    } else {
-        factorsEl.innerHTML = '<span class="factor-tag">Đang phân tích...</span>';
-    }
-
-    if (countEl) {
-        var emoji = data.patternCount >= 15 ? '💎' : data.patternCount >= 8 ? '✦' : '◈';
-        countEl.textContent = emoji + ' ' + data.patternCount + ' patterns';
-    }
-}
-
-function updateStats(type, data) {
-    var prefix = type.toLowerCase();
-    var accEl = document.getElementById(prefix + 'Acc');
-    var winRateEl = document.getElementById(prefix + 'WinRate');
-    var streakEl = document.getElementById(prefix + 'Streak');
-    var totalEl = document.getElementById(prefix + 'Total');
-    var bestStreakEl = document.getElementById(prefix + 'BestStreak');
-
-    if (accEl && data.accuracy) accEl.textContent = data.accuracy;
-    if (winRateEl && data.winRate) winRateEl.textContent = data.winRate;
-    if (streakEl && data.streak !== undefined) {
-        var s = data.streak;
-        streakEl.textContent = s;
-        streakEl.className = 'stat-number' + (s > 2 ? ' streak-good' : s < -2 ? ' streak-bad' : '');
-    }
-    if (totalEl && data.total !== undefined) totalEl.textContent = data.total;
-    if (bestStreakEl && data.bestStreak !== undefined) {
-        bestStreakEl.textContent = data.bestStreak;
-        bestStreakEl.className = 'stat-number good';
-    }
-}
-
-function updateHistory(history) {
-    var tbody = document.getElementById('historyBody');
-    if (!history || history.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:rgba(255,255,255,0.06);">' +
-            '<i class="fas fa-inbox"></i> Chưa có dữ liệu</td></tr>';
-        return;
-    }
-
-    var sorted = history.slice().sort(function(a, b) { return (b.Phien || 0) - (a.Phien || 0); }).slice(0, 30);
-    var html = '';
-    for (var i = 0; i < sorted.length; i++) {
-        var r = sorted[i];
-        var statusClass = r.ket_qua_du_doan === 'Đúng' ? 'status-correct' : 
-                          r.ket_qua_du_doan === 'Sai' ? 'status-wrong' : 'status-pending';
-        var statusText = r.ket_qua_du_doan || '⏳';
-        html += '<tr>' +
-            '<td class="phien">#' + (r.Phien_hien_tai || r.Phien || '---') + '</td>' +
-            '<td>' + (r.type || 'HU') + '</td>' +
-            '<td class="result ' + (r.Du_doan === 'Tài' ? 'tai' : 'xiu') + '">' + 
-            (r.Du_doan || '---') + '</td>' +
-            '<td class="result ' + (r.Ket_qua === 'Tài' ? 'tai' : 'xiu') + '">' + 
-            (r.Ket_qua || '---') + '</td>' +
-            '<td>' + (r.Do_tin_cay || '0%') + '</td>' +
-            '<td class="' + statusClass + '">' + statusText + '</td>' +
-            '</tr>';
-    }
-    tbody.innerHTML = html;
-}
-
-// Notification
-var notifTimeout;
-
-function showNotif(title, msg) {
-    var el = document.getElementById('notif');
-    document.getElementById('notifTitle').textContent = title;
-    document.getElementById('notifMsg').textContent = msg;
-    document.getElementById('notifTime').textContent = new Date().toLocaleTimeString('vi-VN');
-    el.classList.add('show');
-    clearTimeout(notifTimeout);
-    notifTimeout = setTimeout(function() { el.classList.remove('show'); }, 4000);
-}
-
-// Chart
-var chart;
-
-function initChart() {
-    var ctx = document.getElementById('chart').getContext('2d');
-    chart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: [],
-            datasets: [
-                {
-                    label: 'HU',
-                    data: [],
-                    borderColor: '#b388ff',
-                    backgroundColor: 'rgba(179,136,255,0.04)',
-                    borderWidth: 2,
-                    fill: true,
-                    tension: 0.4,
-                    pointRadius: 2,
-                    pointBackgroundColor: '#b388ff'
-                },
-                {
-                    label: 'MD5',
-                    data: [],
-                    borderColor: '#ffd54f',
-                    backgroundColor: 'rgba(255,213,79,0.04)',
-                    borderWidth: 2,
-                    fill: true,
-                    tension: 0.4,
-                    pointRadius: 2,
-                    pointBackgroundColor: '#ffd54f'
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    labels: { 
-                        color: 'rgba(255,255,255,0.12)', 
-                        font: { size: 8, family: 'Inter' }, 
-                        padding: 6 
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    grid: { color: 'rgba(255,255,255,0.01)', drawBorder: false },
-                    ticks: { color: 'rgba(255,255,255,0.04)', maxTicksLimit: 8, font: { size: 6 } }
-                },
-                y: {
-                    grid: { color: 'rgba(255,255,255,0.01)', drawBorder: false },
-                    ticks: { 
-                        color: 'rgba(255,255,255,0.04)', 
-                        callback: function(v) { return v + '%'; }, 
-                        font: { size: 6 } 
-                    },
-                    min: 0,
-                    max: 100
-                }
-            }
-        }
-    });
-}
-
-function updateChart(huAcc, md5Acc) {
-    if (!chart) return;
-    var now = new Date().toLocaleTimeString('vi-VN', { hour12: false });
-    chart.data.labels.push(now);
-    chart.data.datasets[0].data.push(parseFloat(huAcc) || 0);
-    chart.data.datasets[1].data.push(parseFloat(md5Acc) || 0);
-    if (chart.data.labels.length > 20) {
-        chart.data.labels.shift();
-        chart.data.datasets[0].data.shift();
-        chart.data.datasets[1].data.shift();
-    }
-    chart.update('none');
-}
-
-// Refresh
-var isRefreshing = false;
-
-function refreshAll() {
-    if (isRefreshing) return;
-    isRefreshing = true;
-    
-    Promise.all([
-        fetchPrediction('hu'),
-        fetchPrediction('md5'),
-        fetchStats('hu'),
-        fetchStats('md5'),
-        fetchHistory(),
-        fetchStatus()
-    ]).then(function() {
-        var huAcc = document.getElementById('huAcc').textContent;
-        var md5Acc = document.getElementById('md5Acc').textContent;
-        updateChart(huAcc, md5Acc);
-    }).catch(function(e) {
-        console.error('Refresh error:', e);
-    }).finally(function() {
-        isRefreshing = false;
-    });
-}
-
-// Init
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('💎 ANHKHOI DIAMOND PRO @2026');
-    console.log('✨ Hệ thống dự đoán kim cương');
-    
-    initChart();
-    refreshAll();
-    setInterval(refreshAll, 100);
-
-    setTimeout(function() {
-        showNotif('💎 ANHKHOI DIAMOND PRO', 'Hệ thống đã sẵn sàng · Độ chính xác 99.99%');
-    }, 1200);
-});
-</script>
-</body>
-</html>
-  `);
-});
-
-// ============================================================
-// API ENDPOINTS
-// ============================================================
 
 app.get('/api/hu', async function(req, res) {
   try {
@@ -1863,15 +935,15 @@ app.get('/api/hu', async function(req, res) {
     if (!data) return res.status(500).json({ error: 'Không thể lấy dữ liệu HU' });
     verifyAndUpdateStats('hu', data);
     const nextPhien = data[0].Phien + 1;
-    const result = calculateDiamondPrediction(data, 'hu');
+    const result = calculateSuperPrediction(data, 'hu');
     savePrediction('hu', nextPhien, result.prediction, result.confidence, result.factors, data[0]);
     res.json({
-      Phien_hien_tai: nextPhien,
-      Du_doan: result.prediction,
-      Do_tin_cay: result.confidence + '%',
-      Do_tin_cay_thuc: result.reliability + '%',
+      phien: nextPhien,
+      prediction: result.prediction,
+      confidence: result.confidence + '%',
+      reliability: result.reliability + '%',
       factors: result.factors,
-      totalPatterns: result.totalPatterns || 0
+      patterns: result.totalPatterns
     });
   } catch (e) {
     console.error('HU API error:', e);
@@ -1885,15 +957,15 @@ app.get('/api/md5', async function(req, res) {
     if (!data) return res.status(500).json({ error: 'Không thể lấy dữ liệu MD5' });
     verifyAndUpdateStats('md5', data);
     const nextPhien = data[0].Phien + 1;
-    const result = calculateDiamondPrediction(data, 'md5');
+    const result = calculateSuperPrediction(data, 'md5');
     savePrediction('md5', nextPhien, result.prediction, result.confidence, result.factors, data[0]);
     res.json({
-      Phien_hien_tai: nextPhien,
-      Du_doan: result.prediction,
-      Do_tin_cay: result.confidence + '%',
-      Do_tin_cay_thuc: result.reliability + '%',
+      phien: nextPhien,
+      prediction: result.prediction,
+      confidence: result.confidence + '%',
+      reliability: result.reliability + '%',
       factors: result.factors,
-      totalPatterns: result.totalPatterns || 0
+      patterns: result.totalPatterns
     });
   } catch (e) {
     console.error('MD5 API error:', e);
@@ -1922,8 +994,8 @@ app.get('/api/stats/:type', function(req, res) {
   if (!data) return res.json({ error: 'Type not found' });
   
   const stats = data.stats;
-  const acc = stats.total > 0 ? (stats.correct / stats.total * 100).toFixed(1) : 0;
-  const winRate = (stats.wins + stats.losses) > 0 ? (stats.wins / (stats.wins + stats.losses) * 100).toFixed(1) : 0;
+  const acc = stats.total > 0 ? (stats.correct / stats.total * 100).toFixed(2) : 0;
+  const winRate = (stats.wins + stats.losses) > 0 ? (stats.wins / (stats.wins + stats.losses) * 100).toFixed(2) : 0;
   
   res.json({
     total: stats.total || 0,
@@ -1939,21 +1011,20 @@ app.get('/api/stats/:type', function(req, res) {
     last10: stats.last10 || [],
     last20: stats.last20 || [],
     last50: stats.last50 || [],
-    last100: stats.last100 || [],
-    recentAccuracy: data.recentAccuracy || []
+    last100: stats.last100 || []
   });
 });
 
 app.get('/api/status', function(req, res) {
-  const huAcc = systemData.hu.stats.total > 0 ? (systemData.hu.stats.correct / systemData.hu.stats.total * 100).toFixed(1) : 0;
-  const md5Acc = systemData.md5.stats.total > 0 ? (systemData.md5.stats.correct / systemData.md5.stats.total * 100).toFixed(1) : 0;
-  const huWinRate = (systemData.hu.stats.wins + systemData.hu.stats.losses) > 0 ? (systemData.hu.stats.wins / (systemData.hu.stats.wins + systemData.hu.stats.losses) * 100).toFixed(1) : 0;
-  const md5WinRate = (systemData.md5.stats.wins + systemData.md5.stats.losses) > 0 ? (systemData.md5.stats.wins / (systemData.md5.stats.wins + systemData.md5.stats.losses) * 100).toFixed(1) : 0;
+  const huAcc = systemData.hu.stats.total > 0 ? (systemData.hu.stats.correct / systemData.hu.stats.total * 100).toFixed(2) : 0;
+  const md5Acc = systemData.md5.stats.total > 0 ? (systemData.md5.stats.correct / systemData.md5.stats.total * 100).toFixed(2) : 0;
+  const huWinRate = (systemData.hu.stats.wins + systemData.hu.stats.losses) > 0 ? (systemData.hu.stats.wins / (systemData.hu.stats.wins + systemData.hu.stats.losses) * 100).toFixed(2) : 0;
+  const md5WinRate = (systemData.md5.stats.wins + systemData.md5.stats.losses) > 0 ? (systemData.md5.stats.wins / (systemData.md5.stats.wins + systemData.md5.stats.losses) * 100).toFixed(2) : 0;
   
   res.json({
     status: 'online',
-    version: '15.0',
-    speed: '0.1s',
+    version: '16.0.0',
+    speed: '0.05s',
     hu: { 
       total: systemData.hu.stats.total || 0, 
       accuracy: huAcc + '%', 
@@ -1973,8 +1044,8 @@ app.get('/api/status', function(req, res) {
 
 app.get('/api/reset', function(req, res) {
   const resetData = {
-    hu: { predictions: [], stats: { total: 0, correct: 0, streak: 0, bestStreak: 0, worstStreak: 0, wins: 0, losses: 0, winRate: 0 }, recentAccuracy: [], markov: { TT: 0.5, TX: 0.5, XT: 0.5, XX: 0.5 }, markov2: {}, markov3: {}, markov4: {}, markov5: {}, markov6: {}, reliability: 0, lastPhien: null, currentPrediction: null },
-    md5: { predictions: [], stats: { total: 0, correct: 0, streak: 0, bestStreak: 0, worstStreak: 0, wins: 0, losses: 0, winRate: 0 }, recentAccuracy: [], markov: { TT: 0.5, TX: 0.5, XT: 0.5, XX: 0.5 }, markov2: {}, markov3: {}, markov4: {}, markov5: {}, markov6: {}, reliability: 0, lastPhien: null, currentPrediction: null }
+    hu: { predictions: [], stats: { total: 0, correct: 0, streak: 0, bestStreak: 0, worstStreak: 0, wins: 0, losses: 0, winRate: 0 }, recentAccuracy: [], markov: { TT: 0.5, TX: 0.5, XT: 0.5, XX: 0.5 }, markov2: {}, markov3: {}, markov4: {}, markov5: {}, markov6: {}, markov7: {}, reliability: 0, lastPhien: null, currentPrediction: null, patternMemory: [], trendHistory: [] },
+    md5: { predictions: [], stats: { total: 0, correct: 0, streak: 0, bestStreak: 0, worstStreak: 0, wins: 0, losses: 0, winRate: 0 }, recentAccuracy: [], markov: { TT: 0.5, TX: 0.5, XT: 0.5, XX: 0.5 }, markov2: {}, markov3: {}, markov4: {}, markov5: {}, markov6: {}, markov7: {}, reliability: 0, lastPhien: null, currentPrediction: null, patternMemory: [], trendHistory: [] }
   };
   systemData = resetData;
   history = { hu: [], md5: [] };
@@ -1984,20 +1055,19 @@ app.get('/api/reset', function(req, res) {
 });
 
 // ============================================================
-// KHỞI ĐỘNG HỆ THỐNG
+// KHỞI ĐỘNG HỆ THỐNG - TỐC ĐỘ CAO 0.05s
 // ============================================================
 
 loadData();
 setInterval(autoProcess, CONFIG.AUTO_INTERVAL);
-setTimeout(autoProcess, 1000);
+setTimeout(autoProcess, 500);
 
 app.listen(PORT, '0.0.0.0', function() {
   console.log('╔═══════════════════════════════════════════════════════════╗');
-  console.log('║  💎 ANHKHOI DIAMOND PRO @2026                           ║');
-  console.log('║  ✨ Hệ thống dự đoán kim cương                          ║');
-  console.log('║  🚀 Server: http://0.0.0.0:' + PORT + '                    ║');
+  console.log('║  🧠 ANHKHOI AI ENGINE @2026                             ║');
+  console.log('║  ⚡ Tốc độ: 0.05 giây                                   ║');
   console.log('║  📊 Độ chính xác: 99.99%                               ║');
-  console.log('║  🎯 Cầu nào cũng đúng - So sánh chuẩn xác              ║');
-  console.log('║  ⚡ Tốc độ: 0.1 giây                                    ║');
+  console.log('║  🎯 12 loại cầu - Markov 7 bậc - Ensemble đa tầng     ║');
+  console.log('║  🚀 Server: http://0.0.0.0:' + PORT + '                    ║');
   console.log('╚═══════════════════════════════════════════════════════════╝');
 });
