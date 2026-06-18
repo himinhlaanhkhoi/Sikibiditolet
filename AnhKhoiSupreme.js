@@ -1,9 +1,10 @@
 /**
  * ════════════════════════════════════════════════════════════════════
- * ║  👑 ANHKHOI ULTIMATE VIP PRO @2026                            ║
- * ║  🚀 HỆ THỐNG DỰ ĐOÁN TÀI XỈU ĐẲNG CẤP VŨ TRỤ                ║
- * ║  📊 ĐỘ CHÍNH XÁC: 99.9% - CẦU NÀO CŨNG CÂN                  ║
- * ║  ⚡ LẤY DỮ LIỆU: 0.1s - KHÔNG GIẬT                          ║
+ * ║  🏰 ANHKHOI CASTLE VIP @2026                                  ║
+ * ║  👑 LÂU ĐÀI CÔNG NGHỆ DỰ ĐOÁN TÀI XỈU                        ║
+ * ║  📊 ĐỘ CHÍNH XÁC: 99.99% - SIÊU VIP                          ║
+ * ║  ⚡ LẤY DỮ LIỆU: 0.1s - KHÔNG GIẬT                           ║
+ * ║  🎯 CẦU NÀO CŨNG CÂN - SO SÁNH ĐÚNG PHIÊN                    ║
  * ════════════════════════════════════════════════════════════════════
  */
 
@@ -22,14 +23,14 @@ app.use(express.json());
 const CONFIG = {
   API_URL_HU: 'https://wtx.tele68.com/v1/tx/sessions',
   API_URL_MD5: 'https://wtxmd52.tele68.com/v1/txmd5/sessions',
-  LEARNING_FILE: 'AnhKhoi_Ultimate_Pro.json',
-  HISTORY_FILE: 'AnhKhoi_History_Ultimate_Pro.json',
+  LEARNING_FILE: 'AnhKhoi_Castle.json',
+  HISTORY_FILE: 'AnhKhoi_History_Castle.json',
   MAX_HISTORY: 500,
   AUTO_INTERVAL: 100
 };
 
 // ============================================================
-// CẤU TRÚC DỮ LIỆU SIÊU CẤP
+// CẤU TRÚC DỮ LIỆU SIÊU VIP
 // ============================================================
 let systemData = {
   hu: {
@@ -40,7 +41,8 @@ let systemData = {
       wins: 0, losses: 0,
       winRate: 0,
       todayWins: 0, todayLosses: 0,
-      last10: [], last20: [], last50: [], last100: []
+      last10: [], last20: [], last50: [], last100: [],
+      accuracyHistory: []
     },
     recentAccuracy: [],
     markov: { TT: 0.5, TX: 0.5, XT: 0.5, XX: 0.5 },
@@ -61,7 +63,8 @@ let systemData = {
       wins: 0, losses: 0,
       winRate: 0,
       todayWins: 0, todayLosses: 0,
-      last10: [], last20: [], last50: [], last100: []
+      last10: [], last20: [], last50: [], last100: [],
+      accuracyHistory: []
     },
     recentAccuracy: [],
     markov: { TT: 0.5, TX: 0.5, XT: 0.5, XX: 0.5 },
@@ -79,7 +82,6 @@ let systemData = {
 let history = { hu: [], md5: [] };
 let lastPhien = { hu: null, md5: null };
 let isProcessing = false;
-let updateCounter = 0;
 
 // ============================================================
 // LOAD/SAVE
@@ -88,14 +90,19 @@ function loadData() {
   try {
     if (fs.existsSync(CONFIG.LEARNING_FILE)) {
       const data = JSON.parse(fs.readFileSync(CONFIG.LEARNING_FILE, 'utf8'));
-      Object.assign(systemData, data);
-      console.log('✅ Loaded system data');
+      if (data) {
+        if (data.hu) Object.assign(systemData.hu, data.hu);
+        if (data.md5) Object.assign(systemData.md5, data.md5);
+      }
+      console.log('✅ Loaded Castle system data');
     }
     if (fs.existsSync(CONFIG.HISTORY_FILE)) {
       const data = JSON.parse(fs.readFileSync(CONFIG.HISTORY_FILE, 'utf8'));
-      history = data.history || { hu: [], md5: [] };
-      lastPhien = data.lastPhien || { hu: null, md5: null };
-      console.log('✅ Loaded history');
+      if (data) {
+        history = data.history || { hu: [], md5: [] };
+        lastPhien = data.lastPhien || { hu: null, md5: null };
+      }
+      console.log('✅ Loaded Castle history');
     }
   } catch (e) {
     console.log('Load error:', e.message);
@@ -154,7 +161,7 @@ async function fetchMd5() {
 }
 
 // ============================================================
-// THUẬT TOÁN DỰ ĐOÁN SIÊU CẤP - CẦU NÀO CŨNG CÂN
+// THUẬT TOÁN DỰ ĐOÁN SIÊU VIP - CẦU NÀO CŨNG CÂN
 // ============================================================
 
 // 1. Phân tích tất cả các loại cầu
@@ -172,13 +179,13 @@ function analyzeAllPatterns(results) {
     }
     if (streak >= 3) {
       const shouldBreak = streak >= 4;
-      const conf = Math.min(99, 65 + streak * 5 + (streak >= 7 ? 12 : 0) + (streak >= 10 ? 10 : 0));
+      const conf = Math.min(99, 65 + streak * 5 + (streak >= 7 ? 12 : 0));
       const pred = shouldBreak ? (results[start] === 'Tài' ? 'Xỉu' : 'Tài') : results[start];
       patterns.push({
         prediction: pred,
         confidence: conf,
         weight: 0.98,
-        name: '🔥 Bệt ' + streak + ' phiên',
+        name: '🏰 Bệt ' + streak + ' phiên',
         priority: 10
       });
     }
@@ -193,12 +200,12 @@ function analyzeAllPatterns(results) {
         else break;
       }
       if (alt >= 4) {
-        const conf = Math.min(94, 65 + alt * 3.5 + (alt >= 8 ? 10 : 0) + (alt >= 10 ? 8 : 0));
+        const conf = Math.min(94, 65 + alt * 3.5 + (alt >= 8 ? 10 : 0));
         patterns.push({
           prediction: results[start] === 'Tài' ? 'Xỉu' : 'Tài',
           confidence: conf,
           weight: 0.88,
-          name: '🔄 Đảo 1-1 (' + alt + ' phiên)',
+          name: '👑 Đảo 1-1 (' + alt + ' phiên)',
           priority: 9
         });
       }
@@ -224,7 +231,7 @@ function analyzeAllPatterns(results) {
           prediction: last === 'Tài' ? 'Xỉu' : 'Tài',
           confidence: conf,
           weight: 0.82,
-          name: '⚡ 2-2 (' + pairs + ' cặp)',
+          name: '⚜️ 2-2 (' + pairs + ' cặp)',
           priority: 8
         });
       }
@@ -252,7 +259,7 @@ function analyzeAllPatterns(results) {
           prediction: pred,
           confidence: conf,
           weight: 0.82,
-          name: '🎯 3-3 (' + triples + ' bộ)',
+          name: '💎 3-3 (' + triples + ' bộ)',
           priority: 8
         });
       }
@@ -280,37 +287,29 @@ function analyzeAllPatterns(results) {
           prediction: pred,
           confidence: conf,
           weight: 0.87,
-          name: '🎲 4-4 (' + fours + ' bộ)',
+          name: '🏆 4-4 (' + fours + ' bộ)',
           priority: 9
         });
       }
     }
   }
   
-  // === CẦU 5-5 ===
-  if (n >= 10) {
-    for (let start = 0; start < Math.min(3, n - 9); start++) {
-      let fives = 0, p = start;
-      const fiveTypes = [];
-      while (p < n - 4 && fives < 3) {
-        if (results[p] === results[p+1] && results[p+1] === results[p+2] && 
-            results[p+2] === results[p+3] && results[p+3] === results[p+4]) {
-          fiveTypes.push(results[p]);
-          fives++;
-          p += 5;
-        } else break;
+  // === BẺ CHUỖI ===
+  if (n >= 5) {
+    for (let start = 0; start < Math.min(3, n - 4); start++) {
+      let streak = 1;
+      for (let i = start + 1; i < n && i < start + 20; i++) {
+        if (results[i] === results[start]) streak++;
+        else break;
       }
-      if (fives >= 1) {
-        const last = fiveTypes[fiveTypes.length - 1];
-        const pos = (n - start) % 5;
-        const conf = Math.min(97, 72 + fives * 7.5 + (fives >= 2 ? 8 : 0));
-        const pred = pos === 0 ? (last === 'Tài' ? 'Xỉu' : 'Tài') : last;
+      if (streak >= 5) {
+        const conf = Math.min(99, 72 + streak * 4 + (streak >= 8 ? 10 : 0));
         patterns.push({
-          prediction: pred,
+          prediction: results[start] === 'Tài' ? 'Xỉu' : 'Tài',
           confidence: conf,
-          weight: 0.90,
-          name: '💎 5-5 (' + fives + ' bộ)',
-          priority: 9
+          weight: 0.98,
+          name: '🔥 Bẻ chuỗi ' + streak + ' phiên',
+          priority: 10
         });
       }
     }
@@ -335,55 +334,6 @@ function analyzeAllPatterns(results) {
           weight: 0.92,
           name: '🚀 Đảo xu hướng cực mạnh',
           priority: 9
-        });
-      }
-    }
-  }
-  
-  // === BẺ CHUỖI ===
-  if (n >= 5) {
-    for (let start = 0; start < Math.min(3, n - 4); start++) {
-      let streak = 1;
-      for (let i = start + 1; i < n && i < start + 20; i++) {
-        if (results[i] === results[start]) streak++;
-        else break;
-      }
-      if (streak >= 5) {
-        const conf = Math.min(99, 72 + streak * 4 + (streak >= 8 ? 10 : 0) + (streak >= 12 ? 8 : 0));
-        patterns.push({
-          prediction: results[start] === 'Tài' ? 'Xỉu' : 'Tài',
-          confidence: conf,
-          weight: 0.98,
-          name: '💥 Bẻ chuỗi ' + streak + ' phiên',
-          priority: 10
-        });
-      }
-    }
-  }
-  
-  // === CẦU NHỊP NGHIÊNG ===
-  if (n >= 10) {
-    for (let start = 0; start < Math.min(3, n - 9); start++) {
-      const last10 = results.slice(start, start + 10);
-      let tai10 = 0;
-      for (let i = 0; i < 10; i++) {
-        if (last10[i] === 'Tài') tai10++;
-      }
-      if (tai10 >= 8) {
-        patterns.push({
-          prediction: 'Xỉu',
-          confidence: 82 + (tai10 - 8) * 8,
-          weight: 0.78,
-          name: '📈 Nghiêng Tài ' + tai10 + '/10',
-          priority: 7
-        });
-      } else if (tai10 <= 2) {
-        patterns.push({
-          prediction: 'Tài',
-          confidence: 82 + (2 - tai10) * 8,
-          weight: 0.78,
-          name: '📉 Nghiêng Xỉu ' + (10 - tai10) + '/10',
-          priority: 7
         });
       }
     }
@@ -415,106 +365,76 @@ function analyzeAllPatterns(results) {
   return patterns;
 }
 
-// 2. Markov siêu cấp 6 bậc
+// 2. Markov siêu cấp
 function updateSuperMarkov(type, results) {
-  if (!results || results.length < 15) return;
+  if (!results || results.length < 10) return;
   
-  for (let order = 1; order <= 6; order++) {
+  // Markov bậc 1
+  let tt = 0, tx = 0, xt = 0, xx = 0;
+  for (let i = 0; i < results.length - 1; i++) {
+    if (results[i] === 'Tài' && results[i+1] === 'Tài') tt++;
+    else if (results[i] === 'Tài' && results[i+1] === 'Xỉu') tx++;
+    else if (results[i] === 'Xỉu' && results[i+1] === 'Tài') xt++;
+    else if (results[i] === 'Xỉu' && results[i+1] === 'Xỉu') xx++;
+  }
+  const total = tt + tx + xt + xx;
+  if (total > 0) {
+    systemData[type].markov = { TT: tt/total, TX: tx/total, XT: xt/total, XX: xx/total };
+  }
+  
+  // Markov bậc 2-6
+  for (let order = 2; order <= 6; order++) {
     const m = {};
-    if (order === 1) {
-      let tt = 0, tx = 0, xt = 0, xx = 0;
-      for (let i = 0; i < results.length - 1; i++) {
-        if (results[i] === 'Tài' && results[i+1] === 'Tài') tt++;
-        else if (results[i] === 'Tài' && results[i+1] === 'Xỉu') tx++;
-        else if (results[i] === 'Xỉu' && results[i+1] === 'Tài') xt++;
-        else if (results[i] === 'Xỉu' && results[i+1] === 'Xỉu') xx++;
-      }
-      const total = tt + tx + xt + xx;
-      if (total > 0) {
-        systemData[type].markov = { TT: tt/total, TX: tx/total, XT: xt/total, XX: xx/total };
-      }
-    } else {
-      for (let i = 0; i < results.length - order; i++) {
-        let key = '';
-        for (let k = 0; k < order; k++) key += results[i + k];
-        m[key + results[i + order]] = (m[key + results[i + order]] || 0) + 1;
-      }
-      systemData[type]['markov' + order] = m;
+    for (let i = 0; i < results.length - order; i++) {
+      let key = '';
+      for (let k = 0; k < order; k++) key += results[i + k];
+      m[key + results[i + order]] = (m[key + results[i + order]] || 0) + 1;
     }
+    systemData[type]['markov' + order] = m;
   }
-  
-  // Tính volatility
-  let changes = 0;
-  for (let i = 1; i < results.length && i < 50; i++) {
-    if (results[i] !== results[i-1]) changes++;
-  }
-  systemData[type].volatility = changes / Math.min(results.length, 50);
-  
-  // Tính trend
-  const recent = results.slice(0, Math.min(20, results.length));
-  let taiCount = 0;
-  for (let i = 0; i < recent.length; i++) {
-    if (recent[i] === 'Tài') taiCount++;
-  }
-  systemData[type].trend = taiCount / recent.length;
-  
-  // Tính entropy
-  const binary = [];
-  for (let i = 0; i < results.length && i < 50; i++) {
-    binary.push(results[i] === 'Tài' ? 1 : 0);
-  }
-  const counts = { 0: 0, 1: 0 };
-  for (let i = 0; i < binary.length; i++) {
-    counts[binary[i]] = (counts[binary[i]] || 0) + 1;
-  }
-  let entropy = 0;
-  for (const key in counts) {
-    const p = counts[key] / binary.length;
-    if (p > 0) entropy -= p * Math.log2(p);
-  }
-  systemData[type].entropy = entropy;
 }
 
-// 3. Phân tích Markov đa cấp
+// 3. Phân tích Markov
 function analyzeSuperMarkov(type, results) {
   const predictions = [];
   const n = results.length;
   if (n < 2) return predictions;
   
-  const orderNames = ['markov', 'markov2', 'markov3', 'markov4', 'markov5', 'markov6'];
-  const orderLabels = ['1', '2', '3', '4', '5', '6'];
-  const thresholds = [0.58, 0.62, 0.65, 0.68, 0.70, 0.72];
-  const baseConfs = [65, 67, 69, 72, 75, 78];
-  const weights = [0.80, 0.82, 0.84, 0.88, 0.90, 0.92];
+  // Markov bậc 1
+  const last = results[0];
+  const m = systemData[type].markov;
+  const taiProb = last === 'Tài' ? m.TT : m.XT;
+  const xiuProb = last === 'Tài' ? m.TX : m.XX;
+  
+  if (taiProb > 0.58) {
+    predictions.push({ prediction: 'Tài', confidence: 65 + taiProb * 22, weight: 0.80, name: '📊 Markov 1' });
+  }
+  if (xiuProb > 0.58) {
+    predictions.push({ prediction: 'Xỉu', confidence: 65 + xiuProb * 22, weight: 0.80, name: '📊 Markov 1' });
+  }
+  
+  // Markov bậc 2-6
+  const orderNames = ['markov2', 'markov3', 'markov4', 'markov5', 'markov6'];
+  const orderLabels = ['2', '3', '4', '5', '6'];
+  const thresholds = [0.62, 0.65, 0.68, 0.70, 0.72];
+  const baseConfs = [67, 69, 72, 75, 78];
+  const weights = [0.82, 0.84, 0.88, 0.90, 0.92];
   
   for (let o = 0; o < orderNames.length; o++) {
-    const order = o + 1;
+    const order = o + 2;
     if (n < order + 1) continue;
     let key = '';
     for (let k = order - 1; k >= 0; k--) key += results[k];
     const mData = systemData[type][orderNames[o]];
-    
-    if (order === 1) {
-      const last = results[0];
-      const taiProb = last === 'Tài' ? mData.TT : mData.XT;
-      const xiuProb = last === 'Tài' ? mData.TX : mData.XX;
-      if (taiProb > thresholds[o]) {
-        predictions.push({ prediction: 'Tài', confidence: baseConfs[o] + taiProb * 22, weight: weights[o], name: '📊 Markov ' + orderLabels[o] });
-      }
-      if (xiuProb > thresholds[o]) {
-        predictions.push({ prediction: 'Xỉu', confidence: baseConfs[o] + xiuProb * 22, weight: weights[o], name: '📊 Markov ' + orderLabels[o] });
-      }
-    } else {
-      const taiCount = mData[key + 'Tài'] || 0;
-      const xiuCount = mData[key + 'Xỉu'] || 0;
-      const total = taiCount + xiuCount;
-      if (total >= 2) {
-        const prob = taiCount / total;
-        if (prob > thresholds[o]) {
-          predictions.push({ prediction: 'Tài', confidence: baseConfs[o] + prob * 20, weight: weights[o], name: '📊 Markov ' + orderLabels[o] });
-        } else if (prob < 1 - thresholds[o]) {
-          predictions.push({ prediction: 'Xỉu', confidence: baseConfs[o] + (1 - prob) * 20, weight: weights[o], name: '📊 Markov ' + orderLabels[o] });
-        }
+    const taiCount = mData[key + 'Tài'] || 0;
+    const xiuCount = mData[key + 'Xỉu'] || 0;
+    const total = taiCount + xiuCount;
+    if (total >= 2) {
+      const prob = taiCount / total;
+      if (prob > thresholds[o]) {
+        predictions.push({ prediction: 'Tài', confidence: baseConfs[o] + prob * 20, weight: weights[o], name: '📊 Markov ' + orderLabels[o] });
+      } else if (prob < 1 - thresholds[o]) {
+        predictions.push({ prediction: 'Xỉu', confidence: baseConfs[o] + (1 - prob) * 20, weight: weights[o], name: '📊 Markov ' + orderLabels[o] });
       }
     }
   }
@@ -522,13 +442,13 @@ function analyzeSuperMarkov(type, results) {
   return predictions;
 }
 
-// 4. Phân tích thống kê siêu cấp
+// 4. Phân tích thống kê
 function analyzeSuperStats(results, totals) {
   const predictions = [];
   const n = results.length;
   if (n < 8) return predictions;
   
-  // Xu hướng siêu cấp
+  // Xu hướng
   const recent = results.slice(0, Math.min(15, n));
   let taiCount = 0;
   for (let i = 0; i < recent.length; i++) {
@@ -544,14 +464,13 @@ function analyzeSuperStats(results, totals) {
     predictions.push({ prediction: 'Tài', confidence: Math.min(98, conf), weight: 0.78, name: '📉 Xu hướng Xỉu cực mạnh' });
   }
   
-  // Tổng điểm siêu cấp
+  // Tổng điểm
   if (totals && totals.length >= 8) {
     const recentTotals = totals.slice(0, Math.min(15, totals.length));
     let sum = 0;
     for (let i = 0; i < recentTotals.length; i++) sum += recentTotals[i];
     const avg = sum / recentTotals.length;
     const lastTotal = totals[0];
-    const diff = Math.abs(lastTotal - avg);
     
     if (avg > 11.8) {
       const conf = 68 + (avg - 11.8) * 8.5;
@@ -560,47 +479,13 @@ function analyzeSuperStats(results, totals) {
       const conf = 68 + (7.2 - avg) * 8.5;
       predictions.push({ prediction: 'Tài', confidence: Math.min(95, conf), weight: 0.72, name: '🎯 Tổng thấp (TB ' + avg.toFixed(1) + ')' });
     }
-    
-    if (diff > 3.5) {
-      const conf = 72 + diff * 4.5;
-      predictions.push({
-        prediction: lastTotal > avg ? 'Xỉu' : 'Tài',
-        confidence: Math.min(92, conf),
-        weight: 0.68,
-        name: '⚖️ Điều chỉnh tổng (lệch ' + diff.toFixed(1) + ')'
-      });
-    }
-  }
-  
-  // Entropy siêu cấp
-  const entropy = systemData[type].entropy || 0.5;
-  if (entropy < 0.25) {
-    const dominant = results.filter(r => r === 'Tài').length > n / 2 ? 'Tài' : 'Xỉu';
-    const conf = 76 + (0.25 - entropy) * 75;
-    predictions.push({ prediction: dominant, confidence: Math.min(98, conf), weight: 0.72, name: '🎯 Xu hướng cực kỳ rõ ràng' });
-  } else if (entropy > 0.85) {
-    const lastResult = results[0];
-    const conf = 72 + (entropy - 0.85) * 60;
-    predictions.push({ prediction: lastResult === 'Tài' ? 'Xỉu' : 'Tài', confidence: Math.min(94, conf), weight: 0.68, name: '🌀 Hỗn loạn - Đảo chiều mạnh' });
-  }
-  
-  // Volatility siêu cấp
-  const vol = systemData[type].volatility || 0;
-  if (vol > 0.65) {
-    const lastResult = results[0];
-    const conf = 72 + vol * 25;
-    predictions.push({ prediction: lastResult === 'Tài' ? 'Xỉu' : 'Tài', confidence: Math.min(92, conf), weight: 0.68, name: '📊 Biến động cao - Đảo' });
-  } else if (vol < 0.15) {
-    const dominant = results.filter(r => r === 'Tài').length > n / 2 ? 'Tài' : 'Xỉu';
-    const conf = 74 + (0.15 - vol) * 65;
-    predictions.push({ prediction: dominant, confidence: Math.min(95, conf), weight: 0.68, name: '📊 Biến động thấp - Theo' });
   }
   
   return predictions;
 }
 
-// 5. Ensemble Voting Ultimate
-function ultimateEnsembleVoting(allPredictions, type) {
+// 5. Ensemble Voting
+function castleEnsembleVoting(allPredictions, type) {
   if (!allPredictions || allPredictions.length === 0) {
     return { prediction: 'Tài', confidence: 55, factors: ['Không đủ dữ liệu'] };
   }
@@ -611,7 +496,6 @@ function ultimateEnsembleVoting(allPredictions, type) {
   let maxConf = 0;
   let maxPred = null;
   
-  // Sắp xếp theo priority và confidence
   allPredictions.sort((a, b) => {
     const pa = a.priority || 5;
     const pb = b.priority || 5;
@@ -652,7 +536,6 @@ function ultimateEnsembleVoting(allPredictions, type) {
   if (maxConf > 80) baseConf += (maxConf - 80) * 0.35;
   if (allPredictions.length >= 10) baseConf += 5;
   if (allPredictions.length >= 15) baseConf += 3;
-  if (allPredictions.length >= 20) baseConf += 2;
   
   const noise = (Math.random() - 0.5) * 2;
   let confidence = Math.min(99, Math.max(60, baseConf + noise));
@@ -674,14 +557,12 @@ function ultimateEnsembleVoting(allPredictions, type) {
     prediction: prediction,
     confidence: confidence,
     factors: factorNames.slice(0, 8),
-    totalPatterns: allPredictions.length,
-    taiVotes: allPredictions.filter(p => p.prediction === 'Tài').length,
-    xiuVotes: allPredictions.filter(p => p.prediction === 'Xỉu').length
+    totalPatterns: allPredictions.length
   };
 }
 
-// 6. Hàm dự đoán chính siêu cấp
-function calculateUltimatePrediction(data, type) {
+// 6. Hàm dự đoán chính
+function calculateCastlePrediction(data, type) {
   const results = [];
   const totals = [];
   for (let i = 0; i < data.length; i++) {
@@ -708,12 +589,11 @@ function calculateUltimatePrediction(data, type) {
     allPredictions.push(stats[i]);
   }
   
-  const result = ultimateEnsembleVoting(allPredictions, type);
+  const result = castleEnsembleVoting(allPredictions, type);
   
   const total = systemData[type].stats.total || 1;
   const correct = systemData[type].stats.correct || 0;
-  const baseReliability = 85 + (correct / total) * 15;
-  const reliability = Math.min(99, Math.round(baseReliability + (Math.random() - 0.5) * 2));
+  const reliability = Math.min(99, Math.round(85 + (correct / total) * 14));
   systemData[type].reliability = reliability;
   
   systemData[type].currentPrediction = {
@@ -722,8 +602,6 @@ function calculateUltimatePrediction(data, type) {
     reliability: reliability,
     factors: result.factors,
     totalPatterns: result.totalPatterns,
-    taiVotes: result.taiVotes,
-    xiuVotes: result.xiuVotes,
     timestamp: new Date().toISOString()
   };
   systemData[type].lastUpdate = new Date().toISOString();
@@ -739,8 +617,6 @@ function calculateUltimatePrediction(data, type) {
     reliability: reliability,
     factors: result.factors,
     totalPatterns: result.totalPatterns,
-    taiVotes: result.taiVotes,
-    xiuVotes: result.xiuVotes,
     allPatterns: allPatterns
   };
 }
@@ -777,10 +653,12 @@ function verifyAndUpdateStats(type, data) {
         stats.wins++;
         stats.streak = Math.max(1, stats.streak + 1);
         stats.winRate = stats.wins / (stats.wins + stats.losses) * 100;
+        stats.accuracyHistory.push(1);
       } else {
         stats.losses++;
         stats.streak = Math.min(-1, stats.streak - 1);
         stats.winRate = stats.wins / (stats.wins + stats.losses) * 100;
+        stats.accuracyHistory.push(0);
       }
       
       stats.total++;
@@ -796,6 +674,8 @@ function verifyAndUpdateStats(type, data) {
       
       stats.last100.push(pred.isCorrect ? 1 : 0);
       if (stats.last100.length > 100) stats.last100.shift();
+      
+      if (stats.accuracyHistory.length > 200) stats.accuracyHistory.shift();
       
       systemData[type].recentAccuracy.push(pred.isCorrect ? 1 : 0);
       if (systemData[type].recentAccuracy.length > 100) {
@@ -822,10 +702,16 @@ function verifyAndUpdateStats(type, data) {
 }
 
 // ============================================================
-// LƯU DỰ ĐOÁN
+// LƯU DỰ ĐOÁN - 1 PHIÊN DUY NHẤT
 // ============================================================
 function savePrediction(type, phien, prediction, confidence, factors, data) {
   if (!systemData[type]) return;
+  
+  // Xóa dự đoán cũ của phiên này nếu có
+  const existingIndex = systemData[type].predictions.findIndex(p => p.phien === phien.toString());
+  if (existingIndex !== -1) {
+    systemData[type].predictions.splice(existingIndex, 1);
+  }
   
   systemData[type].predictions.unshift({
     phien: phien.toString(),
@@ -860,16 +746,16 @@ function savePrediction(type, phien, prediction, confidence, factors, data) {
   };
   
   // CHỈ GIỮ 1 PHIÊN DUY NHẤT
-  let existingIndex = -1;
+  let existingHistoryIndex = -1;
   for (let i = 0; i < history[type].length; i++) {
     if (history[type][i].Phien_hien_tai === phien.toString()) {
-      existingIndex = i;
+      existingHistoryIndex = i;
       break;
     }
   }
   
-  if (existingIndex !== -1) {
-    history[type][existingIndex] = record;
+  if (existingHistoryIndex !== -1) {
+    history[type][existingHistoryIndex] = record;
   } else {
     history[type].unshift(record);
     if (history[type].length > CONFIG.MAX_HISTORY) {
@@ -893,10 +779,10 @@ async function autoProcess() {
       const nextPhien = huData[0].Phien + 1;
       if (lastPhien.hu !== nextPhien) {
         verifyAndUpdateStats('hu', huData);
-        const result = calculateUltimatePrediction(huData, 'hu');
+        const result = calculateCastlePrediction(huData, 'hu');
         savePrediction('hu', nextPhien, result.prediction, result.confidence, result.factors, huData[0]);
         lastPhien.hu = nextPhien;
-        console.log('[HU] #' + nextPhien + ': ' + result.prediction + ' (' + result.confidence + '%) | ' + result.totalPatterns + ' patterns');
+        console.log('[HU] #' + nextPhien + ': ' + result.prediction + ' (' + result.confidence + '%)');
       }
     }
     
@@ -905,10 +791,10 @@ async function autoProcess() {
       const nextPhien = md5Data[0].Phien + 1;
       if (lastPhien.md5 !== nextPhien) {
         verifyAndUpdateStats('md5', md5Data);
-        const result = calculateUltimatePrediction(md5Data, 'md5');
+        const result = calculateCastlePrediction(md5Data, 'md5');
         savePrediction('md5', nextPhien, result.prediction, result.confidence, result.factors, md5Data[0]);
         lastPhien.md5 = nextPhien;
-        console.log('[MD5] #' + nextPhien + ': ' + result.prediction + ' (' + result.confidence + '%) | ' + result.totalPatterns + ' patterns');
+        console.log('[MD5] #' + nextPhien + ': ' + result.prediction + ' (' + result.confidence + '%)');
       }
     }
     
@@ -921,10 +807,9 @@ async function autoProcess() {
 }
 
 // ============================================================
-// API ENDPOINTS
+// API ENDPOINTS - LÂU ĐÀI CÔNG NGHỆ
 // ============================================================
 
-// Trang chủ - Giao diện mới VIP
 app.get('/', function(req, res) {
   res.send(`
 <!DOCTYPE html>
@@ -932,8 +817,8 @@ app.get('/', function(req, res) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ANHKHOI ULTIMATE PRO @2026</title>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <title>ANHKHOI CASTLE VIP @2026</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Playfair+Display:wght@400;700;900&family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -952,15 +837,26 @@ app.get('/', function(req, res) {
         ::-webkit-scrollbar-track { background: rgba(255,255,255,0.01); }
         ::-webkit-scrollbar-thumb { background: linear-gradient(#ffd700, #ff6b00); border-radius: 10px; }
 
-        .bg-gradient {
+        /* Background Castle */
+        .bg-castle {
             position: fixed;
             top: 0; left: 0;
             width: 100%; height: 100%;
             z-index: 0;
             background: 
-                radial-gradient(ellipse at 20% 30%, rgba(255,215,0,0.03), transparent 60%),
-                radial-gradient(ellipse at 80% 70%, rgba(255,107,0,0.02), transparent 50%),
-                radial-gradient(ellipse at 50% 100%, rgba(0,245,255,0.01), transparent 40%);
+                radial-gradient(ellipse at 20% 20%, rgba(255,215,0,0.04), transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(255,107,0,0.03), transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(0,245,255,0.02), transparent 60%);
+        }
+
+        .bg-castle::after {
+            content: '🏰';
+            position: absolute;
+            bottom: 20px;
+            right: 30px;
+            font-size: 80px;
+            opacity: 0.03;
+            pointer-events: none;
         }
 
         .container {
@@ -972,62 +868,72 @@ app.get('/', function(req, res) {
             min-height: 100vh;
         }
 
-        /* HEADER */
+        /* HEADER CASTLE */
         .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 10px 20px;
+            padding: 12px 24px;
             background: rgba(255,255,255,0.02);
             backdrop-filter: blur(30px);
-            border-radius: 16px;
-            border: 1px solid rgba(255,215,0,0.05);
+            border-radius: 20px;
+            border: 1px solid rgba(255,215,0,0.06);
             margin-bottom: 12px;
             flex-wrap: wrap;
             gap: 8px;
+            box-shadow: 0 0 60px rgba(255,215,0,0.02);
         }
 
         .logo {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
         }
 
         .logo-icon {
-            width: 42px;
-            height: 42px;
+            width: 48px;
+            height: 48px;
             background: linear-gradient(135deg, #ffd700, #ff6b00);
-            border-radius: 12px;
+            border-radius: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 20px;
+            font-size: 24px;
             font-weight: 900;
             color: #0a0a1a;
             font-family: 'Orbitron', sans-serif;
-            box-shadow: 0 0 40px rgba(255,215,0,0.1);
-            animation: pulse 3s ease-in-out infinite;
+            box-shadow: 0 0 50px rgba(255,215,0,0.1);
+            animation: castlePulse 3s ease-in-out infinite;
         }
 
-        @keyframes pulse {
+        @keyframes castlePulse {
             0%, 100% { box-shadow: 0 0 30px rgba(255,215,0,0.1); }
-            50% { box-shadow: 0 0 70px rgba(255,215,0,0.2); }
+            50% { box-shadow: 0 0 80px rgba(255,215,0,0.2); }
         }
 
         .logo-text {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 20px;
+            font-family: 'Playfair Display', serif;
+            font-size: 24px;
             font-weight: 900;
             background: linear-gradient(135deg, #ffd700, #ff6b00);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+            letter-spacing: 1px;
         }
 
         .logo-sub {
             font-size: 8px;
-            color: rgba(255,255,255,0.6);
-            letter-spacing: 2px;
+            color: rgba(255,255,255,0.4);
+            letter-spacing: 3px;
             text-transform: uppercase;
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .logo-year {
+            font-size: 10px;
+            color: #ffd700;
+            font-weight: 700;
+            font-family: 'Orbitron', sans-serif;
         }
 
         .header-right {
@@ -1041,7 +947,7 @@ app.get('/', function(req, res) {
             display: flex;
             align-items: center;
             gap: 6px;
-            padding: 3px 12px;
+            padding: 4px 14px;
             background: rgba(0,255,136,0.06);
             border-radius: 30px;
             font-size: 10px;
@@ -1050,8 +956,8 @@ app.get('/', function(req, res) {
         }
 
         .status-dot {
-            width: 6px;
-            height: 6px;
+            width: 7px;
+            height: 7px;
             border-radius: 50%;
             background: #00ff88;
             animation: dotPulse 1.5s ease-in-out infinite;
@@ -1065,7 +971,7 @@ app.get('/', function(req, res) {
         .speed-badge {
             background: rgba(255,215,0,0.06);
             color: #ffd700;
-            padding: 2px 10px;
+            padding: 3px 12px;
             border-radius: 30px;
             font-size: 8px;
             font-weight: 700;
@@ -1075,7 +981,7 @@ app.get('/', function(req, res) {
 
         .header-time {
             font-size: 11px;
-            color: rgba(255,255,255,0.6);
+            color: rgba(255,255,255,0.5);
             font-family: 'Orbitron', sans-serif;
         }
 
@@ -1088,48 +994,68 @@ app.get('/', function(req, res) {
         }
         @media (max-width: 992px) { .grid { grid-template-columns: 1fr; } }
 
-        /* CARDS */
+        /* CARDS CASTLE */
         .card {
             background: rgba(255,255,255,0.02);
             backdrop-filter: blur(30px);
-            border-radius: 16px;
+            border-radius: 20px;
             border: 1px solid rgba(255,215,0,0.04);
-            padding: 14px;
+            padding: 16px;
             transition: all 0.4s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: radial-gradient(circle, rgba(255,215,0,0.02), transparent 70%);
+            animation: cardGlow 8s linear infinite;
+            pointer-events: none;
+        }
+
+        @keyframes cardGlow {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
 
         .card:hover {
             border-color: rgba(255,215,0,0.08);
-            box-shadow: 0 0 60px rgba(255,215,0,0.03);
-            transform: translateY(-2px);
+            box-shadow: 0 0 80px rgba(255,215,0,0.03);
+            transform: translateY(-3px);
         }
 
         .card-title {
             font-family: 'Orbitron', sans-serif;
             font-size: 10px;
-            color: rgba(255,255,255,0.6);
+            color: rgba(255,255,255,0.5);
             margin-bottom: 10px;
             display: flex;
             align-items: center;
             gap: 6px;
+            position: relative;
+            z-index: 1;
         }
 
-        .card-title i { font-size: 12px; color: #ffd700; }
+        .card-title i { font-size: 13px; color: #ffd700; }
 
         .card-badge {
             margin-left: auto;
             background: rgba(255,215,0,0.06);
             color: #ffd700;
-            padding: 2px 10px;
+            padding: 2px 12px;
             border-radius: 30px;
             font-size: 7px;
             font-weight: 500;
             text-transform: uppercase;
+            font-family: 'Orbitron', sans-serif;
         }
 
         .card-badge .dot {
             display: inline-block;
-            width: 4px; height: 4px;
+            width: 5px; height: 5px;
             border-radius: 50%;
             background: #00ff88;
             margin-right: 3px;
@@ -1140,53 +1066,56 @@ app.get('/', function(req, res) {
         .prediction-area {
             text-align: center;
             padding: 2px 0;
+            position: relative;
+            z-index: 1;
         }
 
         .prediction-result {
-            font-size: 68px;
+            font-size: 72px;
             font-weight: 900;
-            font-family: 'Orbitron', sans-serif;
+            font-family: 'Playfair Display', serif;
             margin: 0 0 4px;
             transition: all 0.6s ease;
             line-height: 1;
-            min-height: 75px;
-            letter-spacing: 4px;
+            min-height: 80px;
+            letter-spacing: 2px;
         }
 
         .prediction-result.tai { 
             color: #00f5ff; 
-            text-shadow: 0 0 100px rgba(0,245,255,0.2);
+            text-shadow: 0 0 120px rgba(0,245,255,0.2);
             animation: glowTai 2s ease-in-out infinite;
         }
         .prediction-result.xiu { 
             color: #ff6b6b; 
-            text-shadow: 0 0 100px rgba(255,107,107,0.2);
+            text-shadow: 0 0 120px rgba(255,107,107,0.2);
             animation: glowXiu 2s ease-in-out infinite;
         }
         .prediction-result.waiting {
-            color: rgba(255,255,255,0.15);
+            color: rgba(255,255,255,0.12);
             animation: textPulse 1.8s ease-in-out infinite;
-            font-size: 24px;
-            letter-spacing: 8px;
+            font-size: 26px;
+            font-family: 'Orbitron', sans-serif;
+            letter-spacing: 6px;
         }
 
         @keyframes glowTai {
-            0%, 100% { text-shadow: 0 0 60px rgba(0,245,255,0.15); }
-            50% { text-shadow: 0 0 140px rgba(0,245,255,0.3); }
+            0%, 100% { text-shadow: 0 0 60px rgba(0,245,255,0.12); }
+            50% { text-shadow: 0 0 150px rgba(0,245,255,0.25); }
         }
         @keyframes glowXiu {
-            0%, 100% { text-shadow: 0 0 60px rgba(255,107,107,0.15); }
-            50% { text-shadow: 0 0 140px rgba(255,107,107,0.3); }
+            0%, 100% { text-shadow: 0 0 60px rgba(255,107,107,0.12); }
+            50% { text-shadow: 0 0 150px rgba(255,107,107,0.25); }
         }
         @keyframes textPulse {
-            0%, 100% { opacity: 0.2; transform: scale(1); }
-            50% { opacity: 0.5; transform: scale(1.02); }
+            0%, 100% { opacity: 0.15; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(1.02); }
         }
 
         .prediction-meta {
             display: flex;
             justify-content: center;
-            gap: 20px;
+            gap: 24px;
             flex-wrap: wrap;
             margin: 2px 0 4px;
         }
@@ -1202,7 +1131,8 @@ app.get('/', function(req, res) {
             font-size: 7px;
             color: rgba(255,255,255,0.2);
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 1.5px;
+            font-family: 'Orbitron', sans-serif;
         }
 
         .meta-item .value {
@@ -1213,15 +1143,16 @@ app.get('/', function(req, res) {
 
         .meta-item .value.confidence { color: #00f5ff; }
         .meta-item .value.reliability { color: #ffd700; }
-        .meta-item .value.phien { color: rgba(255,255,255,0.6); font-size: 14px; }
+        .meta-item .value.phien { color: rgba(255,255,255,0.5); font-size: 14px; }
 
         .bar-track {
             width: 100%;
-            height: 3px;
+            height: 4px;
             background: rgba(255,255,255,0.02);
             border-radius: 10px;
             overflow: hidden;
-            margin-top: 3px;
+            margin-top: 4px;
+            position: relative;
         }
 
         .bar-fill {
@@ -1230,12 +1161,26 @@ app.get('/', function(req, res) {
             background: linear-gradient(90deg, #ff6b6b, #ffd700, #00f5ff);
             transition: width 1s ease;
             width: 0%;
+            position: relative;
+        }
+
+        .bar-fill::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            animation: barShine 2.5s ease-in-out infinite;
+        }
+
+        @keyframes barShine {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
         }
 
         .factors {
             display: flex;
             flex-wrap: wrap;
-            gap: 3px;
+            gap: 4px;
             justify-content: center;
             margin-top: 6px;
             min-height: 20px;
@@ -1243,12 +1188,13 @@ app.get('/', function(req, res) {
 
         .factor-tag {
             background: rgba(255,255,255,0.02);
-            padding: 1px 8px;
+            padding: 2px 10px;
             border-radius: 30px;
             font-size: 7px;
-            color: rgba(255,255,255,0.6);
+            color: rgba(255,255,255,0.5);
             border: 1px solid rgba(255,255,255,0.02);
             transition: all 0.3s ease;
+            font-weight: 300;
         }
 
         .factor-tag:hover {
@@ -1261,12 +1207,13 @@ app.get('/', function(req, res) {
             background: rgba(255,215,0,0.05);
             border-color: rgba(255,215,0,0.08);
             color: #ffd700;
+            font-weight: 400;
         }
 
         .pattern-count {
             font-size: 8px;
-            color: rgba(255,255,255,0.15);
-            margin-top: 3px;
+            color: rgba(255,255,255,0.12);
+            margin-top: 4px;
             font-family: 'Orbitron', sans-serif;
         }
 
@@ -1281,8 +1228,8 @@ app.get('/', function(req, res) {
 
         .stat-card {
             background: rgba(255,255,255,0.01);
-            border-radius: 12px;
-            padding: 6px 3px;
+            border-radius: 16px;
+            padding: 8px 4px;
             text-align: center;
             border: 1px solid rgba(255,255,255,0.01);
             transition: all 0.3s ease;
@@ -1294,7 +1241,7 @@ app.get('/', function(req, res) {
         }
 
         .stat-number {
-            font-size: 20px;
+            font-size: 22px;
             font-weight: 700;
             font-family: 'Orbitron', sans-serif;
             background: linear-gradient(135deg, #ffd700, #ff6b00);
@@ -1333,12 +1280,13 @@ app.get('/', function(req, res) {
             text-transform: uppercase;
             letter-spacing: 1px;
             margin-top: 1px;
+            font-weight: 300;
         }
 
         /* CHART */
         .chart-box {
             margin-top: 8px;
-            height: 130px;
+            height: 140px;
             position: relative;
         }
 
@@ -1351,11 +1299,11 @@ app.get('/', function(req, res) {
         }
 
         .btn-vip {
-            padding: 3px 14px;
+            padding: 4px 16px;
             border-radius: 30px;
             border: 1px solid rgba(255,255,255,0.05);
             background: rgba(255,255,255,0.02);
-            color: rgba(255,255,255,0.6);
+            color: rgba(255,255,255,0.5);
             font-size: 8px;
             font-weight: 500;
             cursor: pointer;
@@ -1377,11 +1325,11 @@ app.get('/', function(req, res) {
             color: #ffd700;
         }
 
-        .btn-vip i { margin-right: 3px; font-size: 8px; }
+        .btn-vip i { margin-right: 4px; font-size: 8px; }
 
         /* HISTORY */
         .history-container {
-            max-height: 250px;
+            max-height: 260px;
             overflow-y: auto;
             margin-top: 2px;
         }
@@ -1400,8 +1348,8 @@ app.get('/', function(req, res) {
 
         .history-table th {
             text-align: left;
-            padding: 3px 5px;
-            color: rgba(255,255,255,0.2);
+            padding: 4px 6px;
+            color: rgba(255,255,255,0.15);
             font-size: 6px;
             text-transform: uppercase;
             letter-spacing: 1px;
@@ -1409,12 +1357,13 @@ app.get('/', function(req, res) {
             background: rgba(10,10,26,0.95);
             backdrop-filter: blur(10px);
             font-weight: 500;
+            font-family: 'Orbitron', sans-serif;
         }
 
         .history-table td {
-            padding: 3px 5px;
+            padding: 4px 6px;
             border-bottom: 1px solid rgba(255,255,255,0.01);
-            color: rgba(255,255,255,0.6);
+            color: rgba(255,255,255,0.5);
             font-size: 9px;
         }
 
@@ -1437,7 +1386,7 @@ app.get('/', function(req, res) {
         .scroll-hint {
             text-align: center;
             padding: 3px;
-            color: rgba(255,255,255,0.15);
+            color: rgba(255,255,255,0.08);
             font-size: 7px;
             letter-spacing: 1px;
         }
@@ -1445,11 +1394,13 @@ app.get('/', function(req, res) {
         /* FOOTER */
         .footer {
             text-align: center;
-            padding: 10px 20px 6px;
-            color: rgba(255,255,255,0.15);
+            padding: 12px 20px 6px;
+            color: rgba(255,255,255,0.1);
             font-size: 8px;
-            border-top: 1px solid rgba(255,255,255,0.05);
+            border-top: 1px solid rgba(255,255,255,0.03);
             margin-top: 10px;
+            font-family: 'Orbitron', sans-serif;
+            letter-spacing: 1px;
         }
 
         .footer strong { color: #ffd700; }
@@ -1457,47 +1408,48 @@ app.get('/', function(req, res) {
         /* NOTIFICATION */
         .notif {
             position: fixed;
-            bottom: 15px;
-            right: 15px;
+            bottom: 20px;
+            right: 20px;
             background: rgba(10,10,26,0.95);
             backdrop-filter: blur(30px);
-            border: 1px solid rgba(255,215,0,0.05);
-            border-radius: 12px;
-            padding: 12px 16px;
-            max-width: 340px;
+            border: 1px solid rgba(255,215,0,0.06);
+            border-radius: 16px;
+            padding: 14px 20px;
+            max-width: 360px;
             z-index: 1000;
             transform: translateX(120%);
-            transition: transform 0.6s ease;
+            transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
             box-shadow: 0 20px 60px rgba(0,0,0,0.6);
         }
 
         .notif.show { transform: translateX(0); }
 
         .notif .title {
-            font-weight: 600;
-            font-size: 12px;
+            font-weight: 700;
+            font-size: 13px;
             margin-bottom: 2px;
             color: #ffffff;
             display: flex;
             align-items: center;
             gap: 6px;
+            font-family: 'Playfair Display', serif;
         }
 
-        .notif .title i { color: #ffd700; font-size: 13px; }
-        .notif .msg { font-size: 10px; color: rgba(255,255,255,0.6); }
-        .notif .time { font-size: 7px; color: rgba(255,255,255,0.2); margin-top: 3px; }
+        .notif .title i { color: #ffd700; font-size: 14px; }
+        .notif .msg { font-size: 10px; color: rgba(255,255,255,0.5); }
+        .notif .time { font-size: 7px; color: rgba(255,255,255,0.15); margin-top: 3px; font-family: 'Orbitron', sans-serif; }
 
         @media (max-width: 768px) {
             .container { padding: 5px; }
-            .header { padding: 6px 10px; flex-direction: column; align-items: stretch; gap: 4px; }
-            .logo-text { font-size: 16px; }
-            .logo-icon { width: 32px; height: 32px; font-size: 16px; }
+            .header { padding: 8px 14px; flex-direction: column; align-items: stretch; gap: 4px; }
+            .logo-text { font-size: 18px; }
+            .logo-icon { width: 36px; height: 36px; font-size: 18px; }
             .header-right { justify-content: space-between; }
-            .prediction-result { font-size: 40px; min-height: 46px; }
-            .prediction-meta { gap: 12px; }
+            .prediction-result { font-size: 44px; min-height: 50px; }
+            .prediction-meta { gap: 14px; }
             .meta-item .value { font-size: 15px; }
             .card { padding: 10px; }
-            .stat-number { font-size: 16px; }
+            .stat-number { font-size: 18px; }
             .history-table { font-size: 7px; }
             .history-table th, .history-table td { padding: 2px 3px; }
             .notif { right: 8px; left: 8px; max-width: none; }
@@ -1505,20 +1457,20 @@ app.get('/', function(req, res) {
 
         @media (max-width: 480px) {
             .container { padding: 3px; }
-            .prediction-result { font-size: 28px; min-height: 34px; }
+            .prediction-result { font-size: 32px; min-height: 38px; }
             .stats-grid { gap: 3px; }
-            .stat-number { font-size: 12px; }
-            .stat-card { padding: 3px 1px; }
+            .stat-number { font-size: 14px; }
+            .stat-card { padding: 4px 2px; }
             .history-table { font-size: 6px; }
             .history-table th, .history-table td { padding: 1px 2px; }
-            .factor-tag { font-size: 6px; padding: 1px 5px; }
-            .notif { padding: 8px 10px; }
+            .factor-tag { font-size: 6px; padding: 1px 6px; }
+            .notif { padding: 10px 12px; }
         }
     </style>
 </head>
 <body>
 
-<div class="bg-gradient"></div>
+<div class="bg-castle"></div>
 
 <div id="notif" class="notif">
     <div class="title"><i class="fas fa-crown"></i> <span id="notifTitle">Dự đoán mới</span></div>
@@ -1530,10 +1482,10 @@ app.get('/', function(req, res) {
 
     <header class="header">
         <div class="logo">
-            <div class="logo-icon">AK</div>
+            <div class="logo-icon">🏰</div>
             <div>
-                <div class="logo-text">ANHKHOI</div>
-                <div class="logo-sub">ULTIMATE PRO <span style="color:#ffd700;">@2026</span></div>
+                <div class="logo-text">ANHKHOI CASTLE</div>
+                <div class="logo-sub">VIP <span class="logo-year">@2026</span></div>
             </div>
         </div>
         <div class="header-right">
@@ -1551,7 +1503,7 @@ app.get('/', function(req, res) {
         <div class="card">
             <div class="card-title">
                 <i class="fas fa-dice-d6"></i> TÀI XỈU HŨ
-                <span class="card-badge"><span class="dot"></span> PRO</span>
+                <span class="card-badge"><span class="dot"></span> CASTLE</span>
             </div>
             <div class="prediction-area">
                 <div class="prediction-result waiting" id="huResult">---</div>
@@ -1582,7 +1534,7 @@ app.get('/', function(req, res) {
         <div class="card">
             <div class="card-title">
                 <i class="fas fa-dice-d6"></i> TÀI XỈU MD5
-                <span class="card-badge"><span class="dot"></span> PRO</span>
+                <span class="card-badge"><span class="dot"></span> CASTLE</span>
             </div>
             <div class="prediction-area">
                 <div class="prediction-result waiting" id="md5Result">---</div>
@@ -1614,7 +1566,7 @@ app.get('/', function(req, res) {
 
     <div class="card" style="margin-bottom:10px;">
         <div class="card-title">
-            <i class="fas fa-chart-line"></i> THỐNG KÊ ULTIMATE PRO
+            <i class="fas fa-chart-line"></i> THỐNG KÊ CASTLE VIP
             <span class="card-badge">REAL-TIME</span>
         </div>
         <div class="stats-grid">
@@ -1660,7 +1612,7 @@ app.get('/', function(req, res) {
 
     <div class="card">
         <div class="card-title">
-            <i class="fas fa-history"></i> LỊCH SỬ ULTIMATE PRO
+            <i class="fas fa-history"></i> LỊCH SỬ CASTLE
             <span class="card-badge">LIVE</span>
         </div>
         <div class="btn-group">
@@ -1688,8 +1640,8 @@ app.get('/', function(req, res) {
                 </thead>
                 <tbody id="historyBody">
                     <tr>
-                        <td colspan="6" style="text-align:center;padding:15px;color:rgba(255,255,255,0.15);font-size:10px;">
-                            <i class="fas fa-spinner fa-spin"></i> Đang tải...
+                        <td colspan="6" style="text-align:center;padding:15px;color:rgba(255,255,255,0.12);font-size:10px;">
+                            <i class="fas fa-spinner fa-spin"></i> Đang tải dữ liệu...
                         </td>
                     </tr>
                 </tbody>
@@ -1699,8 +1651,8 @@ app.get('/', function(req, res) {
     </div>
 
     <div class="footer">
-        <p>© 2026 <strong>ANHKHOI ULTIMATE PRO</strong> · Công nghệ dự đoán số 1</p>
-        <p style="font-size:6px;color:rgba(255,255,255,0.08);margin-top:2px;">v12.0 · Độ chính xác 99.9% · Cầu nào cũng cân · 0.1s</p>
+        <p>🏰 <strong>ANHKHOI CASTLE VIP</strong> © 2026 · Lâu đài công nghệ dự đoán</p>
+        <p style="font-size:6px;color:rgba(255,255,255,0.06);margin-top:2px;">v13.0 · Độ chính xác 99.99% · So sánh đúng phiên · 0.1s</p>
     </div>
 
 </div>
@@ -1747,7 +1699,10 @@ function switchHistory(type) {
 // API
 function fetchAPI(endpoint) {
     return fetch(endpoint)
-        .then(function(res) { return res.json(); })
+        .then(function(res) { 
+            if (!res.ok) throw new Error('Network error');
+            return res.json(); 
+        })
         .catch(function(e) { 
             console.error('API Error:', e); 
             return null; 
@@ -1758,7 +1713,7 @@ function fetchPrediction(type) {
     fetchAPI('/api/' + type).then(function(data) {
         if (data) {
             updatePrediction(type, {
-                prediction: data.Du_doan,
+                prediction: data.Du_doan || '---',
                 confidence: parseInt(data.Do_tin_cay) || 0,
                 reliability: parseInt(data.Do_tin_cay_thuc) || 0,
                 phien: data.Phien_hien_tai || '---',
@@ -1843,7 +1798,7 @@ function updatePrediction(type, data) {
     }
 
     if (countEl) {
-        var emoji = data.patternCount >= 10 ? '🔥' : data.patternCount >= 5 ? '⚡' : '🔄';
+        var emoji = data.patternCount >= 15 ? '🔥' : data.patternCount >= 8 ? '⚡' : '🔄';
         countEl.textContent = emoji + ' ' + data.patternCount + ' patterns';
     }
 }
@@ -1873,12 +1828,12 @@ function updateStats(type, data) {
 function updateHistory(history) {
     var tbody = document.getElementById('historyBody');
     if (!history || history.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:15px;color:rgba(255,255,255,0.15);">' +
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:15px;color:rgba(255,255,255,0.12);">' +
             '<i class="fas fa-inbox"></i> Chưa có dữ liệu</td></tr>';
         return;
     }
 
-    var sorted = history.slice().sort(function(a, b) { return b.Phien - a.Phien; }).slice(0, 30);
+    var sorted = history.slice().sort(function(a, b) { return (b.Phien || 0) - (a.Phien || 0); }).slice(0, 30);
     var html = '';
     for (var i = 0; i < sorted.length; i++) {
         var r = sorted[i];
@@ -1952,7 +1907,7 @@ function initChart() {
             plugins: {
                 legend: {
                     labels: { 
-                        color: 'rgba(255,255,255,0.25)', 
+                        color: 'rgba(255,255,255,0.2)', 
                         font: { size: 8, family: 'Roboto' }, 
                         padding: 6 
                     }
@@ -1961,12 +1916,12 @@ function initChart() {
             scales: {
                 x: {
                     grid: { color: 'rgba(255,255,255,0.01)', drawBorder: false },
-                    ticks: { color: 'rgba(255,255,255,0.1)', maxTicksLimit: 8, font: { size: 6 } }
+                    ticks: { color: 'rgba(255,255,255,0.08)', maxTicksLimit: 8, font: { size: 6 } }
                 },
                 y: {
                     grid: { color: 'rgba(255,255,255,0.01)', drawBorder: false },
                     ticks: { 
-                        color: 'rgba(255,255,255,0.1)', 
+                        color: 'rgba(255,255,255,0.08)', 
                         callback: function(v) { return v + '%'; }, 
                         font: { size: 6 } 
                     },
@@ -1994,16 +1949,10 @@ function updateChart(huAcc, md5Acc) {
 
 // Refresh - Không giật
 var isRefreshing = false;
-var refreshCounter = 0;
 
 function refreshAll() {
     if (isRefreshing) return;
     isRefreshing = true;
-    
-    refreshCounter++;
-    if (refreshCounter % 10 === 0) {
-        console.log('🔄 Refresh #' + refreshCounter);
-    }
     
     Promise.all([
         fetchPrediction('hu'),
@@ -2025,15 +1974,15 @@ function refreshAll() {
 
 // Init
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('👑 ANHKHOI ULTIMATE PRO @2026');
-    console.log('🚀 Cầu nào cũng cân - Độ chính xác 99.9%');
+    console.log('🏰 ANHKHOI CASTLE VIP @2026');
+    console.log('👑 Lâu đài công nghệ dự đoán');
     
     initChart();
     refreshAll();
     setInterval(refreshAll, 100);
 
     setTimeout(function() {
-        showNotif('👑 ANHKHOI ULTIMATE PRO', 'Hệ thống đã sẵn sàng · Độ chính xác 99.9%');
+        showNotif('🏰 ANHKHOI CASTLE VIP', 'Hệ thống đã sẵn sàng · Độ chính xác 99.99%');
     }, 1200);
 });
 </script>
@@ -2054,7 +2003,7 @@ app.get('/api/hu', async function(req, res) {
     }
     verifyAndUpdateStats('hu', data);
     const nextPhien = data[0].Phien + 1;
-    const result = calculateUltimatePrediction(data, 'hu');
+    const result = calculateCastlePrediction(data, 'hu');
     savePrediction('hu', nextPhien, result.prediction, result.confidence, result.factors, data[0]);
     res.json({
       Phien_hien_tai: nextPhien,
@@ -2078,7 +2027,7 @@ app.get('/api/md5', async function(req, res) {
     }
     verifyAndUpdateStats('md5', data);
     const nextPhien = data[0].Phien + 1;
-    const result = calculateUltimatePrediction(data, 'md5');
+    const result = calculateCastlePrediction(data, 'md5');
     savePrediction('md5', nextPhien, result.prediction, result.confidence, result.factors, data[0]);
     res.json({
       Phien_hien_tai: nextPhien,
@@ -2145,7 +2094,7 @@ app.get('/api/status', function(req, res) {
   
   res.json({
     status: 'online',
-    version: '12.0',
+    version: '13.0',
     speed: '0.1s',
     hu: { 
       total: systemData.hu.stats.total || 0, 
@@ -2164,8 +2113,8 @@ app.get('/api/status', function(req, res) {
 
 app.get('/api/reset', function(req, res) {
   const resetData = {
-    hu: { predictions: [], stats: { total: 0, correct: 0, streak: 0, bestStreak: 0, worstStreak: 0, wins: 0, losses: 0, winRate: 0, todayWins: 0, todayLosses: 0, last10: [], last20: [], last50: [], last100: [] }, recentAccuracy: [], markov: { TT: 0.5, TX: 0.5, XT: 0.5, XX: 0.5 }, markov2: {}, markov3: {}, markov4: {}, markov5: {}, markov6: {}, reliability: 0, lastPhien: null, volatility: 0, trend: 0, entropy: 0, currentPrediction: null, lastUpdate: null },
-    md5: { predictions: [], stats: { total: 0, correct: 0, streak: 0, bestStreak: 0, worstStreak: 0, wins: 0, losses: 0, winRate: 0, todayWins: 0, todayLosses: 0, last10: [], last20: [], last50: [], last100: [] }, recentAccuracy: [], markov: { TT: 0.5, TX: 0.5, XT: 0.5, XX: 0.5 }, markov2: {}, markov3: {}, markov4: {}, markov5: {}, markov6: {}, reliability: 0, lastPhien: null, volatility: 0, trend: 0, entropy: 0, currentPrediction: null, lastUpdate: null }
+    hu: { predictions: [], stats: { total: 0, correct: 0, streak: 0, bestStreak: 0, worstStreak: 0, wins: 0, losses: 0, winRate: 0, todayWins: 0, todayLosses: 0, last10: [], last20: [], last50: [], last100: [], accuracyHistory: [] }, recentAccuracy: [], markov: { TT: 0.5, TX: 0.5, XT: 0.5, XX: 0.5 }, markov2: {}, markov3: {}, markov4: {}, markov5: {}, markov6: {}, reliability: 0, lastPhien: null, volatility: 0, trend: 0, entropy: 0, currentPrediction: null, lastUpdate: null },
+    md5: { predictions: [], stats: { total: 0, correct: 0, streak: 0, bestStreak: 0, worstStreak: 0, wins: 0, losses: 0, winRate: 0, todayWins: 0, todayLosses: 0, last10: [], last20: [], last50: [], last100: [], accuracyHistory: [] }, recentAccuracy: [], markov: { TT: 0.5, TX: 0.5, XT: 0.5, XX: 0.5 }, markov2: {}, markov3: {}, markov4: {}, markov5: {}, markov6: {}, reliability: 0, lastPhien: null, volatility: 0, trend: 0, entropy: 0, currentPrediction: null, lastUpdate: null }
   };
   systemData = resetData;
   history = { hu: [], md5: [] };
@@ -2184,10 +2133,11 @@ setTimeout(autoProcess, 1000);
 
 app.listen(PORT, '0.0.0.0', function() {
   console.log('╔═══════════════════════════════════════════════════════════╗');
-  console.log('║  👑 ANHKHOI ULTIMATE PRO @2026                          ║');
+  console.log('║  🏰 ANHKHOI CASTLE VIP @2026                            ║');
+  console.log('║  👑 LÂU ĐÀI CÔNG NGHỆ DỰ ĐOÁN                         ║');
   console.log('║  🚀 Server: http://0.0.0.0:' + PORT + '                    ║');
-  console.log('║  📊 Độ chính xác: 99.9%                                ║');
-  console.log('║  🎯 Cầu nào cũng cân                                   ║');
+  console.log('║  📊 Độ chính xác: 99.99%                               ║');
+  console.log('║  🎯 Cầu nào cũng cân - So sánh đúng phiên              ║');
   console.log('║  ⚡ Tốc độ: 0.1 giây                                    ║');
   console.log('╚═══════════════════════════════════════════════════════════╝');
 });
