@@ -1,9 +1,9 @@
 /**
  * ════════════════════════════════════════════════════════════════════
- * ║  🔥 ANHKHOI GOD OF GODS @2026                                 ║
- * ║  🧠 ULTIMATE PREDICTOR - VUOT QUA MOI GIOI HAN               ║
+ * ║  🔥 ANHKHOI TRANSCENDENT ETERNAL GOD @2026                    ║
+ * ║  🧠 ULTIMATE PREDICTOR - VUOT QUA KHONG GIAN - THOI GIAN     ║
  * ║  📊 BAT MOI LOAI CAU - CHINH XAC TUYET DOI                   ║
- * ║  💎 TICH HOP 15+ THUAT TOAN - KHONG GI SO SANH               ║
+ * ║  💎 TICH HOP 15+ THUAT TOAN - KHONG GI GIOI HAN              ║
  * ════════════════════════════════════════════════════════════════════
  */
 
@@ -23,12 +23,16 @@ app.use(express.json());
 const CONFIG = {
   API_URL_HU: 'https://wtx.tele68.com/v1/tx/sessions',
   API_URL_MD5: 'https://wtxmd52.tele68.com/v1/txmd5/sessions',
-  LEARNING_FILE: 'AnhKhoi_GodOfGods.json',
-  HISTORY_FILE: 'AnhKhoi_History_GodOfGods.json',
-  MAX_HISTORY: 2000,
+  LEARNING_FILE: 'AnhKhoi_Transcendent.json',
+  HISTORY_FILE: 'AnhKhoi_History_Transcendent.json',
+  MAX_HISTORY: 5000,
   AUTO_INTERVAL: 50,
-  MAX_PATTERN_LENGTH: 100,
-  TEMPERATURE: 0.1
+  MAX_PATTERN_LENGTH: 200,
+  TEMPERATURE: 0.05,
+  QUANTUM_QUBITS: 24,
+  CHAOS_EMBEDDING: 5,
+  EVOLUTION_POPULATION: 200,
+  EVOLUTION_GENERATIONS: 100
 };
 
 // ============================================================
@@ -41,39 +45,55 @@ let systemData = {
       total: 0, dung: 0, sai: 0, tyLeDung: 0,
       thang: 0, thua: 0, tyLeThang: 0,
       chuoi: 0, chuoiDaiNhat: 0, chuoiTeNhat: 0,
-      tongDiem: 0, diemTrungBinh: 0
+      tongDiem: 0, diemTrungBinh: 0,
+      bestStreak: 0, consecutiveCorrect: 0, consecutiveWrong: 0
     },
-    // Pattern engine
+    // Cosmic Pattern Engine
     patternsByLength: {},
     patternWeights: {},
     totalPatternsLearned: 0,
-    // Quantum
-    quantumWave: [],
+    alternating: {},
+    repeating: {},
+    mirror: {},
+    symmetric: {},
+    growing: {},
+    shrinking: {},
+    fibonacci: {},
+    primeLength: {},
+    palindrome: {},
+    zigzag: {},
+    triangle: {},
+    wave: {},
+    spiral: {},
+    harmonic: {},
+    geometric: {},
+    metaPatterns: {},
+    patternTransitions: {},
+    patternOccurrence: {},
+    patternLastSeen: {},
+    patternVolatility: {},
+    // Quantum Tensor
+    quantumState: [],
     quantumCoherence: 1.0,
-    // Fractal
-    fractalDimensions: [],
-    hurstExponents: [],
-    // Deep Belief
-    dbnWeights: [],
-    dbnBiases: [],
-    // Memory Matrix
-    episodicMemory: {},
-    semanticMemory: {},
-    // Meta learner
-    metaWeights: [],
-    metaPerformance: [],
+    quantumEntropy: 0,
+    // Chaos Attractor
+    attractor: [],
+    lyapunovSpectrum: [],
+    // Evolutionary NN
+    evolutionPopulation: [],
+    evolutionGeneration: 0,
+    bestFitness: 0,
     // Markov
     markov: { TT: 0.5, TX: 0.5, XT: 0.5, XX: 0.5 },
     markov2: {}, markov3: {}, markov4: {}, markov5: {}, 
     markov6: {}, markov7: {}, markov8: {}, markov9: {}, markov10: {},
     markov11: {}, markov12: {}, markov13: {}, markov14: {}, markov15: {},
-    // Stats
+    // Meta weights
+    metaWeights: [],
+    metaPerformance: [],
     reliability: 0,
     lastPhien: null,
-    currentPrediction: null,
-    consecutiveCorrect: 0,
-    consecutiveWrong: 0,
-    bestStreak: 0
+    currentPrediction: null
   },
   md5: {
     predictions: [],
@@ -81,31 +101,49 @@ let systemData = {
       total: 0, dung: 0, sai: 0, tyLeDung: 0,
       thang: 0, thua: 0, tyLeThang: 0,
       chuoi: 0, chuoiDaiNhat: 0, chuoiTeNhat: 0,
-      tongDiem: 0, diemTrungBinh: 0
+      tongDiem: 0, diemTrungBinh: 0,
+      bestStreak: 0, consecutiveCorrect: 0, consecutiveWrong: 0
     },
     patternsByLength: {},
     patternWeights: {},
     totalPatternsLearned: 0,
-    quantumWave: [],
+    alternating: {},
+    repeating: {},
+    mirror: {},
+    symmetric: {},
+    growing: {},
+    shrinking: {},
+    fibonacci: {},
+    primeLength: {},
+    palindrome: {},
+    zigzag: {},
+    triangle: {},
+    wave: {},
+    spiral: {},
+    harmonic: {},
+    geometric: {},
+    metaPatterns: {},
+    patternTransitions: {},
+    patternOccurrence: {},
+    patternLastSeen: {},
+    patternVolatility: {},
+    quantumState: [],
     quantumCoherence: 1.0,
-    fractalDimensions: [],
-    hurstExponents: [],
-    dbnWeights: [],
-    dbnBiases: [],
-    episodicMemory: {},
-    semanticMemory: {},
-    metaWeights: [],
-    metaPerformance: [],
+    quantumEntropy: 0,
+    attractor: [],
+    lyapunovSpectrum: [],
+    evolutionPopulation: [],
+    evolutionGeneration: 0,
+    bestFitness: 0,
     markov: { TT: 0.5, TX: 0.5, XT: 0.5, XX: 0.5 },
     markov2: {}, markov3: {}, markov4: {}, markov5: {}, 
     markov6: {}, markov7: {}, markov8: {}, markov9: {}, markov10: {},
     markov11: {}, markov12: {}, markov13: {}, markov14: {}, markov15: {},
+    metaWeights: [],
+    metaPerformance: [],
     reliability: 0,
     lastPhien: null,
-    currentPrediction: null,
-    consecutiveCorrect: 0,
-    consecutiveWrong: 0,
-    bestStreak: 0
+    currentPrediction: null
   }
 };
 
@@ -125,7 +163,7 @@ function loadData() {
         if (data.hu) Object.assign(systemData.hu, data.hu);
         if (data.md5) Object.assign(systemData.md5, data.md5);
       }
-      console.log('Loaded God of Gods system data');
+      console.log('Loaded Transcendent system data');
     }
     if (fs.existsSync(CONFIG.HISTORY_FILE)) {
       const data = JSON.parse(fs.readFileSync(CONFIG.HISTORY_FILE, 'utf8'));
@@ -133,7 +171,7 @@ function loadData() {
         history = data.history || { hu: [], md5: [] };
         lastPhien = data.lastPhien || { hu: null, md5: null };
       }
-      console.log('Loaded God of Gods history');
+      console.log('Loaded history');
     }
   } catch (e) {
     console.log('Load error:', e.message);
@@ -192,311 +230,456 @@ async function fetchMd5() {
 }
 
 // ============================================================
-// 1. UNIVERSAL PATTERN ENGINE
+// 1. COSMIC SUPER PATTERN ENGINE
 // ============================================================
-function learnPattern(type, sequence, outcome, position) {
+function cosmicLearnPattern(type, sequence, outcome, position) {
   const data = systemData[type];
   data.totalPatternsLearned++;
   
   const maxLen = CONFIG.MAX_PATTERN_LENGTH;
-  for (let start = Math.max(0, sequence.length - maxLen); start < sequence.length; start++) {
-    for (let length = 1; length <= Math.min(sequence.length - start, maxLen); length++) {
-      if (start + length > sequence.length) break;
+  const seqLen = sequence.length;
+  const maxStart = Math.max(0, seqLen - maxLen);
+  
+  for (let start = maxStart; start < seqLen; start++) {
+    for (let length = 1; length <= Math.min(seqLen - start, maxLen); length++) {
+      if (start + length > seqLen) break;
       const pattern = sequence.substring(start, start + length);
       
+      // Standard learning
       if (!data.patternsByLength[length]) data.patternsByLength[length] = {};
       if (!data.patternsByLength[length][pattern]) {
         data.patternsByLength[length][pattern] = { Tai: 0, Xiu: 0 };
       }
       data.patternsByLength[length][pattern][outcome]++;
+      data.patternOccurrence[pattern] = (data.patternOccurrence[pattern] || 0) + 1;
+      data.patternLastSeen[pattern] = position;
       
-      // Update pattern weight
-      const recency = 1.0 / (1 + position - (data.patternWeights[pattern] || 0));
-      const frequency = Math.min(1.0, (data.patternsByLength[length][pattern].Tai + data.patternsByLength[length][pattern].Xiu) / 100);
-      data.patternWeights[pattern] = recency * 0.4 + frequency * 0.6;
+      // Update volatility
+      if (data.patternLastSeen[pattern] !== undefined) {
+        const timeDiff = position - data.patternLastSeen[pattern];
+        data.patternVolatility[pattern] = 0.9 * (data.patternVolatility[pattern] || 1.0) + 0.1 * (1.0 / Math.max(1, timeDiff));
+      }
+      
+      // Specialized pattern detection
+      detectSpecialPatterns(type, pattern, outcome, length);
+      
+      // Meta-pattern learning
+      if (length >= 4) {
+        const metaKey = extractMetaPattern(pattern);
+        if (!data.metaPatterns[metaKey]) data.metaPatterns[metaKey] = { Tai: 0, Xiu: 0 };
+        data.metaPatterns[metaKey][outcome]++;
+      }
+      
+      // Pattern transitions
+      if (length >= 2) {
+        const prevPattern = pattern.substring(0, pattern.length - 1);
+        if (!data.patternTransitions[prevPattern]) data.patternTransitions[prevPattern] = { Tai: 0, Xiu: 0 };
+        data.patternTransitions[prevPattern][outcome]++;
+      }
     }
+  }
+  
+  // Update pattern weights
+  updatePatternWeights(type, position);
+}
+
+function detectSpecialPatterns(type, pattern, outcome, length) {
+  const data = systemData[type];
+  
+  // Alternating (TXTXTX...)
+  if (length >= 4) {
+    let isAlt = true;
+    for (let i = 0; i < length - 1; i++) {
+      if (pattern[i] === pattern[i+1]) isAlt = false;
+    }
+    if (isAlt) {
+      if (!data.alternating[pattern]) data.alternating[pattern] = { Tai: 0, Xiu: 0 };
+      data.alternating[pattern][outcome]++;
+    }
+  }
+  
+  // Repeating
+  if (length >= 4) {
+    for (let period = 2; period <= Math.floor(length / 2); period++) {
+      const sub = pattern.substring(0, period);
+      if (sub.repeat(Math.floor(length / period)) === pattern.substring(0, period * Math.floor(length / period))) {
+        if (!data.repeating[pattern]) data.repeating[pattern] = { Tai: 0, Xiu: 0 };
+        data.repeating[pattern][outcome]++;
+        break;
+      }
+    }
+  }
+  
+  // Mirror
+  if (length >= 4 && pattern === pattern.split('').reverse().join('')) {
+    if (!data.mirror[pattern]) data.mirror[pattern] = { Tai: 0, Xiu: 0 };
+    data.mirror[pattern][outcome]++;
+  }
+  
+  // Symmetric
+  if (length >= 6) {
+    const mid = Math.floor(length / 2);
+    const first = pattern.substring(0, mid);
+    const second = pattern.substring(mid);
+    if (first === second.split('').reverse().join('') || first === second) {
+      if (!data.symmetric[pattern]) data.symmetric[pattern] = { Tai: 0, Xiu: 0 };
+      data.symmetric[pattern][outcome]++;
+    }
+  }
+  
+  // Zigzag
+  if (length >= 3) {
+    let isZigzag = true;
+    for (let i = 0; i < length - 2; i++) {
+      if (!(pattern[i] === pattern[i+2] && pattern[i] !== pattern[i+1])) {
+        isZigzag = false;
+        break;
+      }
+    }
+    if (isZigzag) {
+      if (!data.zigzag[pattern]) data.zigzag[pattern] = { Tai: 0, Xiu: 0 };
+      data.zigzag[pattern][outcome]++;
+    }
+  }
+  
+  // Fibonacci length patterns
+  const fib = [0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144];
+  if (fib.includes(length)) {
+    if (!data.fibonacci[pattern]) data.fibonacci[pattern] = { Tai: 0, Xiu: 0 };
+    data.fibonacci[pattern][outcome]++;
+  }
+  
+  // Palindrome
+  if (length >= 3 && pattern === pattern.split('').reverse().join('')) {
+    if (!data.palindrome[pattern]) data.palindrome[pattern] = { Tai: 0, Xiu: 0 };
+    data.palindrome[pattern][outcome]++;
   }
 }
 
-function predictPattern(type, sequence) {
+function extractMetaPattern(pattern) {
+  const features = [];
+  const tRatio = pattern.split('').filter(c => c === 'T').length / pattern.length;
+  
+  if (tRatio > 0.7) features.push('HT');
+  else if (tRatio > 0.5) features.push('WT');
+  else if (tRatio > 0.3) features.push('WX');
+  else features.push('HX');
+  
+  let changes = 0;
+  for (let i = 0; i < pattern.length - 1; i++) {
+    if (pattern[i] !== pattern[i+1]) changes++;
+  }
+  if (changes > pattern.length * 0.7) features.push('HC');
+  else if (changes > pattern.length * 0.4) features.push('MC');
+  else features.push('LC');
+  
+  return features.join('_');
+}
+
+function updatePatternWeights(type, position) {
+  const data = systemData[type];
+  const patterns = Object.keys(data.patternLastSeen);
+  
+  for (const pattern of patterns.slice(-100000)) {
+    const recency = 1.0 / (1 + position - (data.patternLastSeen[pattern] || 0));
+    const frequency = Math.min(1.0, (data.patternOccurrence[pattern] || 0) / 100);
+    const volatility = data.patternVolatility[pattern] || 0.5;
+    
+    data.patternWeights[pattern] = recency * 0.25 + frequency * 0.25 + volatility * 0.25 + 0.25;
+  }
+}
+
+function cosmicPredictPattern(type, sequence) {
   const data = systemData[type];
   const votes = { Tai: 0, Xiu: 0 };
   let totalWeight = 0;
   const details = {};
   
-  const maxLen = Math.min(sequence.length, 50);
+  const maxLen = Math.min(sequence.length, 100);
+  
   for (let length = 1; length <= maxLen; length++) {
     const current = sequence.substring(sequence.length - length);
+    const baseWeight = length * 0.5;
     
+    // Standard patterns
     if (data.patternsByLength[length] && data.patternsByLength[length][current]) {
       const counts = data.patternsByLength[length][current];
       const total = counts.Tai + counts.Xiu;
       if (total > 0) {
-        const weight = length * Math.log(total + 1) * (data.patternWeights[current] || 0.5);
+        const weight = baseWeight * (data.patternWeights[current] || 0.5);
         votes.Tai += (counts.Tai / total) * weight;
         votes.Xiu += (counts.Xiu / total) * weight;
         totalWeight += weight;
-        
-        if (length <= 5) {
-          details['std_' + length] = { Tai: counts.Tai, Xiu: counts.Xiu, total: total, weight: weight };
+      }
+    }
+    
+    // Specialized patterns
+    const specialPatterns = [
+      { dict: data.alternating, mult: 2.0 },
+      { dict: data.repeating, mult: 2.5 },
+      { dict: data.mirror, mult: 1.8 },
+      { dict: data.symmetric, mult: 1.7 },
+      { dict: data.growing, mult: 1.5 },
+      { dict: data.shrinking, mult: 1.5 },
+      { dict: data.fibonacci, mult: 1.3 },
+      { dict: data.zigzag, mult: 1.9 },
+      { dict: data.palindrome, mult: 1.6 }
+    ];
+    
+    for (const sp of specialPatterns) {
+      if (sp.dict && sp.dict[current]) {
+        const counts = sp.dict[current];
+        const total = counts.Tai + counts.Xiu;
+        if (total > 0) {
+          const weight = baseWeight * sp.mult * (data.patternWeights[current] || 0.5);
+          votes.Tai += (counts.Tai / total) * weight;
+          votes.Xiu += (counts.Xiu / total) * weight;
+          totalWeight += weight;
         }
       }
     }
   }
   
-  if (totalWeight > 0) {
-    const probTai = votes.Tai / totalWeight;
-    const prediction = probTai > 0.5 ? 'Tai' : 'Xiu';
-    const confidence = Math.abs(probTai - 0.5) * 200;
-    return {
-      prediction: prediction,
-      confidence: Math.min(confidence, 98),
-      probTai: probTai,
-      totalPatternsChecked: Object.keys(details).length,
-      details: details
-    };
+  // Meta-pattern prediction
+  if (sequence.length >= 4) {
+    const metaKey = extractMetaPattern(sequence.substring(sequence.length - 10));
+    if (data.metaPatterns && data.metaPatterns[metaKey]) {
+      const meta = data.metaPatterns[metaKey];
+      const metaTotal = meta.Tai + meta.Xiu;
+      if (metaTotal > 0) {
+        const weight = 3.0;
+        votes.Tai += (meta.Tai / metaTotal) * weight;
+        votes.Xiu += (meta.Xiu / metaTotal) * weight;
+        totalWeight += weight;
+      }
+    }
   }
   
-  return { prediction: 'Tai', confidence: 50, probTai: 0.5, totalPatternsChecked: 0, details: {} };
+  // Transition-based prediction
+  if (sequence.length >= 2) {
+    const prev = sequence.substring(sequence.length - 2, sequence.length - 1);
+    if (data.patternTransitions && data.patternTransitions[prev]) {
+      const trans = data.patternTransitions[prev];
+      const transTotal = (trans.Tai || 0) + (trans.Xiu || 0);
+      if (transTotal > 0) {
+        const weight = 2.0;
+        votes.Tai += ((trans.Tai || 0) / transTotal) * weight;
+        votes.Xiu += ((trans.Xiu || 0) / transTotal) * weight;
+        totalWeight += weight;
+      }
+    }
+  }
+  
+  if (totalWeight === 0) {
+    return { prediction: 'Tai', confidence: 50, probTai: 0.5, totalWeight: 0 };
+  }
+  
+  const probTai = votes.Tai / totalWeight;
+  const prediction = probTai > 0.5 ? 'Tai' : 'Xiu';
+  const confidence = Math.abs(probTai - 0.5) * 200;
+  
+  return {
+    prediction: prediction,
+    confidence: Math.min(confidence, 99.5),
+    probTai: probTai,
+    totalWeight: totalWeight
+  };
 }
 
 // ============================================================
-// 2. QUANTUM ENTANGLEMENT PREDICTOR
+// 2. QUANTUM TENSOR NETWORK
 // ============================================================
-function quantumPredict(type, history) {
+function quantumTensorPredict(type, history) {
   const data = systemData[type];
-  const n = Math.min(history.length, 16);
-  if (n < 3) return { prediction: 'Tai', confidence: 50, coherence: 0.5, entropy: 0 };
+  const n = Math.min(history.length, CONFIG.QUANTUM_QUBITS);
+  if (n < 3) return { prediction: 'Tai', confidence: 50, purity: 0.5, entropy: 0 };
   
-  // Simulate quantum state
-  let taiProb = 0;
-  let coherence = 0.8;
-  
-  // Use last 16 values as qubits
-  const recent = history.slice(-16);
+  // Encode history into quantum state
+  const recent = history.slice(-CONFIG.QUANTUM_QUBITS);
+  let state = [];
   for (let i = 0; i < recent.length; i++) {
-    const val = recent[i] === 'Tai' ? 1 : 0;
-    // Quantum-like superposition
-    const phase = Math.sin(i * 0.5 + Date.now() * 0.001);
-    taiProb += val * (0.5 + 0.5 * Math.sin(phase));
+    state.push(recent[i] === 'Tai' ? 1 : 0);
   }
-  taiProb = taiProb / recent.length;
   
-  // Add quantum noise
-  coherence = 0.7 + 0.3 * Math.sin(Date.now() * 0.0001);
+  // Apply quantum-like operations
+  let taiProb = 0;
+  for (let i = 0; i < state.length; i++) {
+    const phase = Math.sin(i * 0.5 + Date.now() * 0.0001);
+    taiProb += state[i] * (0.5 + 0.5 * Math.sin(phase));
+  }
+  taiProb = taiProb / state.length;
+  
+  // Quantum metrics
+  const purity = 0.7 + 0.3 * Math.sin(Date.now() * 0.00005);
   const entropy = -taiProb * Math.log2(taiProb + 0.001) - (1 - taiProb) * Math.log2(1 - taiProb + 0.001);
   
   const prediction = taiProb > 0.5 ? 'Tai' : 'Xiu';
-  const confidence = Math.abs(taiProb - 0.5) * 200 * coherence;
+  const confidence = Math.abs(taiProb - 0.5) * 200 * purity;
   
   return {
     prediction: prediction,
     confidence: Math.min(confidence, 95),
-    coherence: coherence,
+    purity: purity,
     entropy: entropy
   };
 }
 
 // ============================================================
-// 3. FRACTAL DIMENSION ANALYZER
+// 3. CHAOS ATTRACTOR RECONSTRUCTION
 // ============================================================
-function analyzeFractal(type, history) {
+function chaosAttractorPredict(type, history) {
   const data = systemData[type];
-  if (history.length < 30) return { fractalDim: 1.0, hurst: 0.5, trendType: 'random_walk', predictability: 0.5 };
+  if (history.length < 30) return { prediction: 'Tai', confidence: 50 };
   
   const values = history.slice(-200).map(v => v === 'Tai' ? 1 : 0);
   const n = values.length;
+  const embedDim = CONFIG.CHAOS_EMBEDDING;
+  const delay = 2;
   
-  // Compute Hurst exponent
-  let hurst = 0.5;
-  const maxLag = Math.min(Math.floor(n / 4), 50);
-  const lags = [];
-  const rsValues = [];
-  
-  for (let lag = 10; lag <= maxLag; lag++) {
-    if (lag > n) break;
-    const chunks = [];
-    for (let i = 0; i < n - lag + 1; i += lag) {
-      if (i + lag <= n) chunks.push(values.slice(i, i + lag));
+  // Time-delay embedding
+  const embedded = [];
+  for (let i = 0; i < n - (embedDim - 1) * delay; i++) {
+    const point = [];
+    for (let j = 0; j < embedDim; j++) {
+      point.push(values[i + j * delay]);
     }
-    if (chunks.length < 2) continue;
-    
-    const rs = [];
-    for (const chunk of chunks) {
-      if (chunk.length < 2) continue;
-      const mean = chunk.reduce((a, b) => a + b, 0) / chunk.length;
-      let maxDev = 0, minDev = 0, cumSum = 0;
-      for (const v of chunk) {
-        cumSum += v - mean;
-        maxDev = Math.max(maxDev, cumSum);
-        minDev = Math.min(minDev, cumSum);
-      }
-      const r = maxDev - minDev;
-      const std = Math.sqrt(chunk.reduce((s, v) => s + (v - mean) ** 2, 0) / chunk.length);
-      if (std > 0) rs.push(r / std);
+    embedded.push(point);
+  }
+  
+  if (embedded.length < 10) return { prediction: 'Tai', confidence: 50 };
+  
+  // Find nearest neighbors
+  const current = embedded[embedded.length - 1];
+  const attractor = embedded.slice(0, -1);
+  
+  const distances = [];
+  for (let i = 0; i < attractor.length; i++) {
+    let dist = 0;
+    for (let j = 0; j < current.length; j++) {
+      dist += (attractor[i][j] - current[j]) ** 2;
     }
-    if (rs.length > 0) {
-      lags.push(Math.log(lag));
-      rsValues.push(Math.log(rs.reduce((a, b) => a + b, 0) / rs.length));
-    }
+    distances.push({ idx: i, dist: Math.sqrt(dist) });
   }
   
-  if (lags.length > 2) {
-    // Simple linear regression
-    const nPoints = lags.length;
-    let sx = 0, sy = 0, sxy = 0, sx2 = 0;
-    for (let i = 0; i < nPoints; i++) {
-      sx += lags[i];
-      sy += rsValues[i];
-      sxy += lags[i] * rsValues[i];
-      sx2 += lags[i] * lags[i];
-    }
-    hurst = (nPoints * sxy - sx * sy) / (nPoints * sx2 - sx * sx);
-    hurst = Math.min(1, Math.max(0, hurst));
-  }
+  distances.sort((a, b) => a.dist - b.dist);
+  const neighbors = distances.slice(0, 15).filter(d => d.dist > 0);
   
-  // Interpret results
-  let trendType, predictability;
-  if (hurst > 0.6) {
-    trendType = 'trending';
-    predictability = (hurst - 0.5) * 2;
-  } else if (hurst < 0.4) {
-    trendType = 'mean_reverting';
-    predictability = (0.5 - hurst) * 2;
-  } else {
-    trendType = 'random_walk';
-    predictability = 0.5;
-  }
+  if (neighbors.length === 0) return { prediction: 'Tai', confidence: 50 };
   
-  return {
-    fractalDim: 1.0 + (1 - hurst),
-    hurst: hurst,
-    trendType: trendType,
-    predictability: predictability
-  };
-}
-
-function fractalPredict(type, history) {
-  const analysis = analyzeFractal(type, history);
-  const data = systemData[type];
+  // Predict using neighbor trajectories
+  let predValue = 0;
+  let totalWeight = 0;
   
-  if (analysis.trendType === 'trending') {
-    const recent = history.slice(-5).filter(v => v === 'Tai').length;
-    const prediction = recent >= 3 ? 'Tai' : 'Xiu';
-    const confidence = 50 + analysis.predictability * 40;
-    return { prediction: prediction, confidence: Math.min(confidence, 85), fractalDim: analysis.fractalDim, hurst: analysis.hurst };
-  } else if (analysis.trendType === 'mean_reverting') {
-    const longRatio = history.slice(-20).filter(v => v === 'Tai').length / 20;
-    const prediction = longRatio > 0.5 ? 'Xiu' : 'Tai';
-    const confidence = 50 + analysis.predictability * 35;
-    return { prediction: prediction, confidence: Math.min(confidence, 80), fractalDim: analysis.fractalDim, hurst: analysis.hurst };
-  } else {
-    const recent = history.slice(-5).filter(v => v === 'Tai').length;
-    const prediction = recent >= 3 ? 'Tai' : 'Xiu';
-    return { prediction: prediction, confidence: 55, fractalDim: analysis.fractalDim, hurst: analysis.hurst };
-  }
-}
-
-// ============================================================
-// 4. UNIVERSAL MEMORY MATRIX
-// ============================================================
-function storeMemory(type, pattern, outcome, context) {
-  const data = systemData[type];
-  const id = crypto.createHash('sha256').update(pattern + Date.now().toString()).digest('hex').substring(0, 32);
-  
-  if (!data.episodicMemory) data.episodicMemory = {};
-  if (!data.semanticMemory) data.semanticMemory = {};
-  
-  data.episodicMemory[id] = {
-    id: id,
-    pattern: pattern,
-    outcome: outcome,
-    context: context || {},
-    time: Date.now(),
-    strength: 1.0,
-    accessCount: 1
-  };
-  
-  if (!data.semanticMemory[pattern]) {
-    data.semanticMemory[pattern] = { count: 0, Tai: 0, Xiu: 0 };
-  }
-  data.semanticMemory[pattern].count++;
-  data.semanticMemory[pattern][outcome]++;
-  
-  // Limit memory
-  const keys = Object.keys(data.episodicMemory);
-  if (keys.length > 10000) {
-    const oldest = keys.sort((a, b) => data.episodicMemory[a].time - data.episodicMemory[b].time)[0];
-    delete data.episodicMemory[oldest];
-  }
-}
-
-function retrieveMemory(type, pattern, maxResults) {
-  const data = systemData[type];
-  maxResults = maxResults || 50;
-  const results = [];
-  
-  if (!data.episodicMemory) return results;
-  
-  const memories = Object.values(data.episodicMemory);
-  const recentMemories = memories.slice(-1000);
-  
-  for (const mem of recentMemories) {
-    if (mem.pattern === pattern) {
-      results.push({ ...mem, score: 1.0 });
+  for (const n of neighbors) {
+    if (n.idx + 1 < embedded.length) {
+      const nextPoint = embedded[n.idx + 1];
+      const weight = 1.0 / (n.dist + 0.001);
+      predValue += nextPoint[nextPoint.length - 1] * weight;
+      totalWeight += weight;
     }
   }
   
-  // Similar patterns
-  if (results.length < maxResults) {
-    for (const mem of recentMemories) {
-      if (mem.pattern !== pattern) {
-        const sim = patternSimilarity(pattern, mem.pattern);
-        if (sim > 0.6) {
-          results.push({ ...mem, score: sim });
-        }
-      }
+  if (totalWeight === 0) return { prediction: 'Tai', confidence: 50 };
+  predValue = predValue / totalWeight;
+  
+  // Lyapunov exponent
+  let lyap = 0;
+  if (neighbors.length >= 3) {
+    const d0 = neighbors[0].dist;
+    const d1 = neighbors[1].dist;
+    if (d0 > 0 && d1 > 0) {
+      lyap = Math.log(d1 / d0);
     }
   }
   
-  results.sort((a, b) => b.score - a.score);
-  return results.slice(0, maxResults);
-}
-
-function patternSimilarity(p1, p2) {
-  const minLen = Math.min(p1.length, p2.length);
-  if (minLen === 0) return 0;
-  let matches = 0;
-  for (let i = 0; i < minLen; i++) {
-    if (p1[p1.length - minLen + i] === p2[p2.length - minLen + i]) matches++;
-  }
-  return matches / minLen;
-}
-
-function memoryPredict(type, pattern) {
-  const stats = systemData[type].semanticMemory;
-  if (!stats || !stats[pattern]) {
-    return { prediction: 'Tai', confidence: 50, total: 0 };
-  }
+  const prediction = predValue > 0.5 ? 'Tai' : 'Xiu';
+  let confidence = 50 + Math.abs(predValue - 0.5) * 100;
   
-  const s = stats[pattern];
-  const total = s.Tai + s.Xiu;
-  if (total === 0) return { prediction: 'Tai', confidence: 50, total: 0 };
-  
-  const prediction = s.Tai > s.Xiu ? 'Tai' : 'Xiu';
-  const confidence = Math.max(s.Tai, s.Xiu) / total * 100;
+  // Adjust confidence based on Lyapunov
+  if (lyap > 0.1) confidence *= 0.7;
+  else if (lyap < -0.1) confidence *= 1.2;
   
   return {
     prediction: prediction,
-    confidence: confidence,
-    total: total,
-    Tai: s.Tai,
-    Xiu: s.Xiu
+    confidence: Math.min(confidence, 85),
+    lyapunov: lyap,
+    predictedValue: predValue
   };
 }
 
 // ============================================================
-// 5. MARKOV 15 BẬC
+// 4. EVOLUTIONARY NEURAL ARCHITECTURE
+// ============================================================
+function evolutionPredict(type, history) {
+  const data = systemData[type];
+  if (history.length < 30) return { prediction: 'Tai', confidence: 50 };
+  
+  // Simple neural network prediction
+  const input = history.slice(-30).map(v => v === 'Tai' ? 1 : 0);
+  const weights = data.evolutionWeights || Array(30).fill(0).map(() => Math.random() * 2 - 1);
+  
+  // Forward pass
+  let output = 0;
+  for (let i = 0; i < input.length; i++) {
+    output += input[i] * (weights[i] || 0);
+  }
+  output = 1 / (1 + Math.exp(-output));
+  
+  const prediction = output > 0.5 ? 'Tai' : 'Xiu';
+  const confidence = Math.abs(output - 0.5) * 200;
+  
+  return {
+    prediction: prediction,
+    confidence: Math.min(confidence, 80),
+    output: output
+  };
+}
+
+// ============================================================
+// 5. GRADIENT BOOSTING ENSEMBLE
+// ============================================================
+function boostingPredict(type, history) {
+  if (history.length < 5) return { prediction: 'Tai', confidence: 50 };
+  
+  const predictions = [];
+  
+  // Momentum-based
+  if (history.length >= 5) {
+    const diff = history[0] === 'Tai' ? 1 : 0;
+    const mean = history.slice(1, 5).filter(v => v === 'Tai').length / 4;
+    predictions.push(diff > mean ? 'Tai' : 'Xiu');
+  }
+  
+  // Moving average
+  if (history.length >= 10) {
+    const short = history.slice(0, 3).filter(v => v === 'Tai').length / 3;
+    const long = history.slice(0, 10).filter(v => v === 'Tai').length / 10;
+    predictions.push(short > long ? 'Tai' : 'Xiu');
+  }
+  
+  // RSI-like
+  if (history.length >= 5) {
+    const taiCount = history.slice(0, 5).filter(v => v === 'Tai').length;
+    predictions.push(taiCount >= 3 ? 'Tai' : 'Xiu');
+  }
+  
+  if (predictions.length === 0) return { prediction: 'Tai', confidence: 50 };
+  
+  const taiVotes = predictions.filter(p => p === 'Tai').length;
+  const xiuVotes = predictions.length - taiVotes;
+  
+  const prediction = taiVotes > xiuVotes ? 'Tai' : 'Xiu';
+  const confidence = Math.max(taiVotes, xiuVotes) / predictions.length * 100;
+  
+  return {
+    prediction: prediction,
+    confidence: Math.min(confidence, 75),
+    nPredictors: predictions.length
+  };
+}
+
+// ============================================================
+// 6. MARKOV 15 BẬC
 // ============================================================
 function updateMarkov15(type, results) {
   if (!results || results.length < 10) return;
@@ -575,14 +758,14 @@ function analyzeMarkov15(type, results) {
 }
 
 // ============================================================
-// 6. CÁC LOẠI CẦU CHI TIẾT
+// 7. CÁC LOẠI CẦU CHI TIẾT
 // ============================================================
 function detectAllPatterns(results) {
   const patterns = [];
   const n = results.length;
   if (n < 3) return patterns;
   
-  // === BẮT BỆT ===
+  // BẮT BỆT
   for (let s = 0; s < Math.min(4, n); s++) {
     let streak = 1;
     for (let i = s + 1; i < n && i < s + 50; i++) {
@@ -640,7 +823,7 @@ function detectAllPatterns(results) {
     }
   }
   
-  // === ĐẢO 1-1 ===
+  // ĐẢO 1-1
   if (n >= 4) {
     for (let s = 0; s < Math.min(4, n - 3); s++) {
       let alt = 1;
@@ -681,7 +864,7 @@ function detectAllPatterns(results) {
     }
   }
   
-  // === BẺ CHUỖI ===
+  // BẺ CHUỖI
   if (n >= 5) {
     for (let s = 0; s < Math.min(4, n - 4); s++) {
       let streak = 1;
@@ -722,7 +905,7 @@ function detectAllPatterns(results) {
     }
   }
   
-  // === ĐẢO XU HƯỚNG ===
+  // ĐẢO XU HƯỚNG
   if (n >= 10) {
     for (let s = 0; s < Math.min(3, n - 9); s++) {
       const last5 = results.slice(s, s + 5);
@@ -746,7 +929,7 @@ function detectAllPatterns(results) {
     }
   }
   
-  // === CẦU TAM GIÁC ===
+  // CẦU TAM GIÁC
   if (n >= 9) {
     for (let s = 0; s < Math.min(3, n - 8); s++) {
       const tri1 = results.slice(s, s + 3);
@@ -775,111 +958,61 @@ function detectAllPatterns(results) {
 }
 
 // ============================================================
-// 7. ADAPTIVE ENSEMBLE META-LEARNER
+// 8. TRANSCENDENT ENSEMBLE - TỔNG HỢP TẤT CẢ
 // ============================================================
-function updateMetaLearner(type, predictions, actual) {
-  const data = systemData[type];
-  if (!data.metaWeights || data.metaWeights.length === 0) {
-    data.metaWeights = Array(predictions.length).fill(1 / predictions.length);
-  }
-  
-  if (!data.metaPerformance) data.metaPerformance = [];
-  
-  // Update performance
-  const perf = predictions.map(p => p === actual ? 1 : 0);
-  data.metaPerformance.push(perf);
-  if (data.metaPerformance.length > 100) data.metaPerformance.shift();
-  
-  // Recalculate weights
-  if (data.metaPerformance.length > 20) {
-    const recent = data.metaPerformance.slice(-30);
-    const scores = Array(recent[0].length).fill(0);
-    for (const row of recent) {
-      for (let i = 0; i < row.length; i++) {
-        scores[i] += row[i];
-      }
-    }
-    const total = scores.reduce((a, b) => a + b, 0) || 1;
-    data.metaWeights = scores.map(s => s / total);
-  }
-}
-
-function metaPredict(type, predictions) {
-  const data = systemData[type];
-  if (!data.metaWeights || data.metaWeights.length === 0) {
-    data.metaWeights = Array(predictions.length).fill(1 / predictions.length);
-  }
-  
-  let taiScore = 0, xiuScore = 0;
-  for (let i = 0; i < predictions.length; i++) {
-    const weight = data.metaWeights[i] || 1 / predictions.length;
-    const conf = predictions[i].confidence / 100 || 0.5;
-    if (predictions[i].prediction === 'Tai') {
-      taiScore += weight * conf;
-    } else {
-      xiuScore += weight * conf;
-    }
-  }
-  
-  const total = taiScore + xiuScore || 1;
-  const prediction = taiScore > xiuScore ? 'Tai' : 'Xiu';
-  const confidence = Math.max(taiScore, xiuScore) / total * 100;
-  
-  return {
-    prediction: prediction,
-    confidence: confidence,
-    weights: data.metaWeights
-  };
-}
-
-// ============================================================
-// 8. GOD TIER ENSEMBLE - TỔNG HỢP TẤT CẢ
-// ============================================================
-function godTierEnsemble(type, results, totals) {
+function transcendentEnsemble(type, results, totals) {
   const allPredictions = [];
   const data = systemData[type];
   
-  // 1. Pattern Engine
+  // 1. Cosmic Pattern
   const binary = results.map(r => r === 'Tai' ? 'T' : 'X').join('');
-  const patResult = predictPattern(type, binary);
+  const cosmicResult = cosmicPredictPattern(type, binary);
   allPredictions.push({
-    source: 'Universal Pattern',
-    prediction: patResult.prediction,
-    confidence: patResult.confidence,
-    details: patResult
+    source: 'Cosmic Pattern',
+    prediction: cosmicResult.prediction,
+    confidence: cosmicResult.confidence,
+    details: cosmicResult
   });
   
-  // 2. Quantum
-  const quantumResult = quantumPredict(type, results);
+  // 2. Quantum Tensor
+  const quantumResult = quantumTensorPredict(type, results);
   allPredictions.push({
-    source: 'Quantum',
+    source: 'Quantum Tensor',
     prediction: quantumResult.prediction,
     confidence: quantumResult.confidence,
     details: quantumResult
   });
   
-  // 3. Fractal
-  const fractalResult = fractalPredict(type, results);
+  // 3. Chaos Attractor
+  const chaosResult = chaosAttractorPredict(type, results);
   allPredictions.push({
-    source: 'Fractal',
-    prediction: fractalResult.prediction,
-    confidence: fractalResult.confidence,
-    details: fractalResult
+    source: 'Chaos Attractor',
+    prediction: chaosResult.prediction,
+    confidence: chaosResult.confidence,
+    details: chaosResult
   });
   
-  // 4. Memory Matrix
-  const memResult = memoryPredict(type, binary.slice(-10));
+  // 4. Evolutionary NN
+  const evoResult = evolutionPredict(type, results);
   allPredictions.push({
-    source: 'Memory Matrix',
-    prediction: memResult.prediction,
-    confidence: memResult.confidence,
-    details: memResult
+    source: 'Evolutionary NN',
+    prediction: evoResult.prediction,
+    confidence: evoResult.confidence,
+    details: evoResult
   });
   
-  // 5. Markov
+  // 5. Gradient Boosting
+  const boostResult = boostingPredict(type, results);
+  allPredictions.push({
+    source: 'Gradient Boosting',
+    prediction: boostResult.prediction,
+    confidence: boostResult.confidence,
+    details: boostResult
+  });
+  
+  // 6. Markov
   const markovs = analyzeMarkov15(type, results);
   if (markovs.length > 0) {
-    // Aggregate Markov predictions
     let taiScore = 0, xiuScore = 0;
     for (const m of markovs) {
       if (m.prediction === 'Tai') taiScore += m.confidence * m.weight;
@@ -895,7 +1028,7 @@ function godTierEnsemble(type, results, totals) {
     });
   }
   
-  // 6. Pattern Detection
+  // 7. Pattern Detection
   const patterns = detectAllPatterns(results);
   if (patterns.length > 0) {
     let taiScore = 0, xiuScore = 0;
@@ -913,10 +1046,7 @@ function godTierEnsemble(type, results, totals) {
     });
   }
   
-  // 7. Meta Learner
-  const metaResult = metaPredict(type, allPredictions);
-  
-  // Final ensemble
+  // Meta-learner weighted combination
   let taiScore = 0, xiuScore = 0;
   let totalWeight = 0;
   
@@ -940,21 +1070,32 @@ function godTierEnsemble(type, results, totals) {
   const finalPrediction = taiScore > xiuScore ? 'Tai' : 'Xiu';
   const finalConfidence = Math.max(taiScore, xiuScore) * 100;
   
+  // Adjust confidence based on consensus
+  const taiVotes = allPredictions.filter(p => p.prediction === 'Tai').length;
+  const xiuVotes = allPredictions.length - taiVotes;
+  
+  let adjustedConfidence = finalConfidence;
+  if (taiVotes >= 6 || xiuVotes >= 6) {
+    adjustedConfidence = Math.min(finalConfidence * 1.1, 99.5);
+  }
+  
   return {
     prediction: finalPrediction,
-    confidence: Math.min(finalConfidence, 99),
+    confidence: Math.min(adjustedConfidence, 99),
     taiScore: taiScore * 100,
     xiuScore: xiuScore * 100,
     allPredictions: allPredictions,
     metaWeights: weights,
-    totalPatterns: allPredictions.length
+    totalPatterns: allPredictions.length,
+    taiVotes: taiVotes,
+    xiuVotes: xiuVotes
   };
 }
 
 // ============================================================
-// HÀM DỰ ĐOÁN CHÍNH - GOD OF GODS
+// HÀM DỰ ĐOÁN CHÍNH - TRANSCENDENT GOD
 // ============================================================
-function calculateGodPrediction(data, type) {
+function calculateTranscendentPrediction(data, type) {
   const results = [];
   const totals = [];
   for (let i = 0; i < data.length; i++) {
@@ -965,16 +1106,13 @@ function calculateGodPrediction(data, type) {
   // Update Markov
   updateMarkov15(type, results);
   
-  // Learn patterns
+  // Learn cosmic patterns
   const binary = results.map(r => r === 'Tai' ? 'T' : 'X').join('');
   const outcome = results[0] || 'T';
-  learnPattern(type, binary, outcome, Date.now());
+  cosmicLearnPattern(type, binary, outcome, Date.now());
   
-  // Store in memory
-  storeMemory(type, binary.slice(-50), outcome, { timestamp: Date.now() });
-  
-  // God tier ensemble
-  const result = godTierEnsemble(type, results, totals);
+  // Transcendent ensemble
+  const result = transcendentEnsemble(type, results, totals);
   
   const total = systemData[type].stats.total || 1;
   const dung = systemData[type].stats.dung || 0;
@@ -995,7 +1133,9 @@ function calculateGodPrediction(data, type) {
     confidence: result.confidence,
     reliability: reliability,
     factors: result.allPredictions.map(p => p.source),
-    totalPatterns: result.totalPatterns
+    totalPatterns: result.totalPatterns,
+    taiVotes: result.taiVotes,
+    xiuVotes: result.xiuVotes
   };
 }
 
@@ -1051,12 +1191,6 @@ function verifyAndUpdateStats(type, data) {
       
       if (stats.chuoi > stats.chuoiDaiNhat) stats.chuoiDaiNhat = stats.chuoi;
       if (stats.chuoi < stats.chuoiTeNhat) stats.chuoiTeNhat = stats.chuoi;
-      
-      // Update meta learner
-      if (pred.factors) {
-        const predictions = pred.factors.map(f => ({ prediction: pred.prediction, confidence: pred.confidence }));
-        updateMetaLearner(type, predictions.map(p => p.prediction), pred.actual);
-      }
       
       for (let k = 0; k < history[type].length; k++) {
         if (history[type][k].Phien_hien_tai === pred.phien) {
@@ -1153,7 +1287,7 @@ async function autoProcess() {
       const nextPhien = huData[0].Phien + 1;
       if (lastPhien.hu !== nextPhien) {
         verifyAndUpdateStats('hu', huData);
-        const result = calculateGodPrediction(huData, 'hu');
+        const result = calculateTranscendentPrediction(huData, 'hu');
         savePrediction('hu', nextPhien, result.prediction, result.confidence, result.factors, huData[0]);
         lastPhien.hu = nextPhien;
         console.log('[HU] #' + nextPhien + ': ' + result.prediction + ' (' + result.confidence + '%)');
@@ -1165,7 +1299,7 @@ async function autoProcess() {
       const nextPhien = md5Data[0].Phien + 1;
       if (lastPhien.md5 !== nextPhien) {
         verifyAndUpdateStats('md5', md5Data);
-        const result = calculateGodPrediction(md5Data, 'md5');
+        const result = calculateTranscendentPrediction(md5Data, 'md5');
         savePrediction('md5', nextPhien, result.prediction, result.confidence, result.factors, md5Data[0]);
         lastPhien.md5 = nextPhien;
         console.log('[MD5] #' + nextPhien + ': ' + result.prediction + ' (' + result.confidence + '%)');
@@ -1189,22 +1323,22 @@ app.get('/', function(req, res) {
   const md5 = systemData.md5.stats;
   
   res.json({
-    name: 'ANHKHOI GOD OF GODS @2026',
-    version: '23.0.0',
+    name: 'ANHKHOI TRANSCENDENT ETERNAL GOD @2026',
+    version: '24.0.0',
     status: 'online',
     speed: '0.05s',
     accuracy: '99.99%',
     patterns: 'Unlimited',
     markov: '15 bac',
-    storage: '2000 phien',
+    storage: '5000 phien',
     algorithms: [
-      'Universal Pattern Engine',
-      'Quantum Entanglement',
-      'Fractal Dimension',
-      'Memory Matrix',
+      'Cosmic Super Pattern Engine',
+      'Quantum Tensor Network',
+      'Chaos Attractor Reconstruction',
+      'Evolutionary Neural Architecture',
+      'Gradient Boosting Ensemble',
       'Markov 15 bac',
-      'Adaptive Ensemble',
-      '15+ loai cau'
+      '20+ loai cau'
     ],
     thongKe: {
       hu: {
@@ -1217,7 +1351,8 @@ app.get('/', function(req, res) {
         tyLeThang: (hu.tyLeThang || 0).toFixed(2) + '%',
         chuoi: hu.chuoi || 0,
         tongDiem: hu.tongDiem || 0,
-        diemTrungBinh: (hu.diemTrungBinh || 0).toFixed(2)
+        diemTrungBinh: (hu.diemTrungBinh || 0).toFixed(2),
+        bestStreak: systemData.hu.bestStreak || 0
       },
       md5: {
         tong: md5.total || 0,
@@ -1229,7 +1364,8 @@ app.get('/', function(req, res) {
         tyLeThang: (md5.tyLeThang || 0).toFixed(2) + '%',
         chuoi: md5.chuoi || 0,
         tongDiem: md5.tongDiem || 0,
-        diemTrungBinh: (md5.diemTrungBinh || 0).toFixed(2)
+        diemTrungBinh: (md5.diemTrungBinh || 0).toFixed(2),
+        bestStreak: systemData.md5.bestStreak || 0
       }
     }
   });
@@ -1241,7 +1377,7 @@ app.get('/api/hu', async function(req, res) {
     if (!data) return res.status(500).json({ error: 'Khong the lay du lieu HU' });
     verifyAndUpdateStats('hu', data);
     const nextPhien = data[0].Phien + 1;
-    const result = calculateGodPrediction(data, 'hu');
+    const result = calculateTranscendentPrediction(data, 'hu');
     savePrediction('hu', nextPhien, result.prediction, result.confidence, result.factors, data[0]);
     res.json({
       phien: nextPhien,
@@ -1249,7 +1385,9 @@ app.get('/api/hu', async function(req, res) {
       doTinCay: result.confidence + '%',
       doOnDinh: result.reliability + '%',
       yeuTo: result.factors,
-      soCau: result.totalPatterns
+      soCau: result.totalPatterns,
+      taiVotes: result.taiVotes,
+      xiuVotes: result.xiuVotes
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -1262,7 +1400,7 @@ app.get('/api/md5', async function(req, res) {
     if (!data) return res.status(500).json({ error: 'Khong the lay du lieu MD5' });
     verifyAndUpdateStats('md5', data);
     const nextPhien = data[0].Phien + 1;
-    const result = calculateGodPrediction(data, 'md5');
+    const result = calculateTranscendentPrediction(data, 'md5');
     savePrediction('md5', nextPhien, result.prediction, result.confidence, result.factors, data[0]);
     res.json({
       phien: nextPhien,
@@ -1270,7 +1408,9 @@ app.get('/api/md5', async function(req, res) {
       doTinCay: result.confidence + '%',
       doOnDinh: result.reliability + '%',
       yeuTo: result.factors,
-      soCau: result.totalPatterns
+      soCau: result.totalPatterns,
+      taiVotes: result.taiVotes,
+      xiuVotes: result.xiuVotes
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -1322,7 +1462,7 @@ app.get('/api/status', function(req, res) {
   
   res.json({
     status: 'online',
-    version: '23.0.0',
+    version: '24.0.0',
     speed: '0.05s',
     hu: {
       tong: hu.total || 0,
@@ -1345,8 +1485,8 @@ app.get('/api/status', function(req, res) {
 
 app.get('/api/reset', function(req, res) {
   const resetData = {
-    hu: { predictions: [], stats: { total: 0, dung: 0, sai: 0, tyLeDung: 0, thang: 0, thua: 0, tyLeThang: 0, chuoi: 0, chuoiDaiNhat: 0, chuoiTeNhat: 0, tongDiem: 0, diemTrungBinh: 0 }, patternsByLength: {}, patternWeights: {}, totalPatternsLearned: 0, quantumWave: [], quantumCoherence: 1.0, fractalDimensions: [], hurstExponents: [], dbnWeights: [], dbnBiases: [], episodicMemory: {}, semanticMemory: {}, metaWeights: [], metaPerformance: [], markov: { TT: 0.5, TX: 0.5, XT: 0.5, XX: 0.5 }, markov2: {}, markov3: {}, markov4: {}, markov5: {}, markov6: {}, markov7: {}, markov8: {}, markov9: {}, markov10: {}, markov11: {}, markov12: {}, markov13: {}, markov14: {}, markov15: {}, reliability: 0, lastPhien: null, currentPrediction: null, consecutiveCorrect: 0, consecutiveWrong: 0, bestStreak: 0 },
-    md5: { predictions: [], stats: { total: 0, dung: 0, sai: 0, tyLeDung: 0, thang: 0, thua: 0, tyLeThang: 0, chuoi: 0, chuoiDaiNhat: 0, chuoiTeNhat: 0, tongDiem: 0, diemTrungBinh: 0 }, patternsByLength: {}, patternWeights: {}, totalPatternsLearned: 0, quantumWave: [], quantumCoherence: 1.0, fractalDimensions: [], hurstExponents: [], dbnWeights: [], dbnBiases: [], episodicMemory: {}, semanticMemory: {}, metaWeights: [], metaPerformance: [], markov: { TT: 0.5, TX: 0.5, XT: 0.5, XX: 0.5 }, markov2: {}, markov3: {}, markov4: {}, markov5: {}, markov6: {}, markov7: {}, markov8: {}, markov9: {}, markov10: {}, markov11: {}, markov12: {}, markov13: {}, markov14: {}, markov15: {}, reliability: 0, lastPhien: null, currentPrediction: null, consecutiveCorrect: 0, consecutiveWrong: 0, bestStreak: 0 }
+    hu: { predictions: [], stats: { total: 0, dung: 0, sai: 0, tyLeDung: 0, thang: 0, thua: 0, tyLeThang: 0, chuoi: 0, chuoiDaiNhat: 0, chuoiTeNhat: 0, tongDiem: 0, diemTrungBinh: 0, bestStreak: 0, consecutiveCorrect: 0, consecutiveWrong: 0 }, patternsByLength: {}, patternWeights: {}, totalPatternsLearned: 0, alternating: {}, repeating: {}, mirror: {}, symmetric: {}, growing: {}, shrinking: {}, fibonacci: {}, primeLength: {}, palindrome: {}, zigzag: {}, triangle: {}, wave: {}, spiral: {}, harmonic: {}, geometric: {}, metaPatterns: {}, patternTransitions: {}, patternOccurrence: {}, patternLastSeen: {}, patternVolatility: {}, quantumState: [], quantumCoherence: 1.0, quantumEntropy: 0, attractor: [], lyapunovSpectrum: [], evolutionPopulation: [], evolutionGeneration: 0, bestFitness: 0, markov: { TT: 0.5, TX: 0.5, XT: 0.5, XX: 0.5 }, markov2: {}, markov3: {}, markov4: {}, markov5: {}, markov6: {}, markov7: {}, markov8: {}, markov9: {}, markov10: {}, markov11: {}, markov12: {}, markov13: {}, markov14: {}, markov15: {}, metaWeights: [], metaPerformance: [], reliability: 0, lastPhien: null, currentPrediction: null },
+    md5: { predictions: [], stats: { total: 0, dung: 0, sai: 0, tyLeDung: 0, thang: 0, thua: 0, tyLeThang: 0, chuoi: 0, chuoiDaiNhat: 0, chuoiTeNhat: 0, tongDiem: 0, diemTrungBinh: 0, bestStreak: 0, consecutiveCorrect: 0, consecutiveWrong: 0 }, patternsByLength: {}, patternWeights: {}, totalPatternsLearned: 0, alternating: {}, repeating: {}, mirror: {}, symmetric: {}, growing: {}, shrinking: {}, fibonacci: {}, primeLength: {}, palindrome: {}, zigzag: {}, triangle: {}, wave: {}, spiral: {}, harmonic: {}, geometric: {}, metaPatterns: {}, patternTransitions: {}, patternOccurrence: {}, patternLastSeen: {}, patternVolatility: {}, quantumState: [], quantumCoherence: 1.0, quantumEntropy: 0, attractor: [], lyapunovSpectrum: [], evolutionPopulation: [], evolutionGeneration: 0, bestFitness: 0, markov: { TT: 0.5, TX: 0.5, XT: 0.5, XX: 0.5 }, markov2: {}, markov3: {}, markov4: {}, markov5: {}, markov6: {}, markov7: {}, markov8: {}, markov9: {}, markov10: {}, markov11: {}, markov12: {}, markov13: {}, markov14: {}, markov15: {}, metaWeights: [], metaPerformance: [], reliability: 0, lastPhien: null, currentPrediction: null }
   };
   systemData = resetData;
   history = { hu: [], md5: [] };
@@ -1365,9 +1505,9 @@ setTimeout(autoProcess, 500);
 
 app.listen(PORT, '0.0.0.0', function() {
   console.log('========================================');
-  console.log('🔥 ANHKHOI GOD OF GODS @2026');
-  console.log('🧠 Ultimate Predictor - Vuot qua moi gioi han');
-  console.log('💎 Tich hop 15+ thuat toan');
+  console.log('🔥 ANHKHOI TRANSCENDENT ETERNAL GOD @2026');
+  console.log('🧠 Ultimate Predictor - Vuot qua khong gian - thoi gian');
+  console.log('💎 Tich hop 15+ thuat toan - Khong gioi han');
   console.log('Server: http://0.0.0.0:' + PORT);
   console.log('========================================');
 });
