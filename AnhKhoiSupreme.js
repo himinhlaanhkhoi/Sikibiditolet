@@ -2,7 +2,7 @@
  * ════════════════════════════════════════════════════════════════════
  * ║  🚀 TX PREDICTOR v6 - ĐẠI CA KHÔI @2026                      ║
  * ║  🧠 30+ CẦU + 18+ TREND + DICE + ENSEMBLE                   ║
- * ║  📊 ROUTE RIÊNG: /lichsu/hu - /lichsu/md5                   ║
+ * ║  📊 ROUTE RIÊNG: /hu - /md5 - /lichsu/hu - /lichsu/md5     ║
  * ════════════════════════════════════════════════════════════════════
  */
 
@@ -24,8 +24,6 @@ const CONFIG = {
     API_URL_MD5: 'https://wtxmd52.tele68.com/v1/txmd5/sessions',
     SAVE_PATH: './tx_brain.json',
     MIN_CONF: 46,
-    NOISE: 0.05,
-    ERROR_STREAK_THRESHOLD: 2,
     MAX_PATTERN: 30,
     ADAPT_INTERVAL: 7,
     MAX_HISTORY: 1000
@@ -57,15 +55,15 @@ class TXMemory {
     }
 
     _getPattern(key) {
-        if (!this.patterns[key]) this.patterns[key] = { T: 0, X: 0, w: 1.0, n: 0, success: 0 };
+        if (!this.patterns[key]) this.patterns[key] = { T: 0, X: 0, w: 1.0, n: 0 };
         return this.patterns[key];
     }
     _getMethod(key) {
-        if (!this.methods[key]) this.methods[key] = { w: 0, l: 0, wt: 1.0, r: [], streak: 0, best: 0 };
+        if (!this.methods[key]) this.methods[key] = { w: 0, l: 0, wt: 1.0, r: [] };
         return this.methods[key];
     }
     _getCau(key) {
-        if (!this.cau[key]) this.cau[key] = { w: 0, l: 0, wt: 1.0, r: [], streak: 0 };
+        if (!this.cau[key]) this.cau[key] = { w: 0, l: 0, wt: 1.0, r: [] };
         return this.cau[key];
     }
     _getDicePattern(vi, key) {
@@ -77,7 +75,7 @@ class TXMemory {
         return this.sumPatterns[key];
     }
     _getValuePattern(key) {
-        if (!this.valuePatterns[key]) this.valuePatterns[key] = { s: 0, n: 0, vals: [] };
+        if (!this.valuePatterns[key]) this.valuePatterns[key] = { s: 0, n: 0 };
         return this.valuePatterns[key];
     }
     _getFractalPattern(key) {
@@ -89,10 +87,6 @@ class TXMemory {
         if (!this.multiStep[L][key]) this.multiStep[L][key] = { T: 0, X: 0 };
         return this.multiStep[L][key];
     }
-    _getTransition(key) {
-        if (!this.transitions[key]) this.transitions[key] = { T: 0, X: 0 };
-        return this.transitions[key];
-    }
 
     update(d1, d2, d3) {
         this.diceHistory.push([d1, d2, d3]);
@@ -101,10 +95,12 @@ class TXMemory {
 
         for (let vi = 0; vi < 3; vi++) {
             const dv = [d1, d2, d3][vi];
-            for (const L of [2, 3, 4, 5, 6]) {
+            for (const L of [2, 3, 4, 5]) {
                 if (this.diceHistory.length >= L + 1) {
                     const recent = [];
-                    for (let j = this.diceHistory.length - L - 1; j < this.diceHistory.length - 1; j++) recent.push(this.diceHistory[j][vi]);
+                    for (let j = this.diceHistory.length - L - 1; j < this.diceHistory.length - 1; j++) {
+                        recent.push(this.diceHistory[j][vi]);
+                    }
                     const key = recent.join(',');
                     const pat = this._getDicePattern(vi + 1, key);
                     pat[dv] = (pat[dv] || 0) + 1;
@@ -112,7 +108,7 @@ class TXMemory {
             }
         }
 
-        for (const L of [2, 3, 5, 8, 13, 21]) {
+        for (const L of [2, 3, 5, 8, 13]) {
             if (this.diceHistory.length >= L + 1) {
                 const recent = [];
                 for (let j = this.diceHistory.length - L - 1; j < this.diceHistory.length - 1; j++) {
@@ -125,10 +121,12 @@ class TXMemory {
         }
 
         if (this.diceHistory.length >= 6) {
-            for (let d = 2; d <= 5; d++) {
+            for (let d = 2; d <= 4; d++) {
                 const step = Math.pow(2, d - 1);
                 const indices = [];
-                for (let j = this.diceHistory.length - 1; j >= Math.max(-1, this.diceHistory.length - Math.pow(2, d) - 1); j -= step) indices.push(j);
+                for (let j = this.diceHistory.length - 1; j >= Math.max(-1, this.diceHistory.length - Math.pow(2, d) - 1); j -= step) {
+                    indices.push(j);
+                }
                 if (indices.length >= 2) {
                     const vals = indices.slice(0, d).map(i => this.diceHistory[i][0] + this.diceHistory[i][1] + this.diceHistory[i][2]);
                     const key = vals.join(',');
@@ -145,11 +143,11 @@ class TXMemory {
                 pt.push(h[0] + h[1] + h[2]);
             }
             this.attractor.push(pt);
-            if (this.attractor.length > 500) this.attractor.shift();
+            if (this.attractor.length > 300) this.attractor.shift();
         }
 
-        for (const step of [1, 2, 3, 4, 5]) {
-            for (const L of [3, 5, 8, 13]) {
+        for (const step of [1, 2, 3]) {
+            for (const L of [3, 5, 8]) {
                 if (this.diceHistory.length >= L + step) {
                     const past = [];
                     for (let j = this.diceHistory.length - L - step; j < this.diceHistory.length - step; j++) {
@@ -171,15 +169,11 @@ class TXMemory {
         for (const [name, d] of Object.entries(all)) {
             const t = (d.w || 0) + (d.l || 0);
             if (t >= 5) {
-                const r = (d.r || []).slice(-40);
+                const r = (d.r || []).slice(-30);
                 if (r.length > 0) {
-                    const weights = r.map((_, i) => Math.exp(-0.02 * (r.length - 1 - i)));
-                    const wSum = weights.reduce((a, b) => a + b, 0);
-                    const ra = r.reduce((a, v, i) => a + v * weights[i], 0) / wSum;
+                    const ra = r.reduce((a, b) => a + b, 0) / r.length;
                     const oa = (d.w || 0) / t;
-                    const streakBonus = Math.min((d.streak || 0) * 0.08, 0.5);
-                    const volumeBonus = Math.min(t / 50, 0.3);
-                    d.wt = Math.max(0.01, Math.min(5.0, (ra * 0.55 + oa * 0.25 + 0.2) * (1 + streakBonus + volumeBonus)));
+                    d.wt = Math.max(0.01, Math.min(5.0, (ra * 0.6 + oa * 0.4) * (1 + Math.min(t / 50, 0.3))));
                 }
             }
         }
@@ -193,8 +187,8 @@ class TXMemory {
             bestAcc: this.bestAcc, bestStreak: this.bestStreak, errorStreak: this.errorStreak,
             m: {}, c: {}
         };
-        for (const [k, v] of Object.entries(this.methods)) data.m[k] = { w: v.w, l: v.l, wt: v.wt, streak: v.streak, best: v.best };
-        for (const [k, v] of Object.entries(this.cau)) data.c[k] = { w: v.w, l: v.l, wt: v.wt, streak: v.streak };
+        for (const [k, v] of Object.entries(this.methods)) data.m[k] = { w: v.w, l: v.l, wt: v.wt };
+        for (const [k, v] of Object.entries(this.cau)) data.c[k] = { w: v.w, l: v.l, wt: v.wt };
         const dir = path.dirname(filepath);
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         fs.writeFileSync(filepath, JSON.stringify(data));
@@ -202,16 +196,26 @@ class TXMemory {
 
     load(filepath) {
         if (!fs.existsSync(filepath)) return false;
-        const data = JSON.parse(fs.readFileSync(filepath, 'utf8'));
-        this.session = data.ses || 0;
-        this.correct = data.corr || 0;
-        this.total = data.tot || 0;
-        this.bestAcc = data.bestAcc || 0;
-        this.bestStreak = data.bestStreak || 0;
-        this.errorStreak = data.errorStreak || 0;
-        for (const [k, v] of Object.entries(data.m || {})) { this._getMethod(k); Object.assign(this.methods[k], v); }
-        for (const [k, v] of Object.entries(data.c || {})) { this._getCau(k); Object.assign(this.cau[k], v); }
-        return true;
+        try {
+            const data = JSON.parse(fs.readFileSync(filepath, 'utf8'));
+            this.session = data.ses || 0;
+            this.correct = data.corr || 0;
+            this.total = data.tot || 0;
+            this.bestAcc = data.bestAcc || 0;
+            this.bestStreak = data.bestStreak || 0;
+            this.errorStreak = data.errorStreak || 0;
+            for (const [k, v] of Object.entries(data.m || {})) {
+                this._getMethod(k);
+                Object.assign(this.methods[k], v);
+            }
+            for (const [k, v] of Object.entries(data.c || {})) {
+                this._getCau(k);
+                Object.assign(this.cau[k], v);
+            }
+            return true;
+        } catch (e) {
+            return false;
+        }
     }
 }
 
@@ -222,21 +226,16 @@ class TXDetector {
         if (!this.L.length) return [0, null];
         const last = this.L[this.L.length - 1];
         let s = 1;
-        for (let i = this.L.length - 2; i >= 0; i--) { if (this.L[i] === last) s++; else break; }
+        for (let i = this.L.length - 2; i >= 0; i--) {
+            if (this.L[i] === last) s++;
+            else break;
+        }
         return [s, last];
     }
 
-    _linreg(y) {
-        const n = y.length;
-        let sx = 0, sy = 0, sxy = 0, sx2 = 0;
-        for (let i = 0; i < n; i++) { sx += i; sy += y[i]; sxy += i * y[i]; sx2 += i * i; }
-        return (n * sxy - sx * sy) / (n * sx2 - sx * sx);
-    }
-
-    // 30+ LOẠI CẦU
     bet() {
         const [s, l] = this._streak();
-        if (s >= 7) return { pred: l === 'T' ? 'X' : 'T', conf: 93, strength: s, reason: 'Be Bet Rong' };
+        if (s >= 7) return { pred: l === 'T' ? 'X' : 'T', conf: 92, strength: s, reason: 'Be Bet Rong' };
         if (s >= 5) return { pred: l === 'T' ? 'X' : 'T', conf: 82, strength: s, reason: 'Be Bet Dai' };
         if (s >= 3) return { pred: l, conf: 72, strength: s, reason: 'Du Bet' };
         if (s >= 2) return { pred: l, conf: 60, strength: s, reason: 'Bet Nhe' };
@@ -246,99 +245,64 @@ class TXDetector {
     noi_1_1() {
         if (this.L.length < 6) return null;
         const s = this.L.slice(-6);
-        if (s.every((v, i) => i === 0 || v !== s[i - 1])) return { pred: s[5] === 'T' ? 'X' : 'T', conf: 82, strength: 6, reason: 'Cau Noi 1-1' };
-        return null;
-    }
-
-    ziczac() {
-        if (this.L.length < 10) return null;
-        const s = this.L.slice(-10);
-        if (s.every((v, i) => i === 0 || v !== s[i - 1])) return { pred: s[9] === 'T' ? 'X' : 'T', conf: 80, strength: 10, reason: 'Zic Zac' };
-        return null;
-    }
-
-    doi_2_2() {
-        if (this.L.length < 4) return null;
-        const s = this.L.slice(-4);
-        if (s[0] === s[1] && s[2] === s[3] && s[0] !== s[2]) return { pred: s[2], conf: 78, strength: 4, reason: 'Cau 2-2' };
-        return null;
-    }
-
-    doi_3_3() {
-        if (this.L.length < 6) return null;
-        const s = this.L.slice(-6);
-        if (s[0] === s[1] && s[1] === s[2] && s[3] === s[4] && s[4] === s[5] && s[0] !== s[3]) return { pred: s[3], conf: 80, strength: 6, reason: 'Cau 3-3' };
+        let ok = true;
+        for (let i = 0; i < s.length - 1; i++) {
+            if (s[i] === s[i + 1]) ok = false;
+        }
+        if (ok) return { pred: s[5] === 'T' ? 'X' : 'T', conf: 82, strength: 6, reason: 'Cau Noi 1-1' };
         return null;
     }
 
     doi_2_1() {
         if (this.L.length < 6) return null;
         const s = this.L.slice(-6);
-        const c1 = s.slice(0, 3).join(''), c2 = s.slice(3, 6).join('');
-        if ((c1 === 'TTX' || c1 === 'XXT') && c1 === c2) return { pred: c1 === 'TTX' ? 'T' : 'X', conf: 87, strength: 6, reason: 'Cau 2-1' };
+        const c1 = s.slice(0, 3).join('');
+        const c2 = s.slice(3, 6).join('');
+        if ((c1 === 'TTX' || c1 === 'XXT') && c1 === c2) {
+            return { pred: c1 === 'TTX' ? 'T' : 'X', conf: 87, strength: 6, reason: 'Cau 2-1' };
+        }
         return null;
     }
 
     doi_3_1() {
         if (this.L.length < 8) return null;
         const s = this.L.slice(-8);
-        const c1 = s.slice(0, 4).join(''), c2 = s.slice(4, 8).join('');
-        if ((c1 === 'TTTX' || c1 === 'XXXT') && c1 === c2) return { pred: c1 === 'TTTX' ? 'T' : 'X', conf: 87, strength: 8, reason: 'Cau 3-1' };
+        const c1 = s.slice(0, 4).join('');
+        const c2 = s.slice(4, 8).join('');
+        if ((c1 === 'TTTX' || c1 === 'XXXT') && c1 === c2) {
+            return { pred: c1 === 'TTTX' ? 'T' : 'X', conf: 87, strength: 8, reason: 'Cau 3-1' };
+        }
         return null;
     }
 
-    doi_1_2() {
-        if (this.L.length < 9) return null;
-        const s = this.L.slice(-9);
-        const c1 = s.slice(0, 3).join(''), c2 = s.slice(3, 6).join(''), c3 = s.slice(6, 9).join('');
-        if (c1 === c2 && c2 === c3 && (c1 === 'TXX' || c1 === 'XTT')) return { pred: c1 === 'TXX' ? 'T' : 'X', conf: 80, strength: 9, reason: 'Cau 1-2' };
-        return null;
-    }
-
-    doi_1_3() {
-        if (this.L.length < 8) return null;
-        const s = this.L.slice(-8);
-        const c1 = s.slice(0, 4).join(''), c2 = s.slice(4, 8).join('');
-        if ((c1 === 'TXXX' || c1 === 'XTTT') && c1 === c2) return { pred: c1 === 'TXXX' ? 'T' : 'X', conf: 80, strength: 8, reason: 'Cau 1-3' };
-        return null;
-    }
-
-    gay_3_2() {
-        if (this.L.length < 5) return null;
-        const s = this.L.slice(-5);
-        if (s[0] === s[1] && s[1] === s[2] && s[2] !== s[3] && s[3] === s[4]) return { pred: s[3], conf: 74, strength: 5, reason: 'Gay 3-2' };
-        return null;
-    }
-
-    gay_2_3() {
-        if (this.L.length < 5) return null;
-        const s = this.L.slice(-5);
-        if (s[0] === s[1] && s[1] !== s[2] && s[2] === s[3] && s[3] === s[4]) return { pred: s[2], conf: 74, strength: 5, reason: 'Gay 2-3' };
-        return null;
-    }
-
-    gay_1_2_1() {
+    doi_2_2() {
         if (this.L.length < 4) return null;
         const s = this.L.slice(-4);
-        if (s[0] !== s[1] && s[1] === s[2] && s[2] !== s[3] && s[0] === s[3]) return { pred: s[1], conf: 72, strength: 4, reason: 'Gay 1-2-1' };
+        if (s[0] === s[1] && s[2] === s[3] && s[0] !== s[2]) {
+            return { pred: s[2], conf: 78, strength: 4, reason: 'Cau 2-2' };
+        }
         return null;
     }
 
-    gay_2_1_2() {
-        if (this.L.length < 5) return null;
-        const s = this.L.slice(-5);
-        if (s[0] === s[1] && s[1] !== s[2] && s[2] !== s[3] && s[3] === s[4] && s[0] === s[4]) return { pred: s[2], conf: 72, strength: 5, reason: 'Gay 2-1-2' };
+    doi_3_3() {
+        if (this.L.length < 6) return null;
+        const s = this.L.slice(-6);
+        if (s[0] === s[1] && s[1] === s[2] && s[3] === s[4] && s[4] === s[5] && s[0] !== s[3]) {
+            return { pred: s[3], conf: 80, strength: 6, reason: 'Cau 3-3' };
+        }
         return null;
     }
 
     mau_lap() {
         if (this.L.length < 6) return null;
-        const arr = this.L.slice(-15);
-        for (let Ln = 2; Ln <= 5; Ln++) {
+        const arr = this.L.slice(-12);
+        for (let Ln = 2; Ln <= 4; Ln++) {
             const pat = arr.slice(0, Ln);
             for (let i = Ln; i < arr.length - Ln + 1; i++) {
                 const sub = arr.slice(i, i + Ln);
-                if (JSON.stringify(sub) === JSON.stringify(pat) && i > 0) return { pred: arr[i - 1], conf: 88, strength: Ln, reason: `Mau Lap ${pat.join('')}` };
+                if (JSON.stringify(sub) === JSON.stringify(pat) && i > 0) {
+                    return { pred: arr[i - 1], conf: 86, strength: Ln, reason: 'Mau Lap' };
+                }
             }
         }
         return null;
@@ -346,28 +310,25 @@ class TXDetector {
 
     vi_cuc_tri() {
         if (this.V.length < 5) return null;
-        const pts = this.V.slice(-8);
+        const pts = this.V.slice(-5);
         const last = pts[pts.length - 1];
-        const prev = pts[pts.length - 2];
         const avg = pts.reduce((a, b) => a + b, 0) / pts.length;
-        const std = Math.sqrt(pts.reduce((a, b) => a + (b - avg) ** 2, 0) / pts.length);
-        if (last >= 16) return { pred: 'X', conf: 78, strength: 1, reason: 'Vi Cuc Dai' };
-        if (last <= 4) return { pred: 'T', conf: 78, strength: 1, reason: 'Vi Cuc Tieu' };
-        if (last > avg + 2 * std) return { pred: 'X', conf: 72, strength: 1, reason: 'Vi Dot Bien Cao' };
-        if (last < avg - 2 * std) return { pred: 'T', conf: 72, strength: 1, reason: 'Vi Dot Bien Thap' };
-        if (avg > 11 && last > prev) return { pred: 'X', conf: 68, strength: 1, reason: 'Vi Bao Hoa' };
-        if (avg < 10 && last < prev) return { pred: 'T', conf: 68, strength: 1, reason: 'Vi Can Kiet' };
-        if (avg >= 11 && last >= 11 && last <= 13) return { pred: 'T', conf: 65, strength: 1, reason: 'Vi On Dinh Tai' };
-        if (avg <= 9 && last >= 7 && last <= 9) return { pred: 'X', conf: 65, strength: 1, reason: 'Vi On Dinh Xiu' };
+        if (last >= 16) return { pred: 'X', conf: 76, strength: 1, reason: 'Vi Cuc Dai' };
+        if (last <= 4) return { pred: 'T', conf: 76, strength: 1, reason: 'Vi Cuc Tieu' };
+        if (last > avg + 3) return { pred: 'X', conf: 70, strength: 1, reason: 'Vi Dot Bien Cao' };
+        if (last < avg - 3) return { pred: 'T', conf: 70, strength: 1, reason: 'Vi Dot Bien Thap' };
         return null;
     }
 
     cycle() {
         if (this.L.length < 10) return null;
-        for (const p of [4, 5, 6, 7, 8, 10, 12, 15, 20]) {
+        for (const p of [5, 6, 7, 8, 10, 12]) {
             if (this.L.length >= 2 * p) {
-                const a = this.L.slice(-2 * p, -p), b = this.L.slice(-p);
-                if (JSON.stringify(a) === JSON.stringify(b)) return { pred: b[b.length - 1] === 'T' ? 'X' : 'T', conf: 85, strength: p, reason: `Tuan Hoan ${p}` };
+                const a = this.L.slice(-2 * p, -p);
+                const b = this.L.slice(-p);
+                if (JSON.stringify(a) === JSON.stringify(b)) {
+                    return { pred: b[b.length - 1] === 'T' ? 'X' : 'T', conf: 83, strength: p, reason: 'Tuan Hoan' };
+                }
             }
         }
         return null;
@@ -375,25 +336,35 @@ class TXDetector {
 
     nhay() {
         if (this.L.length < 8) return null;
-        const s = this.L.slice(-10);
+        const s = this.L.slice(-8);
         let ch = 0;
-        for (let i = 1; i < s.length; i++) if (s[i] !== s[i - 1]) ch++;
-        if (ch >= 7) return { pred: s[s.length - 1] === 'T' ? 'X' : 'T', conf: 79, strength: ch, reason: 'Cau Nhay Manh' };
-        if (ch >= 5) return { pred: s[s.length - 1] === 'T' ? 'X' : 'T', conf: 70, strength: ch, reason: 'Cau Nhay' };
+        for (let i = 1; i < s.length; i++) {
+            if (s[i] !== s[i - 1]) ch++;
+        }
+        if (ch >= 6) return { pred: s[7] === 'T' ? 'X' : 'T', conf: 77, strength: ch, reason: 'Cau Nhay' };
         return null;
     }
 
     tam_giac() {
         if (this.L.length < 7) return null;
         const v = this.L.slice(-7).map(x => x === 'T' ? 1 : 0);
-        let peak = 0, maxVal = v[0];
-        for (let i = 1; i < v.length; i++) { if (v[i] > maxVal) { maxVal = v[i]; peak = i; } }
+        let peak = 0;
+        for (let i = 1; i < v.length; i++) {
+            if (v[i] > v[peak]) peak = i;
+        }
         if (peak > 0 && peak < v.length - 1) {
-            const lf = v.slice(0, peak), rt = v.slice(peak + 1);
+            const lf = v.slice(0, peak);
+            const rt = v.slice(peak + 1);
             let lfOk = true, rtOk = true;
-            for (let i = 0; i < lf.length - 1; i++) if (lf[i] > lf[i + 1]) lfOk = false;
-            for (let i = 0; i < rt.length - 1; i++) if (rt[i] < rt[i + 1]) rtOk = false;
-            if (lfOk && rtOk) return { pred: this.L[this.L.length - 1] === 'T' ? 'X' : 'T', conf: 72, strength: peak, reason: 'Tam Giac' };
+            for (let i = 0; i < lf.length - 1; i++) {
+                if (lf[i] > lf[i + 1]) lfOk = false;
+            }
+            for (let i = 0; i < rt.length - 1; i++) {
+                if (rt[i] < rt[i + 1]) rtOk = false;
+            }
+            if (lfOk && rtOk) {
+                return { pred: this.L[this.L.length - 1] === 'T' ? 'X' : 'T', conf: 72, strength: peak, reason: 'Tam Giac' };
+            }
         }
         return null;
     }
@@ -406,59 +377,37 @@ class TXDetector {
         return null;
     }
 
-    peak() {
-        if (this.L.length < 10) return null;
-        const v = this.L.slice(-12).map(x => x === 'T' ? 1 : 0);
-        const peaks = [];
-        for (let i = 1; i < v.length - 1; i++) { if (v[i] > v[i - 1] && v[i] > v[i + 1]) peaks.push(i); }
-        if (peaks.length >= 3) return { pred: this.L[this.L.length - 1] === 'T' ? 'X' : 'T', conf: 72, strength: peaks.length, reason: 'Dinh Nui' };
-        if (peaks.length >= 2) return { pred: this.L[this.L.length - 1] === 'T' ? 'X' : 'T', conf: 68, strength: peaks.length, reason: 'Dinh Nui Nhe' };
-        return null;
-    }
-
-    valley() {
-        if (this.L.length < 10) return null;
-        const v = this.L.slice(-12).map(x => x === 'T' ? 1 : 0);
-        const vals = [];
-        for (let i = 1; i < v.length - 1; i++) { if (v[i] < v[i - 1] && v[i] < v[i + 1]) vals.push(i); }
-        if (vals.length >= 3) return { pred: this.L[this.L.length - 1] === 'X' ? 'T' : 'X', conf: 72, strength: vals.length, reason: 'Day Thung' };
-        if (vals.length >= 2) return { pred: this.L[this.L.length - 1] === 'X' ? 'T' : 'X', conf: 68, strength: vals.length, reason: 'Day Thung Nhe' };
-        return null;
-    }
-
     reversal() {
-        if (this.L.length < 12) return null;
+        if (this.L.length < 10) return null;
         const last = this.L[this.L.length - 1];
         const opp = last === 'T' ? 'X' : 'T';
-        const recent6 = this.L.slice(-6);
-        const recent10 = this.L.slice(-10);
-        if (recent6.filter(x => x === opp).length >= 4) return { pred: opp, conf: 70, strength: 4, reason: 'Hoi Phuc Manh' };
-        if (recent10.filter(x => x === opp).length >= 6) return { pred: opp, conf: 66, strength: 6, reason: 'Hoi Phuc' };
+        const recent5 = this.L.slice(-5);
+        if (recent5.filter(x => x === opp).length >= 3) {
+            return { pred: opp, conf: 68, strength: 3, reason: 'Hoi Phuc' };
+        }
         return null;
     }
 
     divergence() {
         if (this.V.length < 10) return null;
-        const rv = this.V.slice(-12);
-        const rl = this.L.slice(-12).map(x => x === 'T' ? 1 : 0);
-        const vt = this._linreg(rv);
-        const lt = this._linreg(rl);
-        if (vt > 0.3 && lt < -0.05) return { pred: 'X', conf: 73, strength: 1, reason: 'Phan Ky' };
-        if (vt < -0.3 && lt > 0.05) return { pred: 'T', conf: 73, strength: 1, reason: 'Phan Ky' };
-        return null;
-    }
-
-    fractal() {
-        if (this.L.length < 12) return null;
-        for (const lv of [2, 3, 4, 6, 8]) {
-            if (this.L.length >= lv * 2) {
-                const a = this.L.slice(-lv), b = this.L.slice(-2 * lv, -lv);
-                let m = 0;
-                for (let i = 0; i < lv; i++) if (a[i] === b[i]) m++;
-                m /= lv;
-                if (m > 0.7) return { pred: this.L[this.L.length - 1] === 'T' ? 'X' : 'T', conf: 62 + m * 25, strength: lv, reason: 'Fractal' };
-            }
+        const rv = this.V.slice(-10);
+        const rl = this.L.slice(-10).map(x => x === 'T' ? 1 : 0);
+        let sx = 0, sy = 0, sxy = 0, sx2 = 0;
+        for (let i = 0; i < 10; i++) {
+            sx += i;
+            sy += rv[i];
+            sxy += i * rv[i];
+            sx2 += i * i;
         }
+        const vt = (10 * sxy - sx * sy) / (10 * sx2 - sx * sx);
+        sy = 0; sxy = 0;
+        for (let i = 0; i < 10; i++) {
+            sy += rl[i];
+            sxy += i * rl[i];
+        }
+        const lt = (10 * sxy - sx * sy) / (10 * sx2 - sx * sx);
+        if (vt > 0 && lt < 0) return { pred: 'X', conf: 70, strength: 1, reason: 'Phan Ky' };
+        if (vt < 0 && lt > 0) return { pred: 'T', conf: 70, strength: 1, reason: 'Phan Ky' };
         return null;
     }
 
@@ -468,70 +417,8 @@ class TXDetector {
         const p = s.filter(x => x === 'T').length / 20;
         let ent = 0;
         if (p > 0 && p < 1) ent = -p * Math.log2(p) - (1 - p) * Math.log2(1 - p);
-        if (ent < 0.25) return { pred: p > 0.5 ? 'T' : 'X', conf: 76, strength: 1, reason: 'Entropy Rat Thap' };
-        if (ent < 0.4) return { pred: p > 0.5 ? 'T' : 'X', conf: 68, strength: 1, reason: 'Entropy Thap' };
-        if (ent > 0.9) return { pred: s[19] === 'T' ? 'X' : 'T', conf: 71, strength: 1, reason: 'Entropy Cao' };
-        return null;
-    }
-
-    chaos() {
-        if (this.M.attractor.length < 25) return null;
-        const pts = this.M.attractor.slice(-40);
-        const cur = pts[pts.length - 1];
-        const dists = pts.slice(0, -1).map(p => {
-            let sum = 0;
-            for (let i = 0; i < p.length; i++) sum += (p[i] - cur[i]) ** 2;
-            return Math.sqrt(sum);
-        });
-        const near = dists.map((d, i) => ({ d, i })).sort((a, b) => a.d - b.d).slice(0, 7);
-        const preds = near.filter(n => n.i + 1 < pts.length).map(n => pts[n.i + 1][pts[n.i + 1].length - 1]);
-        if (preds.length >= 3) {
-            const avg = preds.reduce((a, b) => a + b, 0) / preds.length;
-            return { pred: avg > 10 ? 'T' : 'X', conf: 61, strength: preds.length, reason: 'Chaos' };
-        }
-        return null;
-    }
-
-    gann() {
-        if (this.L.length < 20) return null;
-        const periods = [7, 9, 12, 14, 18, 21, 24, 28];
-        let best = null;
-        for (const p of periods) {
-            if (this.L.length >= p * 2) {
-                const a = this.L.slice(-p), b = this.L.slice(-2 * p, -p);
-                let m = 0;
-                for (let i = 0; i < p; i++) if (a[i] === b[i]) m++;
-                m /= p;
-                if (m > 0.6 && (!best || m > best.match)) best = { period: p, match: m };
-            }
-        }
-        if (best && best.match > 0.65) return { pred: this.L[this.L.length - best.period], conf: 62 + best.match * 22, strength: best.period, reason: `Gann ${best.period}` };
-        return null;
-    }
-
-    song() {
-        if (this.L.length < 14) return null;
-        const s = this.L.slice(-14);
-        let ch = 0;
-        for (let i = 1; i < s.length; i++) if (s[i] !== s[i - 1]) ch++;
-        if (ch >= 6 && ch <= 9) return { pred: s[s.length - 1] === 'T' ? 'X' : 'T', conf: 67, strength: ch, reason: 'Song' };
-        return null;
-    }
-
-    bac_thang() {
-        if (this.L.length < 8) return null;
-        const streaks = [];
-        let curr = 1;
-        for (let i = 1; i < this.L.slice(-10).length; i++) {
-            if (this.L.slice(-10)[i] === this.L.slice(-10)[i - 1]) curr++;
-            else { streaks.push(curr); curr = 1; }
-        }
-        streaks.push(curr);
-        if (streaks.length >= 3) {
-            let ok = true;
-            for (let i = 0; i < streaks.length - 1; i++) { if (streaks[i] < streaks[i + 1]) ok = false; }
-            if (ok) return { pred: this.L[this.L.length - 1] === 'T' ? 'X' : 'T', conf: 73, strength: streaks.length, reason: 'Bac Thang' };
-        }
+        if (ent < 0.3) return { pred: p > 0.5 ? 'T' : 'X', conf: 74, strength: 1, reason: 'Entropy Thap' };
+        if (ent > 0.9) return { pred: s[19] === 'T' ? 'X' : 'T', conf: 68, strength: 1, reason: 'Entropy Cao' };
         return null;
     }
 
@@ -539,33 +426,19 @@ class TXDetector {
         const detectors = [
             ['mau_lap', () => this.mau_lap()],
             ['noi_1_1', () => this.noi_1_1()],
-            ['ziczac', () => this.ziczac()],
             ['doi_2_2', () => this.doi_2_2()],
             ['doi_3_3', () => this.doi_3_3()],
             ['doi_2_1', () => this.doi_2_1()],
             ['doi_3_1', () => this.doi_3_1()],
-            ['doi_1_2', () => this.doi_1_2()],
-            ['doi_1_3', () => this.doi_1_3()],
-            ['gay_3_2', () => this.gay_3_2()],
-            ['gay_2_3', () => this.gay_2_3()],
-            ['gay_1_2_1', () => this.gay_1_2_1()],
-            ['gay_2_1_2', () => this.gay_2_1_2()],
             ['bet', () => this.bet()],
             ['vi', () => this.vi_cuc_tri()],
             ['cycle', () => this.cycle()],
             ['nhay', () => this.nhay()],
             ['tam_giac', () => this.tam_giac()],
             ['balance', () => this.balance()],
-            ['peak', () => this.peak()],
-            ['valley', () => this.valley()],
             ['reversal', () => this.reversal()],
             ['divergence', () => this.divergence()],
-            ['fractal', () => this.fractal()],
             ['entropy', () => this.entropy()],
-            ['chaos', () => this.chaos()],
-            ['gann', () => this.gann()],
-            ['song', () => this.song()],
-            ['bac_thang', () => this.bac_thang()],
         ];
         const results = [];
         for (const [name, fn] of detectors) {
@@ -588,82 +461,61 @@ class TXDetector {
 class TXTrend {
     constructor(L, V, M) { this.L = L; this.V = V; this.M = M; }
 
-    _linreg(y) {
-        const n = y.length;
-        let sx = 0, sy = 0, sxy = 0, sx2 = 0;
-        for (let i = 0; i < n; i++) { sx += i; sy += y[i]; sxy += i * y[i]; sx2 += i * i; }
-        return (n * sxy - sx * sy) / (n * sx2 - sx * sx);
-    }
-
     short() {
         if (this.V.length < 5) return null;
         const avg = this.V.slice(-5).reduce((a, b) => a + b, 0) / 5;
-        if (avg > 12) return { pred: 'X', conf: 72, reason: 'Short OB' };
-        if (avg < 8) return { pred: 'T', conf: 72, reason: 'Short OS' };
+        if (avg > 12) return { pred: 'X', conf: 70, reason: 'Short OB' };
+        if (avg < 8) return { pred: 'T', conf: 70, reason: 'Short OS' };
         return null;
     }
 
     med() {
         if (this.V.length < 10) return null;
-        const slope = this._linreg(this.V.slice(-10));
-        if (Math.abs(slope) > 0.5) return { pred: slope > 0 ? 'T' : 'X', conf: 67, reason: 'Medium Trend' };
-        return null;
-    }
-
-    long() {
-        if (this.V.length < 30) return null;
-        const slope = this._linreg(this.V.slice(-30));
-        if (Math.abs(slope) > 0.2) return { pred: slope > 0 ? 'T' : 'X', conf: 60, reason: 'Long Trend' };
+        const r = this.V.slice(-10);
+        let sx = 0, sy = 0, sxy = 0, sx2 = 0;
+        for (let i = 0; i < 10; i++) {
+            sx += i;
+            sy += r[i];
+            sxy += i * r[i];
+            sx2 += i * i;
+        }
+        const slope = (10 * sxy - sx * sy) / (10 * sx2 - sx * sx);
+        if (Math.abs(slope) > 0.5) return { pred: slope > 0 ? 'T' : 'X', conf: 65, reason: 'Medium Trend' };
         return null;
     }
 
     rev() {
-        if (this.V.length < 20) return null;
-        const r = this.V.slice(-20);
+        if (this.V.length < 15) return null;
+        const r = this.V.slice(-15);
         const avg = r.reduce((a, b) => a + b, 0) / r.length;
         const last = r[r.length - 1];
-        if (last > avg + 3) return { pred: 'X', conf: 77, reason: 'Mean Reversion' };
-        if (last < avg - 3) return { pred: 'T', conf: 77, reason: 'Mean Reversion' };
-        if (last > avg + 2) return { pred: 'X', conf: 67, reason: 'Mean Rev Nhe' };
-        if (last < avg - 2) return { pred: 'T', conf: 67, reason: 'Mean Rev Nhe' };
+        if (last > avg + 3) return { pred: 'X', conf: 75, reason: 'Mean Reversion' };
+        if (last < avg - 3) return { pred: 'T', conf: 75, reason: 'Mean Reversion' };
         return null;
     }
 
     bal() {
         if (this.L.length < 15) return null;
-        const r = this.L.slice(-15).filter(x => x === 'T').length / 15;
-        if (r > 0.7) return { pred: 'X', conf: 72, reason: 'Balance Over' };
-        if (r < 0.3) return { pred: 'T', conf: 72, reason: 'Balance Under' };
-        if (r > 0.6) return { pred: 'X', conf: 62, reason: 'Balance Light' };
-        if (r < 0.4) return { pred: 'T', conf: 62, reason: 'Balance Light' };
-        return null;
-    }
-
-    mom() {
-        if (this.V.length < 6) return null;
-        const d = this.V.slice(-3).reduce((a, b) => a + b, 0) / 3 - this.V.slice(-6, -3).reduce((a, b) => a + b, 0) / 3;
-        if (Math.abs(d) > 1.5) return { pred: d > 0 ? 'T' : 'X', conf: 67, reason: 'Momentum' };
-        if (Math.abs(d) > 0.8) return { pred: d > 0 ? 'T' : 'X', conf: 60, reason: 'Momentum Nhe' };
+        const ratio = this.L.slice(-15).filter(x => x === 'T').length / 15;
+        if (ratio > 0.7) return { pred: 'X', conf: 70, reason: 'Balance' };
+        if (ratio < 0.3) return { pred: 'T', conf: 70, reason: 'Balance' };
         return null;
     }
 
     pmem() {
         if (this.L.length < 5) return null;
-        let bs = 0, bp = null;
-        for (const Ln of [3, 5, 8, 13, 21]) {
+        for (const Ln of [3, 5, 8]) {
             if (this.L.length >= Ln) {
                 const pat = this.L.slice(-Ln).join(',');
                 const p = this.M._getPattern(pat);
                 const t = (p.T || 0) + (p.X || 0);
                 if (t >= 2) {
-                    const c = Math.max(p.T || 0, p.X || 0) / t;
                     const pred = (p.T || 0) > (p.X || 0) ? 'T' : 'X';
-                    const s = c * (p.w || 1.0);
-                    if (s > bs) { bs = s; bp = pred; }
+                    const conf = Math.max(p.T || 0, p.X || 0) / t * 100;
+                    return { pred: pred, conf: Math.min(conf * 0.9, 85), reason: 'Pattern Mem' };
                 }
             }
         }
-        if (bp && bs > 0.5) return { pred: bp, conf: Math.min(bs * 100, 92), reason: 'Pattern Mem' };
         return null;
     }
 
@@ -676,13 +528,12 @@ class TXTrend {
             if (diff > 0) gains += diff;
             else losses += Math.abs(diff);
         }
-        const ag = gains / 14, al = losses / 14 || 0.001;
+        const ag = gains / 14;
+        const al = losses / 14 || 0.001;
         const rs = ag / al;
         const rsiVal = 100 - (100 / (1 + rs));
-        if (rsiVal > 75) return { pred: 'X', conf: 74, reason: 'RSI OB' };
-        if (rsiVal < 25) return { pred: 'T', conf: 74, reason: 'RSI OS' };
-        if (rsiVal > 65) return { pred: 'X', conf: 64, reason: 'RSI High' };
-        if (rsiVal < 35) return { pred: 'T', conf: 64, reason: 'RSI Low' };
+        if (rsiVal > 75) return { pred: 'X', conf: 72, reason: 'RSI OB' };
+        if (rsiVal < 25) return { pred: 'T', conf: 72, reason: 'RSI OS' };
         return null;
     }
 
@@ -691,140 +542,36 @@ class TXTrend {
         const r = this.V.slice(-20);
         const m = r.reduce((a, b) => a + b, 0) / 20;
         const s = Math.sqrt(r.reduce((a, b) => a + (b - m) ** 2, 0) / 20);
-        if (r[19] > m + 2 * s) return { pred: 'X', conf: 77, reason: 'Boll OB' };
-        if (r[19] < m - 2 * s) return { pred: 'T', conf: 77, reason: 'Boll OS' };
-        if (r[19] > m + 1.5 * s) return { pred: 'X', conf: 67, reason: 'Boll High' };
-        if (r[19] < m - 1.5 * s) return { pred: 'T', conf: 67, reason: 'Boll Low' };
-        return null;
-    }
-
-    macd() {
-        if (this.V.length < 26) return null;
-        const r = this.V.slice(-26);
-        const e12 = r.slice(-12).reduce((a, b) => a + b, 0) / 12;
-        const e26 = r.reduce((a, b) => a + b, 0) / 26;
-        const sig = e12 - e26;
-        if (sig > 2) return { pred: 'T', conf: 67, reason: 'MACD Up' };
-        if (sig < -2) return { pred: 'X', conf: 67, reason: 'MACD Down' };
-        return null;
-    }
-
-    stoch() {
-        if (this.V.length < 14) return null;
-        const r = this.V.slice(-14);
-        const h = Math.max(...r), l = Math.min(...r);
-        if (h === l) return null;
-        const k = (r[13] - l) / (h - l) * 100;
-        if (k > 85) return { pred: 'X', conf: 70, reason: 'Stoch OB' };
-        if (k < 15) return { pred: 'T', conf: 70, reason: 'Stoch OS' };
-        return null;
-    }
-
-    atr() {
-        if (this.V.length < 14) return null;
-        const r = this.V.slice(-14);
-        let trSum = 0;
-        for (let i = 1; i < 14; i++) trSum += Math.abs(r[i] - r[i - 1]);
-        const atrVal = trSum / 13;
-        if (atrVal > 5) return { pred: r[13] > 10 ? 'X' : 'T', conf: 62, reason: 'ATR High' };
-        return null;
-    }
-
-    fib() {
-        if (this.V.length < 20) return null;
-        const r = this.V.slice(-20);
-        const h = Math.max(...r), l = Math.min(...r);
-        const d = h - l;
-        const last = r[19];
-        if (last < l + 0.236 * d) return { pred: 'T', conf: 64, reason: 'Fib Support' };
-        if (last > h - 0.236 * d) return { pred: 'X', conf: 64, reason: 'Fib Resistance' };
+        if (r[19] > m + 2 * s) return { pred: 'X', conf: 75, reason: 'Bollinger' };
+        if (r[19] < m - 2 * s) return { pred: 'T', conf: 75, reason: 'Bollinger' };
         return null;
     }
 
     vpred() {
         if (this.V.length < 5) return null;
-        for (const Ln of [3, 5, 8, 13]) {
+        for (const Ln of [3, 5, 8]) {
             if (this.V.length >= Ln + 1) {
                 const k = this.V.slice(-Ln - 1, -1).join(',');
                 const vp = this.M._getValuePattern(k);
                 if (vp.n >= 3) {
                     const a = vp.s / vp.n;
-                    const std = vp.vals.length > 1 ? Math.sqrt(vp.vals.reduce((s, x) => s + (x - a) ** 2, 0) / vp.vals.length) : 0;
-                    const conf = 57 + Math.abs(a - 10) * 5 - std * 2;
-                    return { pred: a > 10 ? 'T' : 'X', conf: Math.max(50, Math.min(85, conf)), reason: 'Value Pred' };
+                    return { pred: a > 10 ? 'T' : 'X', conf: 55 + Math.abs(a - 10) * 4, reason: 'Value Pred' };
                 }
             }
         }
         return null;
     }
 
-    kal() {
-        if (this.V.length < 5) return null;
-        const r = this.V.slice(-5);
-        const st = r[4];
-        const v = r.length >= 2 ? r[4] - r[3] : 0;
-        const a = r.length >= 3 ? (r[4] - 2 * r[3] + r[2]) : 0;
-        const j = r.length >= 4 ? (r[4] - 3 * r[3] + 3 * r[2] - r[1]) : 0;
-        const pred = st + v + 0.5 * a + j / 6;
-        return { pred: pred > 10 ? 'T' : 'X', conf: Math.max(50, Math.min(80, 57 + Math.abs(pred - 10) * 4)), reason: 'Kalman' };
-    }
-
-    bayes() {
-        if (this.L.length < 10) return null;
-        const tc = this.L.slice(-10).filter(x => x === 'T').length;
-        const prob = (1 + tc) / (2 + 10);
-        return { pred: prob > 0.5 ? 'T' : 'X', conf: Math.abs(prob - 0.5) * 200, reason: 'Bayes' };
-    }
-
-    expSmooth() {
-        if (this.V.length < 8) return null;
-        const r = this.V.slice(-8);
-        const weights = r.map((_, i) => Math.exp(-0.3 * (7 - i)));
-        const wSum = weights.reduce((a, b) => a + b, 0);
-        const pred = r.reduce((a, v, i) => a + v * weights[i], 0) / wSum;
-        return { pred: pred > 10 ? 'T' : 'X', conf: 55 + Math.abs(pred - 10) * 4, reason: 'Exp Smooth' };
-    }
-
-    hurst() {
-        if (this.V.length < 30) return null;
-        const r = this.V.slice(-40);
-        const n = r.length;
-        const lags = [2, 3, 4, 5, 6, 8, 10];
-        const rsVals = [];
-        for (const lag of lags) {
-            const chunks = [];
-            for (let i = 0; i < n - lag + 1; i += lag) {
-                const c = r.slice(i, i + lag);
-                if (c.length === lag) chunks.push(c);
-            }
-            if (chunks.length >= 2) {
-                const rs = chunks.map(c => {
-                    const m = c.reduce((a, b) => a + b, 0) / c.length;
-                    const cumDev = c.map(x => x - m).map((s => x => s += x)(0));
-                    const range = Math.max(...cumDev) - Math.min(...cumDev);
-                    const std = Math.sqrt(c.reduce((a, x) => a + (x - m) ** 2, 0) / c.length) || 0.001;
-                    return range / std;
-                });
-                rsVals.push(Math.log(rs.reduce((a, b) => a + b, 0) / rs.length));
-            }
-        }
-        if (rsVals.length >= 4) {
-            const logLags = lags.slice(0, rsVals.length).map(Math.log);
-            const slope = this._linreg(logLags.map((x, i) => rsVals[i]));
-            if (slope > 0.6) return { pred: r.slice(-5).reduce((a, b) => a + b, 0) / 5 > 10 ? 'T' : 'X', conf: 64, reason: 'Hurst Trend' };
-            if (slope < 0.4) return { pred: r.slice(-5).reduce((a, b) => a + b, 0) / 5 > 10 ? 'X' : 'T', conf: 64, reason: 'Hurst Rev' };
-        }
-        return null;
-    }
-
     analyzeAll() {
         const methods = [
-            ['short', () => this.short()], ['med', () => this.med()], ['long', () => this.long()],
-            ['rev', () => this.rev()], ['bal', () => this.bal()], ['mom', () => this.mom()],
-            ['pmem', () => this.pmem()], ['rsi', () => this.rsi()], ['boll', () => this.boll()],
-            ['macd', () => this.macd()], ['stoch', () => this.stoch()], ['atr', () => this.atr()],
-            ['fib', () => this.fib()], ['vpred', () => this.vpred()], ['kal', () => this.kal()],
-            ['bayes', () => this.bayes()], ['exp', () => this.expSmooth()], ['hurst', () => this.hurst()],
+            ['short', () => this.short()],
+            ['med', () => this.med()],
+            ['rev', () => this.rev()],
+            ['bal', () => this.bal()],
+            ['pmem', () => this.pmem()],
+            ['rsi', () => this.rsi()],
+            ['boll', () => this.boll()],
+            ['vpred', () => this.vpred()],
         ];
         const results = [];
         for (const [name, fn] of methods) {
@@ -850,10 +597,12 @@ class TXDice {
     total() {
         if (this.dice.length < 5) return [null, 0];
         const preds = [];
-        for (const L of [3, 5, 8, 13, 21]) {
+        for (const L of [3, 5, 8, 13]) {
             if (this.dice.length >= L + 1) {
                 const recent = [];
-                for (let j = this.dice.length - L - 1; j < this.dice.length - 1; j++) recent.push(this.dice[j][0] + this.dice[j][1] + this.dice[j][2]);
+                for (let j = this.dice.length - L - 1; j < this.dice.length - 1; j++) {
+                    recent.push(this.dice[j][0] + this.dice[j][1] + this.dice[j][2]);
+                }
                 const key = recent.join(',');
                 const pat = this.M._getSumPattern(key);
                 const entries = Object.entries(pat);
@@ -866,8 +615,11 @@ class TXDice {
         }
         if (preds.length > 0) {
             let ws = 0, wt = 0;
-            for (const p of preds) { ws += p.val * p.conf * p.L; wt += p.conf * p.L; }
-            return [wt > 0 ? ws / wt : null, 74];
+            for (const p of preds) {
+                ws += p.val * p.conf * p.L;
+                wt += p.conf * p.L;
+            }
+            return [wt > 0 ? ws / wt : null, 72];
         }
         return [null, 0];
     }
@@ -875,10 +627,12 @@ class TXDice {
     indiv() {
         const res = {};
         for (let vi = 0; vi < 3; vi++) {
-            for (const L of [3, 4, 5, 6]) {
+            for (const L of [3, 4, 5]) {
                 if (this.dice.length >= L + 1) {
                     const recent = [];
-                    for (let j = this.dice.length - L - 1; j < this.dice.length - 1; j++) recent.push(this.dice[j][vi]);
+                    for (let j = this.dice.length - L - 1; j < this.dice.length - 1; j++) {
+                        recent.push(this.dice[j][vi]);
+                    }
                     const key = recent.join(',');
                     const pat = this.M._getDicePattern(vi + 1, key);
                     const entries = Object.entries(pat);
@@ -893,10 +647,10 @@ class TXDice {
         return res;
     }
 
-    multi(steps = 5) {
+    multi() {
         const preds = {};
-        for (const step of [1, 2, 3, 4, 5]) {
-            for (const L of [5, 8, 13]) {
+        for (const step of [1, 2, 3]) {
+            for (const L of [5, 8]) {
                 if (this.dice.length >= L + step) {
                     const past = [];
                     for (let j = this.dice.length - L - step; j < this.dice.length - step; j++) {
@@ -918,10 +672,12 @@ class TXDice {
     fractal() {
         if (this.dice.length < 6) return [null, 0];
         const preds = [];
-        for (let d = 2; d <= 5; d++) {
+        for (let d = 2; d <= 4; d++) {
             const step = Math.pow(2, d - 1);
             const indices = [];
-            for (let j = this.dice.length - 1; j >= Math.max(-1, this.dice.length - Math.pow(2, d) - 1); j -= step) indices.push(j);
+            for (let j = this.dice.length - 1; j >= Math.max(-1, this.dice.length - Math.pow(2, d) - 1); j -= step) {
+                indices.push(j);
+            }
             if (indices.length >= 2) {
                 const vals = indices.slice(0, d).map(i => this.dice[i][0] + this.dice[i][1] + this.dice[i][2]);
                 const key = vals.join(',');
@@ -936,8 +692,11 @@ class TXDice {
         }
         if (preds.length > 0) {
             let ws = 0, wt = 0;
-            for (const p of preds) { ws += p.val * p.conf * p.d; wt += p.conf * p.d; }
-            return [wt > 0 ? ws / wt : null, 69];
+            for (const p of preds) {
+                ws += p.val * p.conf * p.d;
+                wt += p.conf * p.d;
+            }
+            return [wt > 0 ? ws / wt : null, 67];
         }
         return [null, 0];
     }
@@ -960,30 +719,39 @@ class TXEnsemble {
         }
         if (tot === 0) return { pred: null, conf: 50, signals };
         let ratio = tai / tot;
-        if (this.M.errorStreak >= CONFIG.ERROR_STREAK_THRESHOLD) ratio = 1 - ratio;
-        if (this.M.streak >= 6) ratio = ratio * 0.8 + 0.1;
-        else if (this.M.streak >= 4) ratio = ratio * 0.85 + 0.075;
-        else if (this.M.streak >= 2) ratio = ratio * 0.9 + 0.05;
-        if (Math.abs(ratio - 0.5) < CONFIG.NOISE) return { pred: null, conf: 50, signals };
+        if (this.M.errorStreak >= 2) ratio = 1 - ratio;
+        if (Math.abs(ratio - 0.5) < 0.05) return { pred: null, conf: 50, signals };
         const pred = ratio > 0.5 ? 'TAI' : 'XIU';
-        const conf = Math.min(Math.abs(ratio - 0.5) * 200, 99.5);
+        const conf = Math.min(Math.abs(ratio - 0.5) * 200, 99);
         return { pred, conf, signals };
     }
 }
 
 class TXPredictor {
     constructor() {
-        this.history = []; this.labels = []; this.values = []; this.diceHistory = [];
-        this.memory = new TXMemory(); this.ensemble = new TXEnsemble(this.memory);
-        this.accHistory = []; this._lastPred = null; this._lastSignals = [];
-        this.startTime = new Date(); this.totalPredsMade = 0; this.predictionStarted = false;
+        this.history = [];
+        this.labels = [];
+        this.values = [];
+        this.diceHistory = [];
+        this.memory = new TXMemory();
+        this.ensemble = new TXEnsemble(this.memory);
+        this.accHistory = [];
+        this._lastPred = null;
+        this._lastSignals = [];
+        this.totalPredsMade = 0;
         this.memory.load(CONFIG.SAVE_PATH);
     }
 
     add(d1, d2, d3) {
-        const t = d1 + d2 + d3; const r = t > 10 ? 'T' : 'X';
-        this.history.push(t); this.labels.push(r); this.values.push(t); this.diceHistory.push([d1, d2, d3]);
-        this.memory.update(d1, d2, d3); this._learn(); this._evaluate(r);
+        const t = d1 + d2 + d3;
+        const r = t > 10 ? 'T' : 'X';
+        this.history.push(t);
+        this.labels.push(r);
+        this.values.push(t);
+        this.diceHistory.push([d1, d2, d3]);
+        this.memory.update(d1, d2, d3);
+        this._learn();
+        this._evaluate(r);
     }
 
     _evaluate(r) {
@@ -992,22 +760,32 @@ class TXPredictor {
         const correct = this._lastPred === actual;
         this.accHistory.push(correct ? 1 : 0);
         this.memory.total++;
-        if (correct) { this.memory.correct++; this.memory.streak++; this.memory.errorStreak = 0; }
-        else { this.memory.streak = 0; this.memory.errorStreak++; }
+        if (correct) {
+            this.memory.correct++;
+            this.memory.streak++;
+            this.memory.errorStreak = 0;
+        } else {
+            this.memory.streak = 0;
+            this.memory.errorStreak++;
+        }
         this.memory.bestStreak = Math.max(this.memory.bestStreak, this.memory.streak);
         this.memory.bestAcc = Math.max(this.memory.bestAcc, this.memory.getAcc());
         for (const s of this._lastSignals) {
             const ic = s.pred === actual;
             if (s.name.startsWith('c_')) {
-                const cn = s.name.replace('c_', ''); const c = this.memory._getCau(cn);
-                c.r = c.r || []; c.r.push(ic ? 1 : 0);
-                if (ic) { c.w = (c.w || 0) + 1; c.streak = (c.streak || 0) + 1; }
-                else { c.l = (c.l || 0) + 1; c.streak = 0; }
+                const cn = s.name.replace('c_', '');
+                const c = this.memory._getCau(cn);
+                c.r = c.r || [];
+                c.r.push(ic ? 1 : 0);
+                if (ic) c.w = (c.w || 0) + 1;
+                else c.l = (c.l || 0) + 1;
             } else if (s.name.startsWith('t_')) {
-                const mn = s.name.replace('t_', ''); const m = this.memory._getMethod(mn);
-                m.r = m.r || []; m.r.push(ic ? 1 : 0);
-                if (ic) { m.w = (m.w || 0) + 1; m.streak = (m.streak || 0) + 1; m.best = Math.max(m.best || 0, m.streak); }
-                else { m.l = (m.l || 0) + 1; m.streak = 0; }
+                const mn = s.name.replace('t_', '');
+                const m = this.memory._getMethod(mn);
+                m.r = m.r || [];
+                m.r.push(ic ? 1 : 0);
+                if (ic) m.w = (m.w || 0) + 1;
+                else m.l = (m.l || 0) + 1;
             }
         }
         if (this.memory.session % CONFIG.ADAPT_INTERVAL === 0) this.memory.adapt();
@@ -1024,54 +802,66 @@ class TXPredictor {
                 p.n = (p.n || 0) + 1;
             }
         }
-        for (const L of [3, 5, 8, 13]) {
+        for (const L of [3, 5, 8]) {
             if (this.values.length >= L + 1) {
                 const k = this.values.slice(-L - 1, -1).join(',');
                 const vp = this.memory._getValuePattern(k);
                 vp.s += this.values[this.values.length - 1];
                 vp.n += 1;
-                vp.vals = vp.vals || [];
-                vp.vals.push(this.values[this.values.length - 1]);
-                if (vp.vals.length > 30) vp.vals.shift();
             }
-        }
-        if (this.labels.length >= 2) {
-            const t = this.memory._getTransition(this.labels[this.labels.length - 2]);
-            t[this.labels[this.labels.length - 1]] = (t[this.labels[this.labels.length - 1]] || 0) + 1;
         }
     }
 
     predict() {
         if (this.history.length < 3) return this._fallback();
-        this.totalPredsMade++; this.predictionStarted = true;
+        this.totalPredsMade++;
+
         const detector = new TXDetector(this.labels, this.values, this.memory);
         const trend = new TXTrend(this.labels, this.values, this.memory);
         const dice = this.diceHistory.length > 0 ? new TXDice(this.memory, this.diceHistory) : null;
+
         let signals = [];
         signals = signals.concat(detector.detectAll().filter(s => s.conf >= CONFIG.MIN_CONF));
         signals = signals.concat(trend.analyzeAll().filter(s => s.conf >= CONFIG.MIN_CONF));
+
         if (dice) {
             const [tv, tc] = dice.total();
-            if (tv !== null && tc >= 50) signals.push({ name: 'dice_tot', pred: tv > 10 ? 'TAI' : 'XIU', conf: tc, strength: 3, reason: 'Dice Total' });
-            for (const [n, [v, c]] of Object.entries(dice.indiv())) {
-                if (c >= 55) signals.push({ name: `dice_${n}`, pred: v > 3 ? 'TAI' : 'XIU', conf: c, strength: 1, reason: 'Dice Indiv' });
+            if (tv !== null && tc >= 50) {
+                signals.push({ name: 'dice_tot', pred: tv > 10 ? 'TAI' : 'XIU', conf: tc, strength: 3, reason: 'Dice Total' });
             }
-            for (const [n, [p, c]] of Object.entries(dice.multi(5))) {
-                if (c >= 50) signals.push({ name: `ms_${n}`, pred: p === 'T' ? 'TAI' : 'XIU', conf: c, strength: 2, reason: 'Multi-step' });
+            const indiv = dice.indiv();
+            for (const [n, [v, c]] of Object.entries(indiv)) {
+                if (c >= 55) {
+                    signals.push({ name: `dice_${n}`, pred: v > 3 ? 'TAI' : 'XIU', conf: c, strength: 1, reason: 'Dice Indiv' });
+                }
+            }
+            const multi = dice.multi();
+            for (const [n, [p, c]] of Object.entries(multi)) {
+                if (c >= 50) {
+                    signals.push({ name: `ms_${n}`, pred: p === 'T' ? 'TAI' : 'XIU', conf: c, strength: 2, reason: 'Multi-step' });
+                }
             }
             const [fv, fc] = dice.fractal();
-            if (fv !== null && fc >= 50) signals.push({ name: 'dice_frac', pred: fv > 10 ? 'TAI' : 'XIU', conf: fc, strength: 2, reason: 'Dice Fractal' });
+            if (fv !== null && fc >= 50) {
+                signals.push({ name: 'dice_frac', pred: fv > 10 ? 'TAI' : 'XIU', conf: fc, strength: 2, reason: 'Dice Fractal' });
+            }
         }
+
         const result = this.ensemble.predict(signals);
         if (result.pred === null) return this._fallback();
-        this._lastPred = result.pred; this._lastSignals = result.signals;
+        this._lastPred = result.pred;
+        this._lastSignals = result.signals;
         return result;
     }
 
     _fallback() {
         let p;
-        if (this.history.length < 3) p = !this.history.length || this.history[this.history.length - 1] > 10 ? 'TAI' : 'XIU';
-        else { const l5 = this.labels.slice(-5); p = l5.filter(x => x === 'T').length >= 3 ? 'TAI' : 'XIU'; }
+        if (this.history.length < 3) {
+            p = !this.history.length || this.history[this.history.length - 1] > 10 ? 'TAI' : 'XIU';
+        } else {
+            const l5 = this.labels.slice(-5);
+            p = l5.filter(x => x === 'T').length >= 3 ? 'TAI' : 'XIU';
+        }
         this._lastPred = p;
         this._lastSignals = [{ name: 'fb', pred: p, conf: 50, strength: 1, reason: 'Fallback' }];
         return { pred: p, conf: 50, signals: this._lastSignals };
@@ -1081,7 +871,7 @@ class TXPredictor {
         if (!this._lastSignals.length || this._lastSignals[0].name === 'fb') return 'KHONG TIN HIEU';
         const n = this._lastSignals.length;
         const avg = this._lastSignals.reduce((a, s) => a + s.conf, 0) / n;
-        if (n >= 12 && avg >= 80) return 'GOD TIER';
+        if (n >= 10 && avg >= 80) return 'GOD TIER';
         if (n >= 8 && avg >= 70) return 'RAT MANH';
         if (n >= 5 && avg >= 62) return 'MANH';
         if (n >= 3 && avg >= 55) return 'KHA';
@@ -1091,11 +881,16 @@ class TXPredictor {
     stats() {
         const acc = this.accHistory.length === 0 ? 50 : this.accHistory.reduce((a, b) => a + b, 0) / this.accHistory.length * 100;
         return {
-            phien: this.memory.session, doChinhXac: acc.toFixed(1) + '%',
-            totNhat: this.memory.bestAcc.toFixed(1) + '%', streakTotNhat: this.memory.bestStreak,
-            errorStreak: this.memory.errorStreak, patterns: Object.keys(this.memory.patterns).length,
-            tongDuDoan: this.memory.total, tongDung: this.memory.correct,
-            tongDuDoanDaLam: this.totalPredsMade, chatLuong: this.quality(),
+            phien: this.memory.session,
+            doChinhXac: acc.toFixed(1) + '%',
+            totNhat: this.memory.bestAcc.toFixed(1) + '%',
+            streakTotNhat: this.memory.bestStreak,
+            errorStreak: this.memory.errorStreak,
+            patterns: Object.keys(this.memory.patterns).length,
+            tongDuDoan: this.memory.total,
+            tongDung: this.memory.correct,
+            tongDuDoanDaLam: this.totalPredsMade,
+            chatLuong: this.quality(),
             topCau: Object.entries(this.memory.cau).sort((a, b) => (b[1].wt || 0) - (a[1].wt || 0)).slice(0, 5).map(([k, v]) => ({ name: k, wt: (v.wt || 1).toFixed(3) })),
             topMethod: Object.entries(this.memory.methods).sort((a, b) => (b[1].wt || 0) - (a[1].wt || 0)).slice(0, 5).map(([k, v]) => ({ name: k, wt: (v.wt || 1).toFixed(3) })),
         };
@@ -1215,8 +1010,420 @@ function calculatePrediction(data, type) {
 }
 
 // ============================================================
-// GIAO DIỆN LỊCH SỬ HU
+// HÀM RENDER GIAO DIỆN
 // ============================================================
+function renderPage(title, icon, type) {
+    return `
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TX PREDICTOR - ${title}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: #0a0a1a;
+            color: #fff;
+            min-height: 100vh;
+            overflow-x: hidden;
+            user-select: none;
+        }
+        ::-webkit-scrollbar { width: 3px; }
+        ::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
+        ::-webkit-scrollbar-thumb { background: #7c4dff; border-radius: 10px; }
+
+        .bg-glow {
+            position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+            background: radial-gradient(ellipse at 30% 20%, rgba(124,77,255,0.06), transparent 50%),
+                        radial-gradient(ellipse at 70% 80%, rgba(0,245,255,0.04), transparent 50%);
+        }
+
+        .container { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 16px; min-height: 100vh; }
+
+        .header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 24px;
+            background: rgba(255,255,255,0.03);
+            backdrop-filter: blur(20px);
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.04);
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .logo { display: flex; align-items: center; gap: 12px; }
+        .logo-icon {
+            width: 44px; height: 44px;
+            background: linear-gradient(135deg, #7c4dff, #b388ff);
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; font-weight: 900; color: #fff;
+            font-family: 'Orbitron', sans-serif;
+            box-shadow: 0 0 40px rgba(124,77,255,0.15);
+        }
+        .logo-text {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 20px; font-weight: 700;
+            background: linear-gradient(135deg, #b388ff, #7c4dff);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .logo-sub { font-size: 9px; color: rgba(255,255,255,0.3); letter-spacing: 2px; text-transform: uppercase; }
+        .header-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .status-badge {
+            display: flex; align-items: center; gap: 6px;
+            padding: 4px 14px; background: rgba(0,255,136,0.06);
+            border-radius: 20px; font-size: 10px; color: rgba(255,255,255,0.5);
+            border: 1px solid rgba(0,255,136,0.06);
+        }
+        .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #00ff88; animation: dotPulse 1.5s ease-in-out infinite; }
+        @keyframes dotPulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.2; transform: scale(0.6); } }
+        .header-time { font-size: 11px; color: rgba(255,255,255,0.3); font-family: 'Orbitron', sans-serif; }
+
+        .nav-links { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 16px; }
+        .nav-link {
+            padding: 4px 16px; border-radius: 20px;
+            border: 1px solid rgba(124,77,255,0.15);
+            color: rgba(255,255,255,0.4); font-size: 8px;
+            text-decoration: none; font-family: 'Orbitron', sans-serif;
+            transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .nav-link:hover { border-color: #b388ff; color: #b388ff; background: rgba(124,77,255,0.05); }
+        .nav-link.active { border-color: #b388ff; color: #b388ff; background: rgba(124,77,255,0.05); }
+
+        .card {
+            background: rgba(255,255,255,0.02);
+            border-radius: 16px; border: 1px solid rgba(255,255,255,0.04);
+            padding: 20px; transition: all 0.3s ease;
+        }
+        .card:hover { border-color: rgba(124,77,255,0.08); box-shadow: 0 0 60px rgba(124,77,255,0.03); }
+        .card-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 10px; color: rgba(255,255,255,0.3);
+            margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+            letter-spacing: 1px;
+        }
+        .card-title i { font-size: 13px; color: #b388ff; }
+        .card-badge {
+            margin-left: auto; background: rgba(124,77,255,0.06);
+            color: #b388ff; padding: 2px 12px; border-radius: 20px;
+            font-size: 7px; font-weight: 600; text-transform: uppercase;
+        }
+
+        .pred-result {
+            font-size: 72px; font-weight: 900; font-family: 'Orbitron', sans-serif;
+            margin: 0 0 6px; transition: all 0.5s ease; line-height: 1; min-height: 80px;
+            letter-spacing: 4px; text-align: center;
+        }
+        .pred-result.tai { color: #4fc3f7; text-shadow: 0 0 80px rgba(79,195,247,0.15); }
+        .pred-result.xiu { color: #ef5350; text-shadow: 0 0 80px rgba(239,83,80,0.15); }
+        .pred-result.waiting { color: rgba(255,255,255,0.06); animation: textPulse 1.8s ease-in-out infinite; font-size: 24px; font-family: 'Orbitron', sans-serif; letter-spacing: 6px; }
+        @keyframes textPulse { 0%,100% { opacity: 0.2; } 50% { opacity: 0.5; } }
+
+        .pred-meta { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; margin: 4px 0 6px; }
+        .meta-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+        .meta-item .label { font-size: 8px; color: rgba(255,255,255,0.15); text-transform: uppercase; letter-spacing: 1px; }
+        .meta-item .value { font-size: 18px; font-weight: 700; font-family: 'Orbitron', sans-serif; }
+        .meta-item .value.confidence { color: #4fc3f7; }
+        .meta-item .value.quality { color: #ffd54f; }
+
+        .bar-track { width: 100%; height: 4px; background: rgba(255,255,255,0.03); border-radius: 10px; overflow: hidden; margin-top: 4px; }
+        .bar-fill { height: 100%; border-radius: 10px; background: linear-gradient(90deg, #ef5350, #ffd54f, #4fc3f7); transition: width 0.8s ease; width: 0%; }
+
+        .signals { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-top: 8px; min-height: 20px; }
+        .signal-tag {
+            background: rgba(255,255,255,0.02); padding: 2px 10px; border-radius: 20px;
+            font-size: 7px; color: rgba(255,255,255,0.4); border: 1px solid rgba(255,255,255,0.02);
+            transition: all 0.3s ease;
+        }
+        .signal-tag:hover { background: rgba(124,77,255,0.04); border-color: rgba(124,77,255,0.06); color: #b388ff; }
+        .signal-tag.highlight { background: rgba(124,77,255,0.05); border-color: rgba(124,77,255,0.08); color: #b388ff; }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+        @media (max-width: 600px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+        .stat-card {
+            background: rgba(255,255,255,0.01); border-radius: 12px;
+            padding: 8px 4px; text-align: center;
+            border: 1px solid rgba(255,255,255,0.01);
+            transition: all 0.3s ease;
+        }
+        .stat-card:hover { background: rgba(255,255,255,0.02); border-color: rgba(124,77,255,0.03); }
+        .stat-number { font-size: 22px; font-weight: 700; font-family: 'Orbitron', sans-serif; color: #b388ff; }
+        .stat-number.good { color: #66bb6a; }
+        .stat-number.bad { color: #ef5350; }
+        .stat-number.winrate { color: #ffd54f; }
+        .stat-label { font-size: 7px; color: rgba(255,255,255,0.15); text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
+
+        .footer { text-align: center; padding: 14px 20px 6px; color: rgba(255,255,255,0.04); font-size: 8px; border-top: 1px solid rgba(255,255,255,0.02); margin-top: 12px; font-family: 'Orbitron', sans-serif; letter-spacing: 1px; }
+        .footer strong { color: #b388ff; }
+
+        @media (max-width: 768px) {
+            .container { padding: 8px; }
+            .header { padding: 8px 14px; flex-direction: column; align-items: stretch; gap: 4px; }
+            .logo-text { font-size: 16px; }
+            .logo-icon { width: 36px; height: 36px; font-size: 16px; }
+            .header-right { justify-content: space-between; }
+            .pred-result { font-size: 44px; min-height: 50px; }
+            .pred-meta { gap: 14px; }
+            .meta-item .value { font-size: 15px; }
+            .card { padding: 14px; }
+            .stat-number { font-size: 18px; }
+        }
+        @media (max-width: 480px) {
+            .container { padding: 4px; }
+            .pred-result { font-size: 32px; min-height: 38px; }
+            .stats-grid { gap: 4px; }
+            .stat-number { font-size: 14px; }
+            .stat-card { padding: 4px 2px; }
+            .signal-tag { font-size: 6px; padding: 1px 6px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="bg-glow"></div>
+
+<div class="container">
+
+    <header class="header">
+        <div class="logo">
+            <div class="logo-icon">TX</div>
+            <div>
+                <div class="logo-text">PREDICTOR v6</div>
+                <div class="logo-sub">ĐẠI CA KHÔI <span style="color:#b388ff;">@2026</span></div>
+            </div>
+        </div>
+        <div class="header-right">
+            <span class="status-badge">
+                <span class="status-dot"></span>
+                <span>Live</span>
+            </span>
+            <span class="header-time" id="clockDisplay">--:--:--</span>
+        </div>
+    </header>
+
+    <div class="nav-links">
+        <a href="/" class="nav-link">🏠 Trang chủ</a>
+        <a href="/hu" class="nav-link active">🎲 Dự đoán HŨ</a>
+        <a href="/md5" class="nav-link">🎲 Dự đoán MD5</a>
+        <a href="/lichsu/hu" class="nav-link">📊 Lịch sử HŨ</a>
+        <a href="/lichsu/md5" class="nav-link">📊 Lịch sử MD5</a>
+    </div>
+
+    <div class="card">
+        <div class="card-title">
+            <i class="${icon}"></i> DỰ ĐOÁN ${title}
+            <span class="card-badge">LIVE</span>
+        </div>
+        <div class="pred-area">
+            <div class="pred-result waiting" id="result">---</div>
+            <div class="pred-meta">
+                <div class="meta-item">
+                    <span class="label">Độ tin cậy</span>
+                    <span class="value confidence" id="conf">0%</span>
+                </div>
+                <div class="meta-item">
+                    <span class="label">Chất lượng</span>
+                    <span class="value quality" id="quality">---</span>
+                </div>
+                <div class="meta-item">
+                    <span class="label">Phiên</span>
+                    <span class="value" id="phien" style="color:rgba(255,255,255,0.3);font-size:14px;">---</span>
+                </div>
+            </div>
+            <div class="bar-track">
+                <div class="bar-fill" id="bar"></div>
+            </div>
+            <div class="signals" id="signals">
+                <span class="signal-tag">Đang phân tích...</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+        <div class="card-title">
+            <i class="fas fa-chart-line"></i> THỐNG KÊ ${title}
+            <span class="card-badge">REAL-TIME</span>
+        </div>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number" id="totalPreds">0</div>
+                <div class="stat-label">Tổng dự đoán</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number good" id="totalCorrect">0</div>
+                <div class="stat-label">Đúng</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number winrate" id="accuracy">0%</div>
+                <div class="stat-label">Độ chính xác</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="patternsCount">0</div>
+                <div class="stat-label">Patterns học</div>
+            </div>
+        </div>
+        <div class="stats-grid" style="margin-top:6px;">
+            <div class="stat-card">
+                <div class="stat-number good" id="bestStreak">0</div>
+                <div class="stat-label">Streak tốt nhất</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="bestAcc">0%</div>
+                <div class="stat-label">Acc tốt nhất</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="qualityText">---</div>
+                <div class="stat-label">Chất lượng hiện tại</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="sessionCount">0</div>
+                <div class="stat-label">Phiên đã học</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>🚀 <strong>TX PREDICTOR v6</strong> © 2026 · ĐẠI CA KHÔI</p>
+        <p style="font-size:6px;color:rgba(255,255,255,0.03);margin-top:2px;">30+ Cầu + 18+ Trend + Dice + Ensemble</p>
+    </div>
+
+</div>
+
+<script>
+// Anti-zoom
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('touchstart', e => { if (e.touches.length > 1) e.preventDefault(); });
+let lastTouchEnd = 0;
+document.addEventListener('touchend', e => {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 300) e.preventDefault();
+    lastTouchEnd = now;
+}, false);
+document.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('keydown', e => {
+    if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && ['I','J','C'].includes(e.key)) || (e.ctrlKey && e.key === 'U')) {
+        e.preventDefault();
+        return false;
+    }
+});
+
+// Clock
+function updateClock() {
+    document.getElementById('clockDisplay').textContent = new Date().toLocaleTimeString('vi-VN', { hour12: false });
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// API
+async function fetchAPI(endpoint) {
+    try {
+        const res = await fetch(endpoint);
+        if (!res.ok) throw new Error('Network error');
+        return await res.json();
+    } catch (e) {
+        console.error('API Error:', e);
+        return null;
+    }
+}
+
+async function fetchPrediction(type) {
+    const data = await fetchAPI('/api/' + type);
+    if (data) {
+        updatePrediction(data);
+        updateStats(data.thongKe);
+    }
+}
+
+async function fetchStats() {
+    const data = await fetchAPI('/api/stats');
+    if (data) updateStats(data);
+}
+
+function updatePrediction(data) {
+    const resultEl = document.getElementById('result');
+    const confEl = document.getElementById('conf');
+    const qualityEl = document.getElementById('quality');
+    const phienEl = document.getElementById('phien');
+    const barEl = document.getElementById('bar');
+    const signalsEl = document.getElementById('signals');
+
+    if (!resultEl) return;
+
+    resultEl.textContent = data.duDoan || '---';
+    resultEl.className = 'pred-result';
+    if (data.duDoan === 'TAI') resultEl.classList.add('tai');
+    else if (data.duDoan === 'XIU') resultEl.classList.add('xiu');
+    else resultEl.classList.add('waiting');
+
+    confEl.textContent = data.doTinCay || '0%';
+    qualityEl.textContent = data.chatLuong || '---';
+    phienEl.textContent = '#' + data.phien || '---';
+
+    const conf = parseInt(data.doTinCay) || 0;
+    barEl.style.width = Math.min(100, conf) + '%';
+
+    if (data.tinHieu && data.tinHieu.length > 0) {
+        signalsEl.innerHTML = data.tinHieu.slice(0, 6).map((s, i) => 
+            `<span class="signal-tag${i === 0 ? ' highlight' : ''}">${s.ten}: ${s.duDoan} (${s.doTinCay})</span>`
+        ).join('');
+    } else {
+        signalsEl.innerHTML = '<span class="signal-tag">Đang phân tích...</span>';
+    }
+}
+
+function updateStats(data) {
+    if (!data) return;
+    document.getElementById('totalPreds').textContent = data.tongDuDoan || 0;
+    document.getElementById('totalCorrect').textContent = data.tongDung || 0;
+    document.getElementById('accuracy').textContent = data.doChinhXac || '0%';
+    document.getElementById('patternsCount').textContent = data.patterns || 0;
+    document.getElementById('bestStreak').textContent = data.streakTotNhat || 0;
+    document.getElementById('bestAcc').textContent = data.totNhat || '0%';
+    document.getElementById('qualityText').textContent = data.chatLuong || '---';
+    document.getElementById('sessionCount').textContent = data.phien || 0;
+}
+
+// Refresh
+let isRefreshing = false;
+
+async function refreshAll() {
+    if (isRefreshing) return;
+    isRefreshing = true;
+
+    try {
+        await Promise.all([
+            fetchPrediction('${type}'),
+            fetchStats()
+        ]);
+    } catch (e) {
+        console.error('Refresh error:', e);
+    }
+
+    isRefreshing = false;
+}
+
+// Init
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 TX PREDICTOR v6 - ${title}');
+    refreshAll();
+    setInterval(refreshAll, 5000);
+
+    setTimeout(function() {
+        document.querySelector('.status-badge').innerHTML = '<span class="status-dot"></span><span>Ready</span>';
+    }, 1000);
+});
+</script>
+</body>
+</html>
+    `;
+}
+
 function renderHistoryPage(type, title, icon) {
     return `
 <!DOCTYPE html>
@@ -1287,8 +1494,18 @@ function renderHistoryPage(type, title, icon) {
             border: 1px solid rgba(0,255,136,0.06);
         }
         .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #00ff88; animation: dotPulse 1.5s ease-in-out infinite; }
-        @keyframes dotPulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.2; transform: scale(0.6); } }
         .header-time { font-size: 11px; color: rgba(255,255,255,0.3); font-family: 'Orbitron', sans-serif; }
+
+        .nav-links { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 16px; }
+        .nav-link {
+            padding: 4px 16px; border-radius: 20px;
+            border: 1px solid rgba(124,77,255,0.15);
+            color: rgba(255,255,255,0.4); font-size: 8px;
+            text-decoration: none; font-family: 'Orbitron', sans-serif;
+            transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .nav-link:hover { border-color: #b388ff; color: #b388ff; background: rgba(124,77,255,0.05); }
+        .nav-link.active { border-color: #b388ff; color: #b388ff; background: rgba(124,77,255,0.05); }
 
         .page-title {
             font-family: 'Orbitron', sans-serif;
@@ -1412,6 +1629,14 @@ function renderHistoryPage(type, title, icon) {
             <a href="/" class="btn-back"><i class="fas fa-arrow-left"></i> Trang chủ</a>
         </div>
     </header>
+
+    <div class="nav-links">
+        <a href="/" class="nav-link">🏠 Trang chủ</a>
+        <a href="/hu" class="nav-link">🎲 Dự đoán HŨ</a>
+        <a href="/md5" class="nav-link">🎲 Dự đoán MD5</a>
+        <a href="/lichsu/hu" class="nav-link active">📊 Lịch sử HŨ</a>
+        <a href="/lichsu/md5" class="nav-link">📊 Lịch sử MD5</a>
+    </div>
 
     <div class="page-title">
         <i class="${icon}"></i> LỊCH SỬ ${title}
@@ -1584,40 +1809,10 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 // ============================================================
-// ROUTES - GIAO DIỆN LỊCH SỬ RIÊNG
+// ROUTES - GIAO DIỆN
 // ============================================================
 
-// Lịch sử HU
-app.get('/lichsu/hu', (req, res) => {
-    res.send(renderHistoryPage('hu', 'HŨ', 'fas fa-dice-d6'));
-});
-
-// Lịch sử MD5
-app.get('/lichsu/md5', (req, res) => {
-    res.send(renderHistoryPage('md5', 'MD5', 'fas fa-dice-d6'));
-});
-
-// ============================================================
-// API LỊCH SỬ
-// ============================================================
-app.get('/api/history/:type', (req, res) => {
-    const type = req.params.type;
-    if (type === 'all') {
-        const all = [...historyData.hu, ...historyData.md5];
-        all.sort((a, b) => b.phien - a.phien);
-        res.json({ history: all, total: all.length });
-    } else if (type === 'hu') {
-        res.json({ history: historyData.hu || [], total: (historyData.hu || []).length });
-    } else if (type === 'md5') {
-        res.json({ history: historyData.md5 || [], total: (historyData.md5 || []).length });
-    } else {
-        res.json({ history: [], total: 0 });
-    }
-});
-
-// ============================================================
-// TRANG CHỦ - DỰ ĐOÁN
-// ============================================================
+// Trang chủ - Tổng hợp
 app.get('/', (req, res) => {
     res.send(`
 <!DOCTYPE html>
@@ -1688,10 +1883,9 @@ app.get('/', (req, res) => {
             border: 1px solid rgba(0,255,136,0.06);
         }
         .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #00ff88; animation: dotPulse 1.5s ease-in-out infinite; }
-        @keyframes dotPulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.2; transform: scale(0.6); } }
         .header-time { font-size: 11px; color: rgba(255,255,255,0.3); font-family: 'Orbitron', sans-serif; }
 
-        .nav-links { display: flex; gap: 8px; flex-wrap: wrap; }
+        .nav-links { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 16px; }
         .nav-link {
             padding: 4px 16px; border-radius: 20px;
             border: 1px solid rgba(124,77,255,0.15);
@@ -1700,6 +1894,7 @@ app.get('/', (req, res) => {
             transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 0.5px;
         }
         .nav-link:hover { border-color: #b388ff; color: #b388ff; background: rgba(124,77,255,0.05); }
+        .nav-link.active { border-color: #b388ff; color: #b388ff; background: rgba(124,77,255,0.05); }
 
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
         @media (max-width: 992px) { .grid { grid-template-columns: 1fr; } }
@@ -1731,7 +1926,6 @@ app.get('/', (req, res) => {
         .pred-result.tai { color: #4fc3f7; text-shadow: 0 0 80px rgba(79,195,247,0.15); }
         .pred-result.xiu { color: #ef5350; text-shadow: 0 0 80px rgba(239,83,80,0.15); }
         .pred-result.waiting { color: rgba(255,255,255,0.06); animation: textPulse 1.8s ease-in-out infinite; font-size: 24px; font-family: 'Orbitron', sans-serif; letter-spacing: 6px; }
-        @keyframes textPulse { 0%,100% { opacity: 0.2; } 50% { opacity: 0.5; } }
 
         .pred-meta { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; margin: 4px 0 6px; }
         .meta-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
@@ -1815,10 +2009,12 @@ app.get('/', (req, res) => {
         </div>
     </header>
 
-    <div class="nav-links" style="margin-bottom:16px; justify-content:center;">
-        <a href="/" class="nav-link" style="border-color:#b388ff;color:#b388ff;">🏠 Trang chủ</a>
-        <a href="/lichsu/hu" class="nav-link">🎲 Lịch sử HŨ</a>
-        <a href="/lichsu/md5" class="nav-link">🎲 Lịch sử MD5</a>
+    <div class="nav-links">
+        <a href="/" class="nav-link active">🏠 Trang chủ</a>
+        <a href="/hu" class="nav-link">🎲 Dự đoán HŨ</a>
+        <a href="/md5" class="nav-link">🎲 Dự đoán MD5</a>
+        <a href="/lichsu/hu" class="nav-link">📊 Lịch sử HŨ</a>
+        <a href="/lichsu/md5" class="nav-link">📊 Lịch sử MD5</a>
     </div>
 
     <div class="grid">
@@ -2066,8 +2262,28 @@ document.addEventListener('DOMContentLoaded', function() {
     `);
 });
 
+// Dự đoán HU
+app.get('/hu', (req, res) => {
+    res.send(renderPage('HŨ', 'fas fa-dice-d6', 'hu'));
+});
+
+// Dự đoán MD5
+app.get('/md5', (req, res) => {
+    res.send(renderPage('MD5', 'fas fa-dice-d6', 'md5'));
+});
+
+// Lịch sử HU
+app.get('/lichsu/hu', (req, res) => {
+    res.send(renderHistoryPage('hu', 'HŨ', 'fas fa-dice-d6'));
+});
+
+// Lịch sử MD5
+app.get('/lichsu/md5', (req, res) => {
+    res.send(renderHistoryPage('md5', 'MD5', 'fas fa-dice-d6'));
+});
+
 // ============================================================
-// API Dự đoán
+// API
 // ============================================================
 app.get('/api/hu', async (req, res) => {
     try {
@@ -2115,6 +2331,21 @@ app.get('/api/md5', async (req, res) => {
     }
 });
 
+app.get('/api/history/:type', (req, res) => {
+    const type = req.params.type;
+    if (type === 'all') {
+        const all = [...historyData.hu, ...historyData.md5];
+        all.sort((a, b) => b.phien - a.phien);
+        res.json({ history: all, total: all.length });
+    } else if (type === 'hu') {
+        res.json({ history: historyData.hu || [], total: (historyData.hu || []).length });
+    } else if (type === 'md5') {
+        res.json({ history: historyData.md5 || [], total: (historyData.md5 || []).length });
+    } else {
+        res.json({ history: [], total: 0 });
+    }
+});
+
 app.get('/api/stats', (req, res) => {
     const stats = predictor.stats();
     res.json(stats);
@@ -2134,7 +2365,7 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log('========================================');
     console.log('🚀 TX PREDICTOR v6 - ĐẠI CA KHÔI');
     console.log('🧠 30+ CẦU + 18+ TREND + DICE + ENSEMBLE');
-    console.log('📊 Route: /lichsu/hu - /lichsu/md5');
+    console.log('📊 Route: /hu - /md5 - /lichsu/hu - /lichsu/md5');
     console.log('Server: http://0.0.0.0:' + PORT);
     console.log('========================================');
 });
