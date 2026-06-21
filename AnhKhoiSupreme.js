@@ -2,7 +2,6 @@
  * ════════════════════════════════════════════════════════════════════
  * ║  🚀 TX PREDICTOR v6 - ĐẠI CA KHÔI @2026                      ║
  * ║  🧠 30+ CẦU + 18+ TREND + DICE + ENSEMBLE                   ║
- * ║  📊 ROUTE RIÊNG: /hu - /md5 - /lichsu/hu - /lichsu/md5     ║
  * ════════════════════════════════════════════════════════════════════
  */
 
@@ -235,10 +234,10 @@ class TXDetector {
 
     bet() {
         const [s, l] = this._streak();
-        if (s >= 7) return { pred: l === 'T' ? 'X' : 'T', conf: 92, strength: s, reason: 'Be Bet Rong' };
-        if (s >= 5) return { pred: l === 'T' ? 'X' : 'T', conf: 82, strength: s, reason: 'Be Bet Dai' };
-        if (s >= 3) return { pred: l, conf: 72, strength: s, reason: 'Du Bet' };
-        if (s >= 2) return { pred: l, conf: 60, strength: s, reason: 'Bet Nhe' };
+        if (s >= 7) return { pred: l === 'T' ? 'X' : 'T', conf: 92, strength: s, reason: 'Bệt Rồng' };
+        if (s >= 5) return { pred: l === 'T' ? 'X' : 'T', conf: 82, strength: s, reason: 'Bệt Dài' };
+        if (s >= 3) return { pred: l, conf: 72, strength: s, reason: 'Đu Bệt' };
+        if (s >= 2) return { pred: l, conf: 60, strength: s, reason: 'Bệt Nhẹ' };
         return null;
     }
 
@@ -249,7 +248,7 @@ class TXDetector {
         for (let i = 0; i < s.length - 1; i++) {
             if (s[i] === s[i + 1]) ok = false;
         }
-        if (ok) return { pred: s[5] === 'T' ? 'X' : 'T', conf: 82, strength: 6, reason: 'Cau Noi 1-1' };
+        if (ok) return { pred: s[5] === 'T' ? 'X' : 'T', conf: 82, strength: 6, reason: '1-1' };
         return null;
     }
 
@@ -259,7 +258,7 @@ class TXDetector {
         const c1 = s.slice(0, 3).join('');
         const c2 = s.slice(3, 6).join('');
         if ((c1 === 'TTX' || c1 === 'XXT') && c1 === c2) {
-            return { pred: c1 === 'TTX' ? 'T' : 'X', conf: 87, strength: 6, reason: 'Cau 2-1' };
+            return { pred: c1 === 'TTX' ? 'T' : 'X', conf: 87, strength: 6, reason: '2-1' };
         }
         return null;
     }
@@ -270,7 +269,7 @@ class TXDetector {
         const c1 = s.slice(0, 4).join('');
         const c2 = s.slice(4, 8).join('');
         if ((c1 === 'TTTX' || c1 === 'XXXT') && c1 === c2) {
-            return { pred: c1 === 'TTTX' ? 'T' : 'X', conf: 87, strength: 8, reason: 'Cau 3-1' };
+            return { pred: c1 === 'TTTX' ? 'T' : 'X', conf: 87, strength: 8, reason: '3-1' };
         }
         return null;
     }
@@ -279,7 +278,7 @@ class TXDetector {
         if (this.L.length < 4) return null;
         const s = this.L.slice(-4);
         if (s[0] === s[1] && s[2] === s[3] && s[0] !== s[2]) {
-            return { pred: s[2], conf: 78, strength: 4, reason: 'Cau 2-2' };
+            return { pred: s[2], conf: 78, strength: 4, reason: '2-2' };
         }
         return null;
     }
@@ -288,7 +287,7 @@ class TXDetector {
         if (this.L.length < 6) return null;
         const s = this.L.slice(-6);
         if (s[0] === s[1] && s[1] === s[2] && s[3] === s[4] && s[4] === s[5] && s[0] !== s[3]) {
-            return { pred: s[3], conf: 80, strength: 6, reason: 'Cau 3-3' };
+            return { pred: s[3], conf: 80, strength: 6, reason: '3-3' };
         }
         return null;
     }
@@ -301,7 +300,7 @@ class TXDetector {
             for (let i = Ln; i < arr.length - Ln + 1; i++) {
                 const sub = arr.slice(i, i + Ln);
                 if (JSON.stringify(sub) === JSON.stringify(pat) && i > 0) {
-                    return { pred: arr[i - 1], conf: 86, strength: Ln, reason: 'Mau Lap' };
+                    return { pred: arr[i - 1], conf: 86, strength: Ln, reason: 'Lặp' };
                 }
             }
         }
@@ -313,10 +312,8 @@ class TXDetector {
         const pts = this.V.slice(-5);
         const last = pts[pts.length - 1];
         const avg = pts.reduce((a, b) => a + b, 0) / pts.length;
-        if (last >= 16) return { pred: 'X', conf: 76, strength: 1, reason: 'Vi Cuc Dai' };
-        if (last <= 4) return { pred: 'T', conf: 76, strength: 1, reason: 'Vi Cuc Tieu' };
-        if (last > avg + 3) return { pred: 'X', conf: 70, strength: 1, reason: 'Vi Dot Bien Cao' };
-        if (last < avg - 3) return { pred: 'T', conf: 70, strength: 1, reason: 'Vi Dot Bien Thap' };
+        if (last >= 16) return { pred: 'X', conf: 76, strength: 1, reason: 'Cực Đại' };
+        if (last <= 4) return { pred: 'T', conf: 76, strength: 1, reason: 'Cực Tiểu' };
         return null;
     }
 
@@ -327,7 +324,7 @@ class TXDetector {
                 const a = this.L.slice(-2 * p, -p);
                 const b = this.L.slice(-p);
                 if (JSON.stringify(a) === JSON.stringify(b)) {
-                    return { pred: b[b.length - 1] === 'T' ? 'X' : 'T', conf: 83, strength: p, reason: 'Tuan Hoan' };
+                    return { pred: b[b.length - 1] === 'T' ? 'X' : 'T', conf: 83, strength: p, reason: 'Chu Kỳ' };
                 }
             }
         }
@@ -341,7 +338,7 @@ class TXDetector {
         for (let i = 1; i < s.length; i++) {
             if (s[i] !== s[i - 1]) ch++;
         }
-        if (ch >= 6) return { pred: s[7] === 'T' ? 'X' : 'T', conf: 77, strength: ch, reason: 'Cau Nhay' };
+        if (ch >= 6) return { pred: s[7] === 'T' ? 'X' : 'T', conf: 77, strength: ch, reason: 'Nhảy' };
         return null;
     }
 
@@ -363,7 +360,7 @@ class TXDetector {
                 if (rt[i] < rt[i + 1]) rtOk = false;
             }
             if (lfOk && rtOk) {
-                return { pred: this.L[this.L.length - 1] === 'T' ? 'X' : 'T', conf: 72, strength: peak, reason: 'Tam Giac' };
+                return { pred: this.L[this.L.length - 1] === 'T' ? 'X' : 'T', conf: 72, strength: peak, reason: 'Tam Giác' };
             }
         }
         return null;
@@ -373,7 +370,7 @@ class TXDetector {
         if (this.L.length < 6) return null;
         const s = this.L.slice(-6);
         const c = s.filter(x => x === 'T').length;
-        if (c === 3) return { pred: s[5] === 'T' ? 'X' : 'T', conf: 67, strength: 3, reason: 'Can Bang' };
+        if (c === 3) return { pred: s[5] === 'T' ? 'X' : 'T', conf: 67, strength: 3, reason: 'Cân Bằng' };
         return null;
     }
 
@@ -383,31 +380,8 @@ class TXDetector {
         const opp = last === 'T' ? 'X' : 'T';
         const recent5 = this.L.slice(-5);
         if (recent5.filter(x => x === opp).length >= 3) {
-            return { pred: opp, conf: 68, strength: 3, reason: 'Hoi Phuc' };
+            return { pred: opp, conf: 68, strength: 3, reason: 'Hồi Phục' };
         }
-        return null;
-    }
-
-    divergence() {
-        if (this.V.length < 10) return null;
-        const rv = this.V.slice(-10);
-        const rl = this.L.slice(-10).map(x => x === 'T' ? 1 : 0);
-        let sx = 0, sy = 0, sxy = 0, sx2 = 0;
-        for (let i = 0; i < 10; i++) {
-            sx += i;
-            sy += rv[i];
-            sxy += i * rv[i];
-            sx2 += i * i;
-        }
-        const vt = (10 * sxy - sx * sy) / (10 * sx2 - sx * sx);
-        sy = 0; sxy = 0;
-        for (let i = 0; i < 10; i++) {
-            sy += rl[i];
-            sxy += i * rl[i];
-        }
-        const lt = (10 * sxy - sx * sy) / (10 * sx2 - sx * sx);
-        if (vt > 0 && lt < 0) return { pred: 'X', conf: 70, strength: 1, reason: 'Phan Ky' };
-        if (vt < 0 && lt > 0) return { pred: 'T', conf: 70, strength: 1, reason: 'Phan Ky' };
         return null;
     }
 
@@ -417,7 +391,7 @@ class TXDetector {
         const p = s.filter(x => x === 'T').length / 20;
         let ent = 0;
         if (p > 0 && p < 1) ent = -p * Math.log2(p) - (1 - p) * Math.log2(1 - p);
-        if (ent < 0.3) return { pred: p > 0.5 ? 'T' : 'X', conf: 74, strength: 1, reason: 'Entropy Thap' };
+        if (ent < 0.3) return { pred: p > 0.5 ? 'T' : 'X', conf: 74, strength: 1, reason: 'Entropy Thấp' };
         if (ent > 0.9) return { pred: s[19] === 'T' ? 'X' : 'T', conf: 68, strength: 1, reason: 'Entropy Cao' };
         return null;
     }
@@ -437,7 +411,6 @@ class TXDetector {
             ['tam_giac', () => this.tam_giac()],
             ['balance', () => this.balance()],
             ['reversal', () => this.reversal()],
-            ['divergence', () => this.divergence()],
             ['entropy', () => this.entropy()],
         ];
         const results = [];
@@ -480,7 +453,7 @@ class TXTrend {
             sx2 += i * i;
         }
         const slope = (10 * sxy - sx * sy) / (10 * sx2 - sx * sx);
-        if (Math.abs(slope) > 0.5) return { pred: slope > 0 ? 'T' : 'X', conf: 65, reason: 'Medium Trend' };
+        if (Math.abs(slope) > 0.5) return { pred: slope > 0 ? 'T' : 'X', conf: 65, reason: 'Medium' };
         return null;
     }
 
@@ -489,16 +462,16 @@ class TXTrend {
         const r = this.V.slice(-15);
         const avg = r.reduce((a, b) => a + b, 0) / r.length;
         const last = r[r.length - 1];
-        if (last > avg + 3) return { pred: 'X', conf: 75, reason: 'Mean Reversion' };
-        if (last < avg - 3) return { pred: 'T', conf: 75, reason: 'Mean Reversion' };
+        if (last > avg + 3) return { pred: 'X', conf: 75, reason: 'Rev' };
+        if (last < avg - 3) return { pred: 'T', conf: 75, reason: 'Rev' };
         return null;
     }
 
     bal() {
         if (this.L.length < 15) return null;
         const ratio = this.L.slice(-15).filter(x => x === 'T').length / 15;
-        if (ratio > 0.7) return { pred: 'X', conf: 70, reason: 'Balance' };
-        if (ratio < 0.3) return { pred: 'T', conf: 70, reason: 'Balance' };
+        if (ratio > 0.7) return { pred: 'X', conf: 70, reason: 'Bal' };
+        if (ratio < 0.3) return { pred: 'T', conf: 70, reason: 'Bal' };
         return null;
     }
 
@@ -512,7 +485,7 @@ class TXTrend {
                 if (t >= 2) {
                     const pred = (p.T || 0) > (p.X || 0) ? 'T' : 'X';
                     const conf = Math.max(p.T || 0, p.X || 0) / t * 100;
-                    return { pred: pred, conf: Math.min(conf * 0.9, 85), reason: 'Pattern Mem' };
+                    return { pred: pred, conf: Math.min(conf * 0.9, 85), reason: 'Pattern' };
                 }
             }
         }
@@ -537,31 +510,6 @@ class TXTrend {
         return null;
     }
 
-    boll() {
-        if (this.V.length < 20) return null;
-        const r = this.V.slice(-20);
-        const m = r.reduce((a, b) => a + b, 0) / 20;
-        const s = Math.sqrt(r.reduce((a, b) => a + (b - m) ** 2, 0) / 20);
-        if (r[19] > m + 2 * s) return { pred: 'X', conf: 75, reason: 'Bollinger' };
-        if (r[19] < m - 2 * s) return { pred: 'T', conf: 75, reason: 'Bollinger' };
-        return null;
-    }
-
-    vpred() {
-        if (this.V.length < 5) return null;
-        for (const Ln of [3, 5, 8]) {
-            if (this.V.length >= Ln + 1) {
-                const k = this.V.slice(-Ln - 1, -1).join(',');
-                const vp = this.M._getValuePattern(k);
-                if (vp.n >= 3) {
-                    const a = vp.s / vp.n;
-                    return { pred: a > 10 ? 'T' : 'X', conf: 55 + Math.abs(a - 10) * 4, reason: 'Value Pred' };
-                }
-            }
-        }
-        return null;
-    }
-
     analyzeAll() {
         const methods = [
             ['short', () => this.short()],
@@ -570,8 +518,6 @@ class TXTrend {
             ['bal', () => this.bal()],
             ['pmem', () => this.pmem()],
             ['rsi', () => this.rsi()],
-            ['boll', () => this.boll()],
-            ['vpred', () => this.vpred()],
         ];
         const results = [];
         for (const [name, fn] of methods) {
@@ -832,18 +778,18 @@ class TXPredictor {
             const indiv = dice.indiv();
             for (const [n, [v, c]] of Object.entries(indiv)) {
                 if (c >= 55) {
-                    signals.push({ name: `dice_${n}`, pred: v > 3 ? 'TAI' : 'XIU', conf: c, strength: 1, reason: 'Dice Indiv' });
+                    signals.push({ name: `dice_${n}`, pred: v > 3 ? 'TAI' : 'XIU', conf: c, strength: 1, reason: 'Dice' });
                 }
             }
             const multi = dice.multi();
             for (const [n, [p, c]] of Object.entries(multi)) {
                 if (c >= 50) {
-                    signals.push({ name: `ms_${n}`, pred: p === 'T' ? 'TAI' : 'XIU', conf: c, strength: 2, reason: 'Multi-step' });
+                    signals.push({ name: `ms_${n}`, pred: p === 'T' ? 'TAI' : 'XIU', conf: c, strength: 2, reason: 'Multi' });
                 }
             }
             const [fv, fc] = dice.fractal();
             if (fv !== null && fc >= 50) {
-                signals.push({ name: 'dice_frac', pred: fv > 10 ? 'TAI' : 'XIU', conf: fc, strength: 2, reason: 'Dice Fractal' });
+                signals.push({ name: 'dice_frac', pred: fv > 10 ? 'TAI' : 'XIU', conf: fc, strength: 2, reason: 'Fractal' });
             }
         }
 
@@ -868,14 +814,14 @@ class TXPredictor {
     }
 
     quality() {
-        if (!this._lastSignals.length || this._lastSignals[0].name === 'fb') return 'KHONG TIN HIEU';
+        if (!this._lastSignals.length || this._lastSignals[0].name === 'fb') return 'KHÔNG TÍN HIỆU';
         const n = this._lastSignals.length;
         const avg = this._lastSignals.reduce((a, s) => a + s.conf, 0) / n;
         if (n >= 10 && avg >= 80) return 'GOD TIER';
-        if (n >= 8 && avg >= 70) return 'RAT MANH';
-        if (n >= 5 && avg >= 62) return 'MANH';
-        if (n >= 3 && avg >= 55) return 'KHA';
-        return 'YEU';
+        if (n >= 8 && avg >= 70) return 'RẤT MẠNH';
+        if (n >= 5 && avg >= 62) return 'MẠNH';
+        if (n >= 3 && avg >= 55) return 'KHÁ';
+        return 'YẾU';
     }
 
     stats() {
@@ -890,9 +836,7 @@ class TXPredictor {
             tongDuDoan: this.memory.total,
             tongDung: this.memory.correct,
             tongDuDoanDaLam: this.totalPredsMade,
-            chatLuong: this.quality(),
-            topCau: Object.entries(this.memory.cau).sort((a, b) => (b[1].wt || 0) - (a[1].wt || 0)).slice(0, 5).map(([k, v]) => ({ name: k, wt: (v.wt || 1).toFixed(3) })),
-            topMethod: Object.entries(this.memory.methods).sort((a, b) => (b[1].wt || 0) - (a[1].wt || 0)).slice(0, 5).map(([k, v]) => ({ name: k, wt: (v.wt || 1).toFixed(3) })),
+            chatLuong: this.quality()
         };
     }
 
@@ -1010,16 +954,16 @@ function calculatePrediction(data, type) {
 }
 
 // ============================================================
-// HÀM RENDER GIAO DIỆN
+// HÀM RENDER GIAO DIỆN DỰ ĐOÁN
 // ============================================================
-function renderPage(title, icon, type) {
+function renderPredictionPage(title, icon, type, color) {
     return `
 <!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TX PREDICTOR - ${title}</title>
+    <title>Dự đoán ${title} - TX PREDICTOR</title>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
@@ -1034,7 +978,7 @@ function renderPage(title, icon, type) {
         }
         ::-webkit-scrollbar { width: 3px; }
         ::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
-        ::-webkit-scrollbar-thumb { background: #7c4dff; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: ${color}; border-radius: 10px; }
 
         .bg-glow {
             position: fixed; top: 0; left: 0;
@@ -1044,7 +988,7 @@ function renderPage(title, icon, type) {
                         radial-gradient(ellipse at 70% 80%, rgba(0,245,255,0.04), transparent 50%);
         }
 
-        .container { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 16px; min-height: 100vh; }
+        .container { position: relative; z-index: 1; max-width: 800px; margin: 0 auto; padding: 16px; min-height: 100vh; }
 
         .header {
             display: flex; justify-content: space-between; align-items: center;
@@ -1060,7 +1004,7 @@ function renderPage(title, icon, type) {
         .logo { display: flex; align-items: center; gap: 12px; }
         .logo-icon {
             width: 44px; height: 44px;
-            background: linear-gradient(135deg, #7c4dff, #b388ff);
+            background: linear-gradient(135deg, ${color}, ${color}cc);
             border-radius: 12px;
             display: flex; align-items: center; justify-content: center;
             font-size: 20px; font-weight: 900; color: #fff;
@@ -1070,7 +1014,7 @@ function renderPage(title, icon, type) {
         .logo-text {
             font-family: 'Orbitron', sans-serif;
             font-size: 20px; font-weight: 700;
-            background: linear-gradient(135deg, #b388ff, #7c4dff);
+            background: linear-gradient(135deg, ${color}, #7c4dff);
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         }
         .logo-sub { font-size: 9px; color: rgba(255,255,255,0.3); letter-spacing: 2px; text-transform: uppercase; }
@@ -1088,79 +1032,61 @@ function renderPage(title, icon, type) {
         .nav-links { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 16px; }
         .nav-link {
             padding: 4px 16px; border-radius: 20px;
-            border: 1px solid rgba(124,77,255,0.15);
+            border: 1px solid rgba(255,255,255,0.06);
             color: rgba(255,255,255,0.4); font-size: 8px;
             text-decoration: none; font-family: 'Orbitron', sans-serif;
             transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 0.5px;
         }
-        .nav-link:hover { border-color: #b388ff; color: #b388ff; background: rgba(124,77,255,0.05); }
-        .nav-link.active { border-color: #b388ff; color: #b388ff; background: rgba(124,77,255,0.05); }
+        .nav-link:hover { border-color: ${color}; color: ${color}; background: rgba(124,77,255,0.05); }
+        .nav-link.active { border-color: ${color}; color: ${color}; background: rgba(124,77,255,0.05); }
 
         .card {
             background: rgba(255,255,255,0.02);
             border-radius: 16px; border: 1px solid rgba(255,255,255,0.04);
-            padding: 20px; transition: all 0.3s ease;
+            padding: 24px; transition: all 0.3s ease;
+            margin-bottom: 16px;
         }
         .card:hover { border-color: rgba(124,77,255,0.08); box-shadow: 0 0 60px rgba(124,77,255,0.03); }
-        .card-title {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 10px; color: rgba(255,255,255,0.3);
-            margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
-            letter-spacing: 1px;
-        }
-        .card-title i { font-size: 13px; color: #b388ff; }
-        .card-badge {
-            margin-left: auto; background: rgba(124,77,255,0.06);
-            color: #b388ff; padding: 2px 12px; border-radius: 20px;
-            font-size: 7px; font-weight: 600; text-transform: uppercase;
-        }
 
         .pred-result {
-            font-size: 72px; font-weight: 900; font-family: 'Orbitron', sans-serif;
-            margin: 0 0 6px; transition: all 0.5s ease; line-height: 1; min-height: 80px;
-            letter-spacing: 4px; text-align: center;
+            font-size: 80px; font-weight: 900; font-family: 'Orbitron', sans-serif;
+            margin: 0 0 8px; transition: all 0.5s ease; line-height: 1; min-height: 90px;
+            letter-spacing: 6px; text-align: center;
         }
-        .pred-result.tai { color: #4fc3f7; text-shadow: 0 0 80px rgba(79,195,247,0.15); }
-        .pred-result.xiu { color: #ef5350; text-shadow: 0 0 80px rgba(239,83,80,0.15); }
-        .pred-result.waiting { color: rgba(255,255,255,0.06); animation: textPulse 1.8s ease-in-out infinite; font-size: 24px; font-family: 'Orbitron', sans-serif; letter-spacing: 6px; }
+        .pred-result.tai { color: #4fc3f7; text-shadow: 0 0 100px rgba(79,195,247,0.2); }
+        .pred-result.xiu { color: #ef5350; text-shadow: 0 0 100px rgba(239,83,80,0.2); }
+        .pred-result.waiting { color: rgba(255,255,255,0.06); animation: textPulse 1.8s ease-in-out infinite; font-size: 28px; letter-spacing: 8px; }
         @keyframes textPulse { 0%,100% { opacity: 0.2; } 50% { opacity: 0.5; } }
 
-        .pred-meta { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; margin: 4px 0 6px; }
+        .pred-meta { display: flex; justify-content: center; gap: 30px; flex-wrap: wrap; margin: 6px 0 8px; }
         .meta-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-        .meta-item .label { font-size: 8px; color: rgba(255,255,255,0.15); text-transform: uppercase; letter-spacing: 1px; }
-        .meta-item .value { font-size: 18px; font-weight: 700; font-family: 'Orbitron', sans-serif; }
-        .meta-item .value.confidence { color: #4fc3f7; }
-        .meta-item .value.quality { color: #ffd54f; }
+        .meta-item .label { font-size: 8px; color: rgba(255,255,255,0.15); text-transform: uppercase; letter-spacing: 1.5px; }
+        .meta-item .value { font-size: 20px; font-weight: 700; font-family: 'Orbitron', sans-serif; }
+        .meta-item .value.confidence { color: ${color}; }
 
-        .bar-track { width: 100%; height: 4px; background: rgba(255,255,255,0.03); border-radius: 10px; overflow: hidden; margin-top: 4px; }
-        .bar-fill { height: 100%; border-radius: 10px; background: linear-gradient(90deg, #ef5350, #ffd54f, #4fc3f7); transition: width 0.8s ease; width: 0%; }
+        .bar-track { width: 100%; height: 5px; background: rgba(255,255,255,0.03); border-radius: 10px; overflow: hidden; margin-top: 6px; }
+        .bar-fill { height: 100%; border-radius: 10px; background: linear-gradient(90deg, #ef5350, #ffd54f, ${color}); transition: width 0.8s ease; width: 0%; }
 
-        .signals { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-top: 8px; min-height: 20px; }
+        .signals { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-top: 10px; min-height: 22px; }
         .signal-tag {
-            background: rgba(255,255,255,0.02); padding: 2px 10px; border-radius: 20px;
+            background: rgba(255,255,255,0.02); padding: 2px 12px; border-radius: 20px;
             font-size: 7px; color: rgba(255,255,255,0.4); border: 1px solid rgba(255,255,255,0.02);
             transition: all 0.3s ease;
         }
-        .signal-tag:hover { background: rgba(124,77,255,0.04); border-color: rgba(124,77,255,0.06); color: #b388ff; }
-        .signal-tag.highlight { background: rgba(124,77,255,0.05); border-color: rgba(124,77,255,0.08); color: #b388ff; }
+        .signal-tag:hover { background: rgba(124,77,255,0.04); border-color: rgba(124,77,255,0.06); color: ${color}; }
+        .signal-tag.highlight { background: rgba(124,77,255,0.05); border-color: rgba(124,77,255,0.08); color: ${color}; }
 
-        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
-        @media (max-width: 600px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
-        .stat-card {
-            background: rgba(255,255,255,0.01); border-radius: 12px;
-            padding: 8px 4px; text-align: center;
-            border: 1px solid rgba(255,255,255,0.01);
-            transition: all 0.3s ease;
+        .btn-history {
+            display: inline-block; padding: 8px 24px; border-radius: 20px;
+            border: 1px solid ${color}44; background: rgba(124,77,255,0.05);
+            color: ${color}; font-size: 10px; font-weight: 500; cursor: pointer;
+            transition: all 0.3s ease; text-decoration: none;
+            font-family: 'Orbitron', sans-serif; letter-spacing: 0.5px;
         }
-        .stat-card:hover { background: rgba(255,255,255,0.02); border-color: rgba(124,77,255,0.03); }
-        .stat-number { font-size: 22px; font-weight: 700; font-family: 'Orbitron', sans-serif; color: #b388ff; }
-        .stat-number.good { color: #66bb6a; }
-        .stat-number.bad { color: #ef5350; }
-        .stat-number.winrate { color: #ffd54f; }
-        .stat-label { font-size: 7px; color: rgba(255,255,255,0.15); text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
+        .btn-history:hover { background: rgba(124,77,255,0.1); border-color: ${color}; }
 
         .footer { text-align: center; padding: 14px 20px 6px; color: rgba(255,255,255,0.04); font-size: 8px; border-top: 1px solid rgba(255,255,255,0.02); margin-top: 12px; font-family: 'Orbitron', sans-serif; letter-spacing: 1px; }
-        .footer strong { color: #b388ff; }
+        .footer strong { color: ${color}; }
 
         @media (max-width: 768px) {
             .container { padding: 8px; }
@@ -1168,19 +1094,15 @@ function renderPage(title, icon, type) {
             .logo-text { font-size: 16px; }
             .logo-icon { width: 36px; height: 36px; font-size: 16px; }
             .header-right { justify-content: space-between; }
-            .pred-result { font-size: 44px; min-height: 50px; }
-            .pred-meta { gap: 14px; }
-            .meta-item .value { font-size: 15px; }
+            .pred-result { font-size: 48px; min-height: 54px; }
+            .pred-meta { gap: 16px; }
+            .meta-item .value { font-size: 16px; }
             .card { padding: 14px; }
-            .stat-number { font-size: 18px; }
         }
         @media (max-width: 480px) {
             .container { padding: 4px; }
-            .pred-result { font-size: 32px; min-height: 38px; }
-            .stats-grid { gap: 4px; }
-            .stat-number { font-size: 14px; }
-            .stat-card { padding: 4px 2px; }
-            .signal-tag { font-size: 6px; padding: 1px 6px; }
+            .pred-result { font-size: 36px; min-height: 42px; }
+            .signal-tag { font-size: 6px; padding: 1px 8px; }
         }
     </style>
 </head>
@@ -1195,7 +1117,7 @@ function renderPage(title, icon, type) {
             <div class="logo-icon">TX</div>
             <div>
                 <div class="logo-text">PREDICTOR v6</div>
-                <div class="logo-sub">ĐẠI CA KHÔI <span style="color:#b388ff;">@2026</span></div>
+                <div class="logo-sub">ĐẠI CA KHÔI <span style="color:${color};">@2026</span></div>
             </div>
         </div>
         <div class="header-right">
@@ -1209,16 +1131,16 @@ function renderPage(title, icon, type) {
 
     <div class="nav-links">
         <a href="/" class="nav-link">🏠 Trang chủ</a>
-        <a href="/hu" class="nav-link active">🎲 Dự đoán HŨ</a>
-        <a href="/md5" class="nav-link">🎲 Dự đoán MD5</a>
-        <a href="/lichsu/hu" class="nav-link">📊 Lịch sử HŨ</a>
-        <a href="/lichsu/md5" class="nav-link">📊 Lịch sử MD5</a>
+        <a href="/hu" class="nav-link ${type === 'hu' ? 'active' : ''}">🎲 HŨ</a>
+        <a href="/md5" class="nav-link ${type === 'md5' ? 'active' : ''}">🎲 MD5</a>
+        <a href="/lichsu/${type}" class="nav-link">📊 Lịch sử</a>
     </div>
 
     <div class="card">
-        <div class="card-title">
-            <i class="${icon}"></i> DỰ ĐOÁN ${title}
-            <span class="card-badge">LIVE</span>
+        <div style="text-align:center;margin-bottom:12px;">
+            <span style="font-family:'Orbitron',sans-serif;font-size:12px;color:rgba(255,255,255,0.2);letter-spacing:2px;">
+                <i class="${icon}" style="color:${color};"></i> DỰ ĐOÁN ${title}
+            </span>
         </div>
         <div class="pred-area">
             <div class="pred-result waiting" id="result">---</div>
@@ -1229,11 +1151,11 @@ function renderPage(title, icon, type) {
                 </div>
                 <div class="meta-item">
                     <span class="label">Chất lượng</span>
-                    <span class="value quality" id="quality">---</span>
+                    <span class="value" id="quality" style="color:#ffd54f;">---</span>
                 </div>
                 <div class="meta-item">
                     <span class="label">Phiên</span>
-                    <span class="value" id="phien" style="color:rgba(255,255,255,0.3);font-size:14px;">---</span>
+                    <span class="value" id="phien" style="color:rgba(255,255,255,0.3);font-size:16px;">---</span>
                 </div>
             </div>
             <div class="bar-track">
@@ -1245,47 +1167,8 @@ function renderPage(title, icon, type) {
         </div>
     </div>
 
-    <div class="card" style="margin-top:16px;">
-        <div class="card-title">
-            <i class="fas fa-chart-line"></i> THỐNG KÊ ${title}
-            <span class="card-badge">REAL-TIME</span>
-        </div>
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-number" id="totalPreds">0</div>
-                <div class="stat-label">Tổng dự đoán</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number good" id="totalCorrect">0</div>
-                <div class="stat-label">Đúng</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number winrate" id="accuracy">0%</div>
-                <div class="stat-label">Độ chính xác</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="patternsCount">0</div>
-                <div class="stat-label">Patterns học</div>
-            </div>
-        </div>
-        <div class="stats-grid" style="margin-top:6px;">
-            <div class="stat-card">
-                <div class="stat-number good" id="bestStreak">0</div>
-                <div class="stat-label">Streak tốt nhất</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="bestAcc">0%</div>
-                <div class="stat-label">Acc tốt nhất</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="qualityText">---</div>
-                <div class="stat-label">Chất lượng hiện tại</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="sessionCount">0</div>
-                <div class="stat-label">Phiên đã học</div>
-            </div>
-        </div>
+    <div style="text-align:center;">
+        <a href="/lichsu/${type}" class="btn-history"><i class="fas fa-history"></i> Xem lịch sử ${title}</a>
     </div>
 
     <div class="footer">
@@ -1296,7 +1179,6 @@ function renderPage(title, icon, type) {
 </div>
 
 <script>
-// Anti-zoom
 document.addEventListener('gesturestart', e => e.preventDefault());
 document.addEventListener('touchstart', e => { if (e.touches.length > 1) e.preventDefault(); });
 let lastTouchEnd = 0;
@@ -1313,14 +1195,12 @@ document.addEventListener('keydown', e => {
     }
 });
 
-// Clock
 function updateClock() {
     document.getElementById('clockDisplay').textContent = new Date().toLocaleTimeString('vi-VN', { hour12: false });
 }
 setInterval(updateClock, 1000);
 updateClock();
 
-// API
 async function fetchAPI(endpoint) {
     try {
         const res = await fetch(endpoint);
@@ -1332,17 +1212,11 @@ async function fetchAPI(endpoint) {
     }
 }
 
-async function fetchPrediction(type) {
-    const data = await fetchAPI('/api/' + type);
+async function fetchPrediction() {
+    const data = await fetchAPI('/api/${type}');
     if (data) {
         updatePrediction(data);
-        updateStats(data.thongKe);
     }
-}
-
-async function fetchStats() {
-    const data = await fetchAPI('/api/stats');
-    if (data) updateStats(data);
 }
 
 function updatePrediction(data) {
@@ -1377,38 +1251,19 @@ function updatePrediction(data) {
     }
 }
 
-function updateStats(data) {
-    if (!data) return;
-    document.getElementById('totalPreds').textContent = data.tongDuDoan || 0;
-    document.getElementById('totalCorrect').textContent = data.tongDung || 0;
-    document.getElementById('accuracy').textContent = data.doChinhXac || '0%';
-    document.getElementById('patternsCount').textContent = data.patterns || 0;
-    document.getElementById('bestStreak').textContent = data.streakTotNhat || 0;
-    document.getElementById('bestAcc').textContent = data.totNhat || '0%';
-    document.getElementById('qualityText').textContent = data.chatLuong || '---';
-    document.getElementById('sessionCount').textContent = data.phien || 0;
-}
-
-// Refresh
 let isRefreshing = false;
 
 async function refreshAll() {
     if (isRefreshing) return;
     isRefreshing = true;
-
     try {
-        await Promise.all([
-            fetchPrediction('${type}'),
-            fetchStats()
-        ]);
+        await fetchPrediction();
     } catch (e) {
         console.error('Refresh error:', e);
     }
-
     isRefreshing = false;
 }
 
-// Init
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 TX PREDICTOR v6 - ${title}');
     refreshAll();
@@ -1424,14 +1279,17 @@ document.addEventListener('DOMContentLoaded', function() {
     `;
 }
 
-function renderHistoryPage(type, title, icon) {
+// ============================================================
+// HÀM RENDER LỊCH SỬ
+// ============================================================
+function renderHistoryPage(type, title, icon, color) {
     return `
 <!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TX PREDICTOR - LỊCH SỬ ${title}</title>
+    <title>Lịch sử ${title} - TX PREDICTOR</title>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
@@ -1446,7 +1304,7 @@ function renderHistoryPage(type, title, icon) {
         }
         ::-webkit-scrollbar { width: 3px; }
         ::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
-        ::-webkit-scrollbar-thumb { background: #7c4dff; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: ${color}; border-radius: 10px; }
 
         .bg-glow {
             position: fixed; top: 0; left: 0;
@@ -1472,7 +1330,7 @@ function renderHistoryPage(type, title, icon) {
         .logo { display: flex; align-items: center; gap: 12px; }
         .logo-icon {
             width: 44px; height: 44px;
-            background: linear-gradient(135deg, #7c4dff, #b388ff);
+            background: linear-gradient(135deg, ${color}, ${color}cc);
             border-radius: 12px;
             display: flex; align-items: center; justify-content: center;
             font-size: 20px; font-weight: 900; color: #fff;
@@ -1482,7 +1340,7 @@ function renderHistoryPage(type, title, icon) {
         .logo-text {
             font-family: 'Orbitron', sans-serif;
             font-size: 20px; font-weight: 700;
-            background: linear-gradient(135deg, #b388ff, #7c4dff);
+            background: linear-gradient(135deg, ${color}, #7c4dff);
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         }
         .logo-sub { font-size: 9px; color: rgba(255,255,255,0.3); letter-spacing: 2px; text-transform: uppercase; }
@@ -1499,18 +1357,18 @@ function renderHistoryPage(type, title, icon) {
         .nav-links { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 16px; }
         .nav-link {
             padding: 4px 16px; border-radius: 20px;
-            border: 1px solid rgba(124,77,255,0.15);
+            border: 1px solid rgba(255,255,255,0.06);
             color: rgba(255,255,255,0.4); font-size: 8px;
             text-decoration: none; font-family: 'Orbitron', sans-serif;
             transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 0.5px;
         }
-        .nav-link:hover { border-color: #b388ff; color: #b388ff; background: rgba(124,77,255,0.05); }
-        .nav-link.active { border-color: #b388ff; color: #b388ff; background: rgba(124,77,255,0.05); }
+        .nav-link:hover { border-color: ${color}; color: ${color}; background: rgba(124,77,255,0.05); }
+        .nav-link.active { border-color: ${color}; color: ${color}; background: rgba(124,77,255,0.05); }
 
         .page-title {
             font-family: 'Orbitron', sans-serif;
-            font-size: 22px; font-weight: 700;
-            color: #b388ff;
+            font-size: 24px; font-weight: 700;
+            color: ${color};
             text-align: center;
             margin-bottom: 16px;
             letter-spacing: 2px;
@@ -1529,10 +1387,10 @@ function renderHistoryPage(type, title, icon) {
             margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
             letter-spacing: 1px;
         }
-        .card-title i { font-size: 13px; color: #b388ff; }
+        .card-title i { font-size: 13px; color: ${color}; }
         .card-badge {
             margin-left: auto; background: rgba(124,77,255,0.06);
-            color: #b388ff; padding: 2px 12px; border-radius: 20px;
+            color: ${color}; padding: 2px 12px; border-radius: 20px;
             font-size: 7px; font-weight: 600; text-transform: uppercase;
         }
 
@@ -1545,7 +1403,7 @@ function renderHistoryPage(type, title, icon) {
             transition: all 0.3s ease;
         }
         .stat-card:hover { background: rgba(255,255,255,0.02); border-color: rgba(124,77,255,0.03); }
-        .stat-number { font-size: 24px; font-weight: 700; font-family: 'Orbitron', sans-serif; color: #b388ff; }
+        .stat-number { font-size: 26px; font-weight: 700; font-family: 'Orbitron', sans-serif; color: ${color}; }
         .stat-number.good { color: #66bb6a; }
         .stat-number.bad { color: #ef5350; }
         .stat-number.winrate { color: #ffd54f; }
@@ -1574,15 +1432,15 @@ function renderHistoryPage(type, title, icon) {
 
         .btn-back {
             display: inline-block; padding: 8px 24px; border-radius: 20px;
-            border: 1px solid rgba(124,77,255,0.2); background: rgba(124,77,255,0.05);
-            color: #b388ff; font-size: 10px; font-weight: 500; cursor: pointer;
+            border: 1px solid ${color}44; background: rgba(124,77,255,0.05);
+            color: ${color}; font-size: 10px; font-weight: 500; cursor: pointer;
             transition: all 0.3s ease; text-decoration: none;
             font-family: 'Orbitron', sans-serif; letter-spacing: 0.5px;
         }
-        .btn-back:hover { background: rgba(124,77,255,0.1); border-color: #b388ff; }
+        .btn-back:hover { background: rgba(124,77,255,0.1); border-color: ${color}; }
 
         .footer { text-align: center; padding: 14px 20px 6px; color: rgba(255,255,255,0.04); font-size: 8px; border-top: 1px solid rgba(255,255,255,0.02); margin-top: 12px; font-family: 'Orbitron', sans-serif; letter-spacing: 1px; }
-        .footer strong { color: #b388ff; }
+        .footer strong { color: ${color}; }
 
         @media (max-width: 768px) {
             .container { padding: 8px; }
@@ -1617,7 +1475,7 @@ function renderHistoryPage(type, title, icon) {
             <div class="logo-icon">TX</div>
             <div>
                 <div class="logo-text">PREDICTOR v6</div>
-                <div class="logo-sub">ĐẠI CA KHÔI <span style="color:#b388ff;">@2026</span></div>
+                <div class="logo-sub">ĐẠI CA KHÔI <span style="color:${color};">@2026</span></div>
             </div>
         </div>
         <div class="header-right">
@@ -1626,16 +1484,15 @@ function renderHistoryPage(type, title, icon) {
                 <span>Live</span>
             </span>
             <span class="header-time" id="clockDisplay">--:--:--</span>
-            <a href="/" class="btn-back"><i class="fas fa-arrow-left"></i> Trang chủ</a>
+            <a href="/${type}" class="btn-back"><i class="fas fa-arrow-left"></i> Dự đoán</a>
         </div>
     </header>
 
     <div class="nav-links">
         <a href="/" class="nav-link">🏠 Trang chủ</a>
-        <a href="/hu" class="nav-link">🎲 Dự đoán HŨ</a>
-        <a href="/md5" class="nav-link">🎲 Dự đoán MD5</a>
-        <a href="/lichsu/hu" class="nav-link active">📊 Lịch sử HŨ</a>
-        <a href="/lichsu/md5" class="nav-link">📊 Lịch sử MD5</a>
+        <a href="/hu" class="nav-link ${type === 'hu' ? 'active' : ''}">🎲 HŨ</a>
+        <a href="/md5" class="nav-link ${type === 'md5' ? 'active' : ''}">🎲 MD5</a>
+        <a href="/lichsu/${type}" class="nav-link active">📊 Lịch sử</a>
     </div>
 
     <div class="page-title">
@@ -1645,7 +1502,7 @@ function renderHistoryPage(type, title, icon) {
     <div class="card" style="margin-bottom:12px;">
         <div class="card-title">
             <i class="fas fa-chart-line"></i> THỐNG KÊ ${title}
-            <span class="card-badge">REAL-TIME</span>
+            <span class="card-badge">THỰC TẾ</span>
         </div>
         <div class="stats-grid">
             <div class="stat-card">
@@ -1703,7 +1560,6 @@ function renderHistoryPage(type, title, icon) {
 </div>
 
 <script>
-// Anti-zoom
 document.addEventListener('gesturestart', e => e.preventDefault());
 document.addEventListener('touchstart', e => { if (e.touches.length > 1) e.preventDefault(); });
 let lastTouchEnd = 0;
@@ -1720,14 +1576,12 @@ document.addEventListener('keydown', e => {
     }
 });
 
-// Clock
 function updateClock() {
     document.getElementById('clockDisplay').textContent = new Date().toLocaleTimeString('vi-VN', { hour12: false });
 }
 setInterval(updateClock, 1000);
 updateClock();
 
-// API
 async function fetchAPI(endpoint) {
     try {
         const res = await fetch(endpoint);
@@ -1739,8 +1593,8 @@ async function fetchAPI(endpoint) {
     }
 }
 
-async function fetchHistory(type) {
-    const data = await fetchAPI('/api/history/' + type);
+async function fetchHistory() {
+    const data = await fetchAPI('/api/history/${type}');
     if (data) {
         renderHistory(data.history || []);
         updateStats(data.history || []);
@@ -1792,14 +1646,13 @@ let refreshInterval;
 function startAutoRefresh() {
     if (refreshInterval) clearInterval(refreshInterval);
     refreshInterval = setInterval(() => {
-        fetchHistory('${type}');
+        fetchHistory();
     }, 5000);
 }
 
-// Init
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 TX PREDICTOR v6 - LỊCH SỬ ${title}');
-    fetchHistory('${type}');
+    fetchHistory();
     startAutoRefresh();
 });
 </script>
@@ -1809,10 +1662,10 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 // ============================================================
-// ROUTES - GIAO DIỆN
+// ROUTES
 // ============================================================
 
-// Trang chủ - Tổng hợp
+// Trang chủ
 app.get('/', (req, res) => {
     res.send(`
 <!DOCTYPE html>
@@ -1888,7 +1741,7 @@ app.get('/', (req, res) => {
         .nav-links { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 16px; }
         .nav-link {
             padding: 4px 16px; border-radius: 20px;
-            border: 1px solid rgba(124,77,255,0.15);
+            border: 1px solid rgba(255,255,255,0.06);
             color: rgba(255,255,255,0.4); font-size: 8px;
             text-decoration: none; font-family: 'Orbitron', sans-serif;
             transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 0.5px;
@@ -1896,70 +1749,52 @@ app.get('/', (req, res) => {
         .nav-link:hover { border-color: #b388ff; color: #b388ff; background: rgba(124,77,255,0.05); }
         .nav-link.active { border-color: #b388ff; color: #b388ff; background: rgba(124,77,255,0.05); }
 
+        .welcome {
+            text-align: center;
+            padding: 40px 20px;
+            background: rgba(255,255,255,0.02);
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.04);
+            margin-bottom: 16px;
+        }
+        .welcome h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 32px;
+            font-weight: 900;
+            background: linear-gradient(135deg, #b388ff, #7c4dff);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            margin-bottom: 12px;
+        }
+        .welcome p {
+            color: rgba(255,255,255,0.4);
+            font-size: 14px;
+            letter-spacing: 1px;
+        }
+        .welcome .version {
+            color: rgba(255,255,255,0.15);
+            font-size: 10px;
+            margin-top: 8px;
+            font-family: 'Orbitron', sans-serif;
+            letter-spacing: 2px;
+        }
+
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
         @media (max-width: 992px) { .grid { grid-template-columns: 1fr; } }
 
-        .card {
+        .menu-card {
             background: rgba(255,255,255,0.02);
             border-radius: 16px; border: 1px solid rgba(255,255,255,0.04);
-            padding: 20px; transition: all 0.3s ease;
-        }
-        .card:hover { border-color: rgba(124,77,255,0.08); box-shadow: 0 0 60px rgba(124,77,255,0.03); }
-        .card-title {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 10px; color: rgba(255,255,255,0.3);
-            margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
-            letter-spacing: 1px;
-        }
-        .card-title i { font-size: 13px; color: #b388ff; }
-        .card-badge {
-            margin-left: auto; background: rgba(124,77,255,0.06);
-            color: #b388ff; padding: 2px 12px; border-radius: 20px;
-            font-size: 7px; font-weight: 600; text-transform: uppercase;
-        }
-
-        .pred-result {
-            font-size: 72px; font-weight: 900; font-family: 'Orbitron', sans-serif;
-            margin: 0 0 6px; transition: all 0.5s ease; line-height: 1; min-height: 80px;
-            letter-spacing: 4px; text-align: center;
-        }
-        .pred-result.tai { color: #4fc3f7; text-shadow: 0 0 80px rgba(79,195,247,0.15); }
-        .pred-result.xiu { color: #ef5350; text-shadow: 0 0 80px rgba(239,83,80,0.15); }
-        .pred-result.waiting { color: rgba(255,255,255,0.06); animation: textPulse 1.8s ease-in-out infinite; font-size: 24px; font-family: 'Orbitron', sans-serif; letter-spacing: 6px; }
-
-        .pred-meta { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; margin: 4px 0 6px; }
-        .meta-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-        .meta-item .label { font-size: 8px; color: rgba(255,255,255,0.15); text-transform: uppercase; letter-spacing: 1px; }
-        .meta-item .value { font-size: 18px; font-weight: 700; font-family: 'Orbitron', sans-serif; }
-        .meta-item .value.confidence { color: #4fc3f7; }
-        .meta-item .value.quality { color: #ffd54f; }
-
-        .bar-track { width: 100%; height: 4px; background: rgba(255,255,255,0.03); border-radius: 10px; overflow: hidden; margin-top: 4px; }
-        .bar-fill { height: 100%; border-radius: 10px; background: linear-gradient(90deg, #ef5350, #ffd54f, #4fc3f7); transition: width 0.8s ease; width: 0%; }
-
-        .signals { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-top: 8px; min-height: 20px; }
-        .signal-tag {
-            background: rgba(255,255,255,0.02); padding: 2px 10px; border-radius: 20px;
-            font-size: 7px; color: rgba(255,255,255,0.4); border: 1px solid rgba(255,255,255,0.02);
+            padding: 30px 20px;
+            text-align: center;
             transition: all 0.3s ease;
+            text-decoration: none;
+            color: #fff;
+            display: block;
         }
-        .signal-tag:hover { background: rgba(124,77,255,0.04); border-color: rgba(124,77,255,0.06); color: #b388ff; }
-        .signal-tag.highlight { background: rgba(124,77,255,0.05); border-color: rgba(124,77,255,0.08); color: #b388ff; }
-
-        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
-        @media (max-width: 600px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
-        .stat-card {
-            background: rgba(255,255,255,0.01); border-radius: 12px;
-            padding: 8px 4px; text-align: center;
-            border: 1px solid rgba(255,255,255,0.01);
-            transition: all 0.3s ease;
-        }
-        .stat-card:hover { background: rgba(255,255,255,0.02); border-color: rgba(124,77,255,0.03); }
-        .stat-number { font-size: 22px; font-weight: 700; font-family: 'Orbitron', sans-serif; color: #b388ff; }
-        .stat-number.good { color: #66bb6a; }
-        .stat-number.bad { color: #ef5350; }
-        .stat-number.winrate { color: #ffd54f; }
-        .stat-label { font-size: 7px; color: rgba(255,255,255,0.15); text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
+        .menu-card:hover { border-color: rgba(124,77,255,0.08); box-shadow: 0 0 60px rgba(124,77,255,0.03); transform: translateY(-4px); }
+        .menu-card .icon { font-size: 40px; margin-bottom: 12px; display: block; }
+        .menu-card .title { font-family: 'Orbitron', sans-serif; font-size: 16px; font-weight: 700; }
+        .menu-card .desc { font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 4px; }
 
         .footer { text-align: center; padding: 14px 20px 6px; color: rgba(255,255,255,0.04); font-size: 8px; border-top: 1px solid rgba(255,255,255,0.02); margin-top: 12px; font-family: 'Orbitron', sans-serif; letter-spacing: 1px; }
         .footer strong { color: #b388ff; }
@@ -1970,19 +1805,15 @@ app.get('/', (req, res) => {
             .logo-text { font-size: 16px; }
             .logo-icon { width: 36px; height: 36px; font-size: 16px; }
             .header-right { justify-content: space-between; }
-            .pred-result { font-size: 44px; min-height: 50px; }
-            .pred-meta { gap: 14px; }
-            .meta-item .value { font-size: 15px; }
-            .card { padding: 14px; }
-            .stat-number { font-size: 18px; }
+            .welcome h1 { font-size: 24px; }
+            .grid { gap: 10px; }
+            .menu-card { padding: 20px 14px; }
+            .menu-card .icon { font-size: 30px; }
         }
         @media (max-width: 480px) {
             .container { padding: 4px; }
-            .pred-result { font-size: 32px; min-height: 38px; }
-            .stats-grid { gap: 4px; }
-            .stat-number { font-size: 14px; }
-            .stat-card { padding: 4px 2px; }
-            .signal-tag { font-size: 6px; padding: 1px 6px; }
+            .welcome h1 { font-size: 18px; }
+            .menu-card .title { font-size: 13px; }
         }
     </style>
 </head>
@@ -2011,117 +1842,39 @@ app.get('/', (req, res) => {
 
     <div class="nav-links">
         <a href="/" class="nav-link active">🏠 Trang chủ</a>
-        <a href="/hu" class="nav-link">🎲 Dự đoán HŨ</a>
-        <a href="/md5" class="nav-link">🎲 Dự đoán MD5</a>
+        <a href="/hu" class="nav-link">🎲 HŨ</a>
+        <a href="/md5" class="nav-link">🎲 MD5</a>
         <a href="/lichsu/hu" class="nav-link">📊 Lịch sử HŨ</a>
         <a href="/lichsu/md5" class="nav-link">📊 Lịch sử MD5</a>
     </div>
 
-    <div class="grid">
-
-        <div class="card">
-            <div class="card-title">
-                <i class="fas fa-dice-d6"></i> TÀI XỈU HŨ
-                <span class="card-badge">LIVE</span>
-            </div>
-            <div class="pred-area">
-                <div class="pred-result waiting" id="huResult">---</div>
-                <div class="pred-meta">
-                    <div class="meta-item">
-                        <span class="label">Độ tin cậy</span>
-                        <span class="value confidence" id="huConf">0%</span>
-                    </div>
-                    <div class="meta-item">
-                        <span class="label">Chất lượng</span>
-                        <span class="value quality" id="huQuality">---</span>
-                    </div>
-                    <div class="meta-item">
-                        <span class="label">Phiên</span>
-                        <span class="value" id="huPhien" style="color:rgba(255,255,255,0.3);font-size:14px;">---</span>
-                    </div>
-                </div>
-                <div class="bar-track">
-                    <div class="bar-fill" id="huBar"></div>
-                </div>
-                <div class="signals" id="huSignals">
-                    <span class="signal-tag">Đang phân tích...</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="card-title">
-                <i class="fas fa-dice-d6"></i> TÀI XỈU MD5
-                <span class="card-badge">LIVE</span>
-            </div>
-            <div class="pred-area">
-                <div class="pred-result waiting" id="md5Result">---</div>
-                <div class="pred-meta">
-                    <div class="meta-item">
-                        <span class="label">Độ tin cậy</span>
-                        <span class="value confidence" id="md5Conf">0%</span>
-                    </div>
-                    <div class="meta-item">
-                        <span class="label">Chất lượng</span>
-                        <span class="value quality" id="md5Quality">---</span>
-                    </div>
-                    <div class="meta-item">
-                        <span class="label">Phiên</span>
-                        <span class="value" id="md5Phien" style="color:rgba(255,255,255,0.3);font-size:14px;">---</span>
-                    </div>
-                </div>
-                <div class="bar-track">
-                    <div class="bar-fill" id="md5Bar"></div>
-                </div>
-                <div class="signals" id="md5Signals">
-                    <span class="signal-tag">Đang phân tích...</span>
-                </div>
-            </div>
-        </div>
-
+    <div class="welcome">
+        <h1>TX PREDICTOR v6</h1>
+        <p>🚀 Hệ thống dự đoán Tài Xỉu siêu chính xác</p>
+        <p class="version">🧠 30+ Cầu · 18+ Trend · Dice · Ensemble</p>
     </div>
 
-    <div class="card" style="margin-bottom:12px;">
-        <div class="card-title">
-            <i class="fas fa-chart-line"></i> THỐNG KÊ SIÊU VIP
-            <span class="card-badge">REAL-TIME</span>
-        </div>
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-number" id="totalPreds">0</div>
-                <div class="stat-label">Tổng dự đoán</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number good" id="totalCorrect">0</div>
-                <div class="stat-label">Đúng</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number winrate" id="accuracy">0%</div>
-                <div class="stat-label">Độ chính xác</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="patternsCount">0</div>
-                <div class="stat-label">Patterns học</div>
-            </div>
-        </div>
-        <div class="stats-grid" style="margin-top:6px;">
-            <div class="stat-card">
-                <div class="stat-number good" id="bestStreak">0</div>
-                <div class="stat-label">Streak tốt nhất</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="bestAcc">0%</div>
-                <div class="stat-label">Acc tốt nhất</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="qualityText">---</div>
-                <div class="stat-label">Chất lượng hiện tại</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="sessionCount">0</div>
-                <div class="stat-label">Phiên đã học</div>
-            </div>
-        </div>
+    <div class="grid">
+        <a href="/hu" class="menu-card">
+            <span class="icon">🎲</span>
+            <div class="title">Dự đoán HŨ</div>
+            <div class="desc">Phân tích và dự đoán Tài Xỉu HŨ</div>
+        </a>
+        <a href="/md5" class="menu-card">
+            <span class="icon">🎲</span>
+            <div class="title">Dự đoán MD5</div>
+            <div class="desc">Phân tích và dự đoán Tài Xỉu MD5</div>
+        </a>
+        <a href="/lichsu/hu" class="menu-card">
+            <span class="icon">📊</span>
+            <div class="title">Lịch sử HŨ</div>
+            <div class="desc">Thống kê thắng thua HŨ</div>
+        </a>
+        <a href="/lichsu/md5" class="menu-card">
+            <span class="icon">📊</span>
+            <div class="title">Lịch sử MD5</div>
+            <div class="desc">Thống kê thắng thua MD5</div>
+        </a>
     </div>
 
     <div class="footer">
@@ -2132,7 +1885,6 @@ app.get('/', (req, res) => {
 </div>
 
 <script>
-// Anti-zoom
 document.addEventListener('gesturestart', e => e.preventDefault());
 document.addEventListener('touchstart', e => { if (e.touches.length > 1) e.preventDefault(); });
 let lastTouchEnd = 0;
@@ -2149,113 +1901,11 @@ document.addEventListener('keydown', e => {
     }
 });
 
-// Clock
 function updateClock() {
     document.getElementById('clockDisplay').textContent = new Date().toLocaleTimeString('vi-VN', { hour12: false });
 }
 setInterval(updateClock, 1000);
 updateClock();
-
-// API
-async function fetchAPI(endpoint) {
-    try {
-        const res = await fetch(endpoint);
-        if (!res.ok) throw new Error('Network error');
-        return await res.json();
-    } catch (e) {
-        console.error('API Error:', e);
-        return null;
-    }
-}
-
-async function fetchPrediction(type) {
-    const data = await fetchAPI('/api/' + type);
-    if (data) {
-        updatePrediction(type, data);
-        updateStats(data.thongKe);
-    }
-}
-
-async function fetchStats() {
-    const data = await fetchAPI('/api/stats');
-    if (data) updateStats(data);
-}
-
-function updatePrediction(type, data) {
-    const prefix = type.toLowerCase();
-    const resultEl = document.getElementById(prefix + 'Result');
-    const confEl = document.getElementById(prefix + 'Conf');
-    const qualityEl = document.getElementById(prefix + 'Quality');
-    const phienEl = document.getElementById(prefix + 'Phien');
-    const barEl = document.getElementById(prefix + 'Bar');
-    const signalsEl = document.getElementById(prefix + 'Signals');
-
-    if (!resultEl) return;
-
-    resultEl.textContent = data.duDoan || '---';
-    resultEl.className = 'pred-result';
-    if (data.duDoan === 'TAI') resultEl.classList.add('tai');
-    else if (data.duDoan === 'XIU') resultEl.classList.add('xiu');
-    else resultEl.classList.add('waiting');
-
-    confEl.textContent = data.doTinCay || '0%';
-    qualityEl.textContent = data.chatLuong || '---';
-    phienEl.textContent = '#' + data.phien || '---';
-
-    const conf = parseInt(data.doTinCay) || 0;
-    barEl.style.width = Math.min(100, conf) + '%';
-
-    if (data.tinHieu && data.tinHieu.length > 0) {
-        signalsEl.innerHTML = data.tinHieu.slice(0, 6).map((s, i) => 
-            `<span class="signal-tag${i === 0 ? ' highlight' : ''}">${s.ten}: ${s.duDoan} (${s.doTinCay})</span>`
-        ).join('');
-    } else {
-        signalsEl.innerHTML = '<span class="signal-tag">Đang phân tích...</span>';
-    }
-}
-
-function updateStats(data) {
-    if (!data) return;
-    document.getElementById('totalPreds').textContent = data.tongDuDoan || 0;
-    document.getElementById('totalCorrect').textContent = data.tongDung || 0;
-    document.getElementById('accuracy').textContent = data.doChinhXac || '0%';
-    document.getElementById('patternsCount').textContent = data.patterns || 0;
-    document.getElementById('bestStreak').textContent = data.streakTotNhat || 0;
-    document.getElementById('bestAcc').textContent = data.totNhat || '0%';
-    document.getElementById('qualityText').textContent = data.chatLuong || '---';
-    document.getElementById('sessionCount').textContent = data.phien || 0;
-}
-
-// Refresh
-let isRefreshing = false;
-
-async function refreshAll() {
-    if (isRefreshing) return;
-    isRefreshing = true;
-
-    try {
-        await Promise.all([
-            fetchPrediction('hu'),
-            fetchPrediction('md5'),
-            fetchStats()
-        ]);
-    } catch (e) {
-        console.error('Refresh error:', e);
-    }
-
-    isRefreshing = false;
-}
-
-// Init
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 TX PREDICTOR v6 - ĐẠI CA KHÔI');
-    refreshAll();
-    setInterval(refreshAll, 5000);
-
-    setTimeout(function() {
-        document.querySelector('.status-badge').innerHTML = '<span class="status-dot"></span><span>Ready</span>';
-    }, 1000);
-});
 </script>
 </body>
 </html>
@@ -2264,22 +1914,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Dự đoán HU
 app.get('/hu', (req, res) => {
-    res.send(renderPage('HŨ', 'fas fa-dice-d6', 'hu'));
+    res.send(renderPredictionPage('HŨ', 'fas fa-dice-d6', 'hu', '#4fc3f7'));
 });
 
 // Dự đoán MD5
 app.get('/md5', (req, res) => {
-    res.send(renderPage('MD5', 'fas fa-dice-d6', 'md5'));
+    res.send(renderPredictionPage('MD5', 'fas fa-dice-d6', 'md5', '#ff6b6b'));
 });
 
 // Lịch sử HU
 app.get('/lichsu/hu', (req, res) => {
-    res.send(renderHistoryPage('hu', 'HŨ', 'fas fa-dice-d6'));
+    res.send(renderHistoryPage('hu', 'HŨ', 'fas fa-dice-d6', '#4fc3f7'));
 });
 
 // Lịch sử MD5
 app.get('/lichsu/md5', (req, res) => {
-    res.send(renderHistoryPage('md5', 'MD5', 'fas fa-dice-d6'));
+    res.send(renderHistoryPage('md5', 'MD5', 'fas fa-dice-d6', '#ff6b6b'));
 });
 
 // ============================================================
@@ -2300,8 +1950,7 @@ app.get('/api/hu', async (req, res) => {
                 duDoan: s.pred,
                 doTinCay: s.conf.toFixed(0) + '%',
                 lyDo: s.reason || ''
-            })),
-            thongKe: result.stats
+            }))
         });
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -2323,8 +1972,7 @@ app.get('/api/md5', async (req, res) => {
                 duDoan: s.pred,
                 doTinCay: s.conf.toFixed(0) + '%',
                 lyDo: s.reason || ''
-            })),
-            thongKe: result.stats
+            }))
         });
     } catch (e) {
         res.status(500).json({ error: e.message });
