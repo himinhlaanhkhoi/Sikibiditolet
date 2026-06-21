@@ -2,7 +2,7 @@
  * ════════════════════════════════════════════════════════════════════
  * ║  🚀 TX PREDICTOR v6 - ĐẠI CA KHÔI @2026                      ║
  * ║  🧠 30+ CẦU + 18+ TREND + DICE + ENSEMBLE                   ║
- * ║  📊 TÍCH HỢP 1 FILE - GIAO DIỆN SIÊU ĐẸP                    ║
+ * ║  📊 ROUTE RIÊNG: /lichsu/hu - /lichsu/md5                   ║
  * ════════════════════════════════════════════════════════════════════
  */
 
@@ -1215,10 +1215,409 @@ function calculatePrediction(data, type) {
 }
 
 // ============================================================
-// SERVER - GIAO DIỆN TÍCH HỢP 1 FILE
+// GIAO DIỆN LỊCH SỬ HU
+// ============================================================
+function renderHistoryPage(type, title, icon) {
+    return `
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TX PREDICTOR - LỊCH SỬ ${title}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: #0a0a1a;
+            color: #fff;
+            min-height: 100vh;
+            overflow-x: hidden;
+            user-select: none;
+        }
+        ::-webkit-scrollbar { width: 3px; }
+        ::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
+        ::-webkit-scrollbar-thumb { background: #7c4dff; border-radius: 10px; }
+
+        .bg-glow {
+            position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+            background: radial-gradient(ellipse at 30% 20%, rgba(124,77,255,0.06), transparent 50%),
+                        radial-gradient(ellipse at 70% 80%, rgba(0,245,255,0.04), transparent 50%);
+        }
+
+        .container { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 16px; min-height: 100vh; }
+
+        .header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 24px;
+            background: rgba(255,255,255,0.03);
+            backdrop-filter: blur(20px);
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.04);
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .logo { display: flex; align-items: center; gap: 12px; }
+        .logo-icon {
+            width: 44px; height: 44px;
+            background: linear-gradient(135deg, #7c4dff, #b388ff);
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; font-weight: 900; color: #fff;
+            font-family: 'Orbitron', sans-serif;
+            box-shadow: 0 0 40px rgba(124,77,255,0.15);
+        }
+        .logo-text {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 20px; font-weight: 700;
+            background: linear-gradient(135deg, #b388ff, #7c4dff);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .logo-sub { font-size: 9px; color: rgba(255,255,255,0.3); letter-spacing: 2px; text-transform: uppercase; }
+        .header-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .status-badge {
+            display: flex; align-items: center; gap: 6px;
+            padding: 4px 14px; background: rgba(0,255,136,0.06);
+            border-radius: 20px; font-size: 10px; color: rgba(255,255,255,0.5);
+            border: 1px solid rgba(0,255,136,0.06);
+        }
+        .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #00ff88; animation: dotPulse 1.5s ease-in-out infinite; }
+        @keyframes dotPulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.2; transform: scale(0.6); } }
+        .header-time { font-size: 11px; color: rgba(255,255,255,0.3); font-family: 'Orbitron', sans-serif; }
+
+        .page-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 22px; font-weight: 700;
+            color: #b388ff;
+            text-align: center;
+            margin-bottom: 16px;
+            letter-spacing: 2px;
+        }
+        .page-title i { margin-right: 10px; }
+
+        .card {
+            background: rgba(255,255,255,0.02);
+            border-radius: 16px; border: 1px solid rgba(255,255,255,0.04);
+            padding: 20px; transition: all 0.3s ease;
+        }
+        .card:hover { border-color: rgba(124,77,255,0.08); box-shadow: 0 0 60px rgba(124,77,255,0.03); }
+        .card-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 10px; color: rgba(255,255,255,0.3);
+            margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+            letter-spacing: 1px;
+        }
+        .card-title i { font-size: 13px; color: #b388ff; }
+        .card-badge {
+            margin-left: auto; background: rgba(124,77,255,0.06);
+            color: #b388ff; padding: 2px 12px; border-radius: 20px;
+            font-size: 7px; font-weight: 600; text-transform: uppercase;
+        }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
+        @media (max-width: 600px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+        .stat-card {
+            background: rgba(255,255,255,0.01); border-radius: 12px;
+            padding: 12px 8px; text-align: center;
+            border: 1px solid rgba(255,255,255,0.01);
+            transition: all 0.3s ease;
+        }
+        .stat-card:hover { background: rgba(255,255,255,0.02); border-color: rgba(124,77,255,0.03); }
+        .stat-number { font-size: 24px; font-weight: 700; font-family: 'Orbitron', sans-serif; color: #b388ff; }
+        .stat-number.good { color: #66bb6a; }
+        .stat-number.bad { color: #ef5350; }
+        .stat-number.winrate { color: #ffd54f; }
+        .stat-label { font-size: 8px; color: rgba(255,255,255,0.15); text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
+
+        .history-container { max-height: 500px; overflow-y: auto; margin-top: 4px; }
+        .history-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        .history-table thead { position: sticky; top: 0; z-index: 2; }
+        .history-table th {
+            text-align: left; padding: 6px 8px;
+            color: rgba(255,255,255,0.12); font-size: 8px; text-transform: uppercase;
+            letter-spacing: 1px; border-bottom: 1px solid rgba(255,255,255,0.03);
+            background: rgba(10,10,26,0.95); backdrop-filter: blur(10px);
+            font-weight: 500;
+        }
+        .history-table td { padding: 5px 8px; border-bottom: 1px solid rgba(255,255,255,0.01); color: rgba(255,255,255,0.35); font-size: 10px; }
+        .history-table tr:hover td { background: rgba(255,255,255,0.01); }
+        .history-table .phien { color: #fff; font-family: 'Orbitron', sans-serif; font-size: 9px; }
+        .history-table .win { color: #66bb6a; font-weight: 600; }
+        .history-table .lose { color: #ef5350; font-weight: 600; }
+        .history-table .pending { color: #ffd54f; }
+        .history-table .tai { color: #4fc3f7; font-weight: 600; }
+        .history-table .xiu { color: #ef5350; font-weight: 600; }
+
+        .scroll-hint { text-align: center; padding: 8px; color: rgba(255,255,255,0.04); font-size: 7px; letter-spacing: 1px; }
+
+        .btn-back {
+            display: inline-block; padding: 8px 24px; border-radius: 20px;
+            border: 1px solid rgba(124,77,255,0.2); background: rgba(124,77,255,0.05);
+            color: #b388ff; font-size: 10px; font-weight: 500; cursor: pointer;
+            transition: all 0.3s ease; text-decoration: none;
+            font-family: 'Orbitron', sans-serif; letter-spacing: 0.5px;
+        }
+        .btn-back:hover { background: rgba(124,77,255,0.1); border-color: #b388ff; }
+
+        .footer { text-align: center; padding: 14px 20px 6px; color: rgba(255,255,255,0.04); font-size: 8px; border-top: 1px solid rgba(255,255,255,0.02); margin-top: 12px; font-family: 'Orbitron', sans-serif; letter-spacing: 1px; }
+        .footer strong { color: #b388ff; }
+
+        @media (max-width: 768px) {
+            .container { padding: 8px; }
+            .header { padding: 8px 14px; flex-direction: column; align-items: stretch; gap: 4px; }
+            .logo-text { font-size: 16px; }
+            .logo-icon { width: 36px; height: 36px; font-size: 16px; }
+            .header-right { justify-content: space-between; }
+            .page-title { font-size: 18px; }
+            .stat-number { font-size: 18px; }
+            .history-table { font-size: 9px; }
+            .history-table th, .history-table td { padding: 3px 5px; }
+        }
+        @media (max-width: 480px) {
+            .container { padding: 4px; }
+            .page-title { font-size: 14px; }
+            .stats-grid { gap: 4px; }
+            .stat-number { font-size: 14px; }
+            .stat-card { padding: 6px 3px; }
+            .history-table { font-size: 7px; }
+            .history-table th, .history-table td { padding: 2px 4px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="bg-glow"></div>
+
+<div class="container">
+
+    <header class="header">
+        <div class="logo">
+            <div class="logo-icon">TX</div>
+            <div>
+                <div class="logo-text">PREDICTOR v6</div>
+                <div class="logo-sub">ĐẠI CA KHÔI <span style="color:#b388ff;">@2026</span></div>
+            </div>
+        </div>
+        <div class="header-right">
+            <span class="status-badge">
+                <span class="status-dot"></span>
+                <span>Live</span>
+            </span>
+            <span class="header-time" id="clockDisplay">--:--:--</span>
+            <a href="/" class="btn-back"><i class="fas fa-arrow-left"></i> Trang chủ</a>
+        </div>
+    </header>
+
+    <div class="page-title">
+        <i class="${icon}"></i> LỊCH SỬ ${title}
+    </div>
+
+    <div class="card" style="margin-bottom:12px;">
+        <div class="card-title">
+            <i class="fas fa-chart-line"></i> THỐNG KÊ ${title}
+            <span class="card-badge">REAL-TIME</span>
+        </div>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number" id="totalPreds">0</div>
+                <div class="stat-label">Tổng phiên</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number good" id="totalCorrect">0</div>
+                <div class="stat-label">Thắng</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number bad" id="totalWrong">0</div>
+                <div class="stat-label">Thua</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number winrate" id="winRate">0%</div>
+                <div class="stat-label">Tỷ lệ thắng</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">
+            <i class="fas fa-history"></i> CHI TIẾT ${title}
+            <span class="card-badge">1000 phiên</span>
+        </div>
+        <div class="history-container">
+            <table class="history-table">
+                <thead>
+                    <tr>
+                        <th>Phiên</th>
+                        <th>Dự đoán</th>
+                        <th>Kết quả</th>
+                        <th>Độ tin cậy</th>
+                        <th>Trạng thái</th>
+                    </tr>
+                </thead>
+                <tbody id="historyBody">
+                    <tr>
+                        <td colspan="5" style="text-align:center;padding:20px;color:rgba(255,255,255,0.06);font-size:10px;">
+                            <i class="fas fa-spinner fa-spin"></i> Đang tải...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="scroll-hint">↓ Cuộn để xem thêm</div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>🚀 <strong>TX PREDICTOR v6</strong> © 2026 · ĐẠI CA KHÔI</p>
+        <p style="font-size:6px;color:rgba(255,255,255,0.03);margin-top:2px;">30+ Cầu + 18+ Trend + Dice + Ensemble</p>
+    </div>
+
+</div>
+
+<script>
+// Anti-zoom
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('touchstart', e => { if (e.touches.length > 1) e.preventDefault(); });
+let lastTouchEnd = 0;
+document.addEventListener('touchend', e => {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 300) e.preventDefault();
+    lastTouchEnd = now;
+}, false);
+document.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('keydown', e => {
+    if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && ['I','J','C'].includes(e.key)) || (e.ctrlKey && e.key === 'U')) {
+        e.preventDefault();
+        return false;
+    }
+});
+
+// Clock
+function updateClock() {
+    document.getElementById('clockDisplay').textContent = new Date().toLocaleTimeString('vi-VN', { hour12: false });
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// API
+async function fetchAPI(endpoint) {
+    try {
+        const res = await fetch(endpoint);
+        if (!res.ok) throw new Error('Network error');
+        return await res.json();
+    } catch (e) {
+        console.error('API Error:', e);
+        return null;
+    }
+}
+
+async function fetchHistory(type) {
+    const data = await fetchAPI('/api/history/' + type);
+    if (data) {
+        renderHistory(data.history || []);
+        updateStats(data.history || []);
+    }
+}
+
+function renderHistory(history) {
+    const tbody = document.getElementById('historyBody');
+    if (!history || history.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:rgba(255,255,255,0.06);">Chưa có dữ liệu</td></tr>';
+        return;
+    }
+
+    const rows = history.slice(0, 100).map(r => {
+        const statusClass = r.trangThai === 'WIN' ? 'win' : (r.trangThai === 'LOSE' ? 'lose' : 'pending');
+        const statusText = r.trangThai === 'WIN' ? '✅ THẮNG' : (r.trangThai === 'LOSE' ? '❌ THUA' : '⏳ CHỜ');
+        return `<tr>
+            <td class="phien">#${r.phien}</td>
+            <td class="${r.duDoan === 'TAI' ? 'tai' : 'xiu'}">${r.duDoan || '---'}</td>
+            <td class="${r.ketQua === 'TAI' ? 'tai' : 'xiu'}">${r.ketQua || '---'}</td>
+            <td>${r.do_tin_cay || '0%'}</td>
+            <td class="${statusClass}">${statusText}</td>
+        </tr>`;
+    }).join('');
+    tbody.innerHTML = rows;
+}
+
+function updateStats(history) {
+    if (!history || history.length === 0) {
+        document.getElementById('totalPreds').textContent = 0;
+        document.getElementById('totalCorrect').textContent = 0;
+        document.getElementById('totalWrong').textContent = 0;
+        document.getElementById('winRate').textContent = '0%';
+        return;
+    }
+
+    const total = history.length;
+    const wins = history.filter(r => r.trangThai === 'WIN').length;
+    const loses = history.filter(r => r.trangThai === 'LOSE').length;
+
+    document.getElementById('totalPreds').textContent = total;
+    document.getElementById('totalCorrect').textContent = wins;
+    document.getElementById('totalWrong').textContent = loses;
+    document.getElementById('winRate').textContent = total > 0 ? (wins / total * 100).toFixed(1) + '%' : '0%';
+}
+
+let refreshInterval;
+
+function startAutoRefresh() {
+    if (refreshInterval) clearInterval(refreshInterval);
+    refreshInterval = setInterval(() => {
+        fetchHistory('${type}');
+    }, 5000);
+}
+
+// Init
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 TX PREDICTOR v6 - LỊCH SỬ ${title}');
+    fetchHistory('${type}');
+    startAutoRefresh();
+});
+</script>
+</body>
+</html>
+    `;
+}
+
+// ============================================================
+// ROUTES - GIAO DIỆN LỊCH SỬ RIÊNG
 // ============================================================
 
-// Trang chủ - Tổng hợp
+// Lịch sử HU
+app.get('/lichsu/hu', (req, res) => {
+    res.send(renderHistoryPage('hu', 'HŨ', 'fas fa-dice-d6'));
+});
+
+// Lịch sử MD5
+app.get('/lichsu/md5', (req, res) => {
+    res.send(renderHistoryPage('md5', 'MD5', 'fas fa-dice-d6'));
+});
+
+// ============================================================
+// API LỊCH SỬ
+// ============================================================
+app.get('/api/history/:type', (req, res) => {
+    const type = req.params.type;
+    if (type === 'all') {
+        const all = [...historyData.hu, ...historyData.md5];
+        all.sort((a, b) => b.phien - a.phien);
+        res.json({ history: all, total: all.length });
+    } else if (type === 'hu') {
+        res.json({ history: historyData.hu || [], total: (historyData.hu || []).length });
+    } else if (type === 'md5') {
+        res.json({ history: historyData.md5 || [], total: (historyData.md5 || []).length });
+    } else {
+        res.json({ history: [], total: 0 });
+    }
+});
+
+// ============================================================
+// TRANG CHỦ - DỰ ĐOÁN
+// ============================================================
 app.get('/', (req, res) => {
     res.send(`
 <!DOCTYPE html>
@@ -1290,13 +1689,17 @@ app.get('/', (req, res) => {
         }
         .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #00ff88; animation: dotPulse 1.5s ease-in-out infinite; }
         @keyframes dotPulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.2; transform: scale(0.6); } }
-        .speed-badge {
-            background: rgba(124,77,255,0.06); color: #b388ff;
-            padding: 2px 12px; border-radius: 20px;
-            font-size: 8px; font-weight: 700; font-family: 'Orbitron', sans-serif;
-            border: 1px solid rgba(124,77,255,0.06);
-        }
         .header-time { font-size: 11px; color: rgba(255,255,255,0.3); font-family: 'Orbitron', sans-serif; }
+
+        .nav-links { display: flex; gap: 8px; flex-wrap: wrap; }
+        .nav-link {
+            padding: 4px 16px; border-radius: 20px;
+            border: 1px solid rgba(124,77,255,0.15);
+            color: rgba(255,255,255,0.4); font-size: 8px;
+            text-decoration: none; font-family: 'Orbitron', sans-serif;
+            transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .nav-link:hover { border-color: #b388ff; color: #b388ff; background: rgba(124,77,255,0.05); }
 
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
         @media (max-width: 992px) { .grid { grid-template-columns: 1fr; } }
@@ -1364,36 +1767,6 @@ app.get('/', (req, res) => {
         .stat-number.winrate { color: #ffd54f; }
         .stat-label { font-size: 7px; color: rgba(255,255,255,0.15); text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
 
-        .history-tabs { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
-        .tab-btn {
-            padding: 4px 16px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.06);
-            background: rgba(255,255,255,0.02); color: rgba(255,255,255,0.4);
-            font-size: 9px; font-weight: 500; cursor: pointer;
-            transition: all 0.3s ease; font-family: 'Orbitron', sans-serif;
-            text-transform: uppercase; letter-spacing: 0.5px;
-        }
-        .tab-btn:hover { border-color: #b388ff; color: #b388ff; }
-        .tab-btn.active { background: rgba(124,77,255,0.06); border-color: #b388ff; color: #b388ff; }
-
-        .history-container { max-height: 350px; overflow-y: auto; margin-top: 4px; }
-        .history-table { width: 100%; border-collapse: collapse; font-size: 10px; }
-        .history-table thead { position: sticky; top: 0; z-index: 2; }
-        .history-table th {
-            text-align: left; padding: 4px 6px;
-            color: rgba(255,255,255,0.12); font-size: 7px; text-transform: uppercase;
-            letter-spacing: 1px; border-bottom: 1px solid rgba(255,255,255,0.03);
-            background: rgba(10,10,26,0.95); backdrop-filter: blur(10px);
-            font-weight: 500;
-        }
-        .history-table td { padding: 4px 6px; border-bottom: 1px solid rgba(255,255,255,0.01); color: rgba(255,255,255,0.35); font-size: 9px; }
-        .history-table tr:hover td { background: rgba(255,255,255,0.01); }
-        .history-table .phien { color: #fff; font-family: 'Orbitron', sans-serif; font-size: 8px; }
-        .history-table .win { color: #66bb6a; font-weight: 600; }
-        .history-table .lose { color: #ef5350; font-weight: 600; }
-        .history-table .pending { color: #ffd54f; }
-
-        .scroll-hint { text-align: center; padding: 4px; color: rgba(255,255,255,0.04); font-size: 7px; letter-spacing: 1px; }
-
         .footer { text-align: center; padding: 14px 20px 6px; color: rgba(255,255,255,0.04); font-size: 8px; border-top: 1px solid rgba(255,255,255,0.02); margin-top: 12px; font-family: 'Orbitron', sans-serif; letter-spacing: 1px; }
         .footer strong { color: #b388ff; }
 
@@ -1408,8 +1781,6 @@ app.get('/', (req, res) => {
             .meta-item .value { font-size: 15px; }
             .card { padding: 14px; }
             .stat-number { font-size: 18px; }
-            .history-table { font-size: 8px; }
-            .history-table th, .history-table td { padding: 2px 4px; }
         }
         @media (max-width: 480px) {
             .container { padding: 4px; }
@@ -1417,8 +1788,6 @@ app.get('/', (req, res) => {
             .stats-grid { gap: 4px; }
             .stat-number { font-size: 14px; }
             .stat-card { padding: 4px 2px; }
-            .history-table { font-size: 7px; }
-            .history-table th, .history-table td { padding: 1px 3px; }
             .signal-tag { font-size: 6px; padding: 1px 6px; }
         }
     </style>
@@ -1438,14 +1807,19 @@ app.get('/', (req, res) => {
             </div>
         </div>
         <div class="header-right">
-            <span class="speed-badge"><i class="fas fa-bolt"></i> 0.1s</span>
-            <div class="status-badge">
+            <span class="status-badge">
                 <span class="status-dot"></span>
                 <span>Live</span>
-            </div>
+            </span>
             <span class="header-time" id="clockDisplay">--:--:--</span>
         </div>
     </header>
+
+    <div class="nav-links" style="margin-bottom:16px; justify-content:center;">
+        <a href="/" class="nav-link" style="border-color:#b388ff;color:#b388ff;">🏠 Trang chủ</a>
+        <a href="/lichsu/hu" class="nav-link">🎲 Lịch sử HŨ</a>
+        <a href="/lichsu/md5" class="nav-link">🎲 Lịch sử MD5</a>
+    </div>
 
     <div class="grid">
 
@@ -1554,40 +1928,6 @@ app.get('/', (req, res) => {
         </div>
     </div>
 
-    <div class="card">
-        <div class="card-title">
-            <i class="fas fa-history"></i> LỊCH SỬ THẮNG THUA
-            <span class="card-badge">1000 phiên</span>
-        </div>
-        <div class="history-tabs">
-            <button class="tab-btn active" data-tab="all">📊 Tất cả</button>
-            <button class="tab-btn" data-tab="hu">🎲 HŨ</button>
-            <button class="tab-btn" data-tab="md5">🎲 MD5</button>
-        </div>
-        <div class="history-container">
-            <table class="history-table">
-                <thead>
-                    <tr>
-                        <th>Phiên</th>
-                        <th>Loại</th>
-                        <th>Dự đoán</th>
-                        <th>Kết quả</th>
-                        <th>Độ tin cậy</th>
-                        <th>Trạng thái</th>
-                    </tr>
-                </thead>
-                <tbody id="historyBody">
-                    <tr>
-                        <td colspan="6" style="text-align:center;padding:15px;color:rgba(255,255,255,0.06);font-size:9px;">
-                            <i class="fas fa-spinner fa-spin"></i> Đang tải...
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-            <div class="scroll-hint">↓ Cuộn để xem thêm</div>
-        </div>
-    </div>
-
     <div class="footer">
         <p>🚀 <strong>TX PREDICTOR v6</strong> © 2026 · ĐẠI CA KHÔI</p>
         <p style="font-size:6px;color:rgba(255,255,255,0.03);margin-top:2px;">30+ Cầu + 18+ Trend + Dice + Ensemble</p>
@@ -1632,9 +1972,6 @@ async function fetchAPI(endpoint) {
     }
 }
 
-let currentTab = 'all';
-let historyCache = {};
-
 async function fetchPrediction(type) {
     const data = await fetchAPI('/api/' + type);
     if (data) {
@@ -1646,14 +1983,6 @@ async function fetchPrediction(type) {
 async function fetchStats() {
     const data = await fetchAPI('/api/stats');
     if (data) updateStats(data);
-}
-
-async function fetchHistory(type) {
-    const data = await fetchAPI('/api/history/' + type);
-    if (data) {
-        historyCache[type] = data.history || [];
-        renderHistory(type);
-    }
 }
 
 function updatePrediction(type, data) {
@@ -1701,49 +2030,6 @@ function updateStats(data) {
     document.getElementById('sessionCount').textContent = data.phien || 0;
 }
 
-function renderHistory(type) {
-    const tbody = document.getElementById('historyBody');
-    let history = [];
-    
-    if (type === 'all') {
-        const hu = historyCache['all'] || [];
-        const md5 = historyCache['all'] || [];
-        history = [...hu, ...md5];
-        history.sort((a, b) => b.phien - a.phien);
-    } else {
-        history = historyCache[type] || [];
-    }
-
-    if (!history || history.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:15px;color:rgba(255,255,255,0.06);">Chưa có dữ liệu</td></tr>`;
-        return;
-    }
-
-    const rows = history.slice(0, 50).map(r => {
-        const statusClass = r.trangThai === 'WIN' ? 'win' : (r.trangThai === 'LOSE' ? 'lose' : 'pending');
-        const statusText = r.trangThai === 'WIN' ? '✅ THẮNG' : (r.trangThai === 'LOSE' ? '❌ THUA' : '⏳ CHỜ');
-        return `<tr>
-            <td class="phien">#${r.phien}</td>
-            <td>${r.loai || 'HU'}</td>
-            <td class="${r.duDoan === 'TAI' ? 'tai' : 'xiu'}">${r.duDoan || '---'}</td>
-            <td class="${r.ketQua === 'TAI' ? 'tai' : 'xiu'}">${r.ketQua || '---'}</td>
-            <td>${r.do_tin_cay || '0%'}</td>
-            <td class="${statusClass}">${statusText}</td>
-        </tr>`;
-    }).join('');
-    tbody.innerHTML = rows || `<tr><td colspan="6" style="text-align:center;padding:15px;color:rgba(255,255,255,0.06);">Chưa có dữ liệu</td></tr>`;
-}
-
-// Tabs
-document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        this.classList.add('active');
-        currentTab = this.dataset.tab;
-        fetchHistory(currentTab);
-    });
-});
-
 // Refresh
 let isRefreshing = false;
 
@@ -1755,8 +2041,7 @@ async function refreshAll() {
         await Promise.all([
             fetchPrediction('hu'),
             fetchPrediction('md5'),
-            fetchStats(),
-            fetchHistory(currentTab)
+            fetchStats()
         ]);
     } catch (e) {
         console.error('Refresh error:', e);
@@ -1768,8 +2053,6 @@ async function refreshAll() {
 // Init
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 TX PREDICTOR v6 - ĐẠI CA KHÔI');
-    console.log('🧠 30+ Cầu + 18+ Trend + Dice + Ensemble');
-
     refreshAll();
     setInterval(refreshAll, 5000);
 
@@ -1783,7 +2066,9 @@ document.addEventListener('DOMContentLoaded', function() {
     `);
 });
 
-// API Dự đoán HU - Giao diện riêng
+// ============================================================
+// API Dự đoán
+// ============================================================
 app.get('/api/hu', async (req, res) => {
     try {
         const data = await fetchHu();
@@ -1807,7 +2092,6 @@ app.get('/api/hu', async (req, res) => {
     }
 });
 
-// API Dự đoán MD5 - Giao diện riêng
 app.get('/api/md5', async (req, res) => {
     try {
         const data = await fetchMd5();
@@ -1831,25 +2115,11 @@ app.get('/api/md5', async (req, res) => {
     }
 });
 
-// Lịch sử
-app.get('/api/history/:type', (req, res) => {
-    const type = req.params.type;
-    if (type === 'all') {
-        const all = [...historyData.hu, ...historyData.md5];
-        all.sort((a, b) => b.phien - a.phien);
-        res.json({ history: all, total: all.length });
-    } else {
-        res.json({ history: historyData[type] || [], total: (historyData[type] || []).length });
-    }
-});
-
-// Thống kê
 app.get('/api/stats', (req, res) => {
     const stats = predictor.stats();
     res.json(stats);
 });
 
-// Reset
 app.get('/api/reset', (req, res) => {
     historyData = { hu: [], md5: [] };
     saveHistory();
@@ -1864,6 +2134,7 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log('========================================');
     console.log('🚀 TX PREDICTOR v6 - ĐẠI CA KHÔI');
     console.log('🧠 30+ CẦU + 18+ TREND + DICE + ENSEMBLE');
+    console.log('📊 Route: /lichsu/hu - /lichsu/md5');
     console.log('Server: http://0.0.0.0:' + PORT);
     console.log('========================================');
 });
