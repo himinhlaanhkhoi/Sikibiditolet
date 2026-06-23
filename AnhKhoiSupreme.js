@@ -1,167 +1,22 @@
 /**
  * ════════════════════════════════════════════════════════════════════
- * ║  🏛️ TX PREDICTOR STATE SECURITY - BẢO MẬT CẤP NHÀ NƯỚC     ║
- * ║  🚀 HỆ THỐNG DỰ ĐOÁN TÀI XỈU CHUẨN GOV                       ║
- * ║  📊 LƯU 1000 PHIÊN - GIAO DIỆN HIỆN ĐẠI                     ║
+ * ║  👑 TX PREDICTOR ROYAL EDITION - ĐẲNG CẤP THƯỢNG LƯU       ║
+ * ║  💎 HỆ THỐNG DỰ ĐOÁN TÀI XỈU CAO CẤP                         ║
+ * ║  📊 LƯU 1000 PHIÊN - TỰ ĐỘNG +1 - SIÊU ĐẸP                 ║
  * ════════════════════════════════════════════════════════════════════
  */
 
 const express = require('express');
 const axios = require('axios');
 const fs = require('fs');
-const crypto = require('crypto');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const cors = require('cors');
-const compression = require('compression');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ============================================================
-// 🛡️ BẢO MẬT CẤP NHÀ NƯỚC
-// ============================================================
-
-// 1. CORS Policy - Chỉ cho phép domain được ủy quyền
-app.use(cors({
-    origin: function(origin, callback) {
-        const allowedOrigins = [
-            'http://localhost:5000',
-            'https://txpredictor.gov.vn',
-            'https://txpredictor.com.vn'
-        ];
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            callback(new Error('Không được phép truy cập'));
-        }
-    },
-    credentials: true,
-    optionsSuccessStatus: 200
-}));
-
-// 2. Helmet với cấu hình bảo mật tối đa
-app.use(helmet({
-    contentSecurityPolicy: {
-        directives: {
-            defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com", "https://fonts.googleapis.com"],
-            styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com", "https://fonts.googleapis.com"],
-            fontSrc: ["'self'", "https://cdnjs.cloudflare.com", "https://fonts.gstatic.com"],
-            imgSrc: ["'self'", "data:", "https:"],
-            connectSrc: ["'self'"],
-            frameSrc: ["'none'"],
-            objectSrc: ["'none'"],
-            baseUri: ["'self'"],
-            formAction: ["'self'"],
-            upgradeInsecureRequests: []
-        }
-    },
-    hsts: {
-        maxAge: 31536000,
-        includeSubDomains: true,
-        preload: true
-    },
-    frameguard: {
-        action: 'deny'
-    },
-    referrerPolicy: {
-        policy: 'no-referrer'
-    },
-    noSniff: true,
-    xssFilter: true,
-    hidePoweredBy: true,
-    ieNoOpen: true
-}));
-
-// 3. Rate Limiting - Chống tấn công DDoS
-const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 phút
-    max: 50, // Giới hạn 50 request/phút
-    message: '🚫 Quá nhiều yêu cầu, vui lòng thử lại sau 15 phút',
-    standardHeaders: true,
-    legacyHeaders: false,
-    handler: function(req, res) {
-        res.status(429).json({
-            error: '429',
-            message: 'Quá nhiều yêu cầu truy cập, vui lòng thử lại sau',
-            timestamp: new Date().toISOString()
-        });
-    }
-});
-app.use('/api/', limiter);
-
-// 4. Compression - Tối ưu tốc độ
-app.use(compression());
-
-// 5. JSON giới hạn kích thước
-app.use(express.json({ limit: '100kb' }));
-app.use(express.urlencoded({ extended: true, limit: '100kb' }));
-
-// 6. Security Headers bổ sung
-app.use((req, res, next) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader('X-XSS-Protection', '1; mode=block');
-    res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=(), usb=(), magnetometer=(), accelerometer=()');
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, private');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
-    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'");
-    next();
-});
-
-// 7. Session Security
-app.disable('x-powered-by');
-
-// 8. Request Validation
-app.use((req, res, next) => {
-    if (req.method === 'POST' || req.method === 'PUT') {
-        if (!req.headers['content-type'] || !req.headers['content-type'].includes('application/json')) {
-            if (req.method !== 'OPTIONS') {
-                return res.status(415).json({ error: 'Unsupported Media Type' });
-            }
-        }
-    }
-    next();
-});
-
-// 9. Security Monitoring
-app.use((req, res, next) => {
-    const start = Date.now();
-    res.on('finish', () => {
-        const duration = Date.now() - start;
-        if (res.statusCode >= 400) {
-            console.log(`⚠️ Security Alert: ${req.method} ${req.path} - ${res.statusCode} - ${duration}ms`);
-        }
-    });
-    next();
-});
-
-// 10. Encryption Helper
-function encryptData(data) {
-    const algorithm = 'aes-256-cbc';
-    const key = crypto.scryptSync('TX_PREDICTOR_SECURE_KEY_2026', 'salt', 32);
-    const iv = crypto.randomBytes(16);
-    const cipher = crypto.createCipheriv(algorithm, key, iv);
-    let encrypted = cipher.update(JSON.stringify(data), 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    return { encrypted, iv: iv.toString('hex') };
-}
-
-function decryptData(encryptedData, ivHex) {
-    const algorithm = 'aes-256-cbc';
-    const key = crypto.scryptSync('TX_PREDICTOR_SECURE_KEY_2026', 'salt', 32);
-    const iv = Buffer.from(ivHex, 'hex');
-    const decipher = crypto.createDecipheriv(algorithm, key, iv);
-    let decrypted = decipher.update(encryptedData, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    return JSON.parse(decrypted);
-}
+app.use(express.json());
 
 // ============================================================
-// ⏰ HÀM THỜI GIAN VIỆT NAM
+// HÀM THỜI GIAN VIỆT NAM
 // ============================================================
 function vnNow() {
     const now = new Date();
@@ -173,11 +28,6 @@ function getVNTime() {
     const now = new Date();
     now.setMinutes(now.getMinutes() + 420);
     return now;
-}
-
-function formatVNTime(date) {
-    const d = date || getVNTime();
-    return d.toLocaleString('vi-VN', { hour12: false, timeZone: 'Asia/Ho_Chi_Minh' });
 }
 
 // ============================================================
@@ -195,18 +45,15 @@ let stats = {
     hourly_stats: {},
     daily_profit: 0,
     accuracy_curve: [],
-    profit_curve: [],
     learning_progress: 0,
-    model_version: "STATE_SECURITY_v4.0",
-    last_phien: 0,
-    security_level: "GOVERNMENT"
+    model_version: "ROYAL_EDITION_v5.0",
+    last_phien: 0
 };
 
 // ============================================================
-// 💀 TX_LogicPen_STATE_SECURITY — BẢO MẬT CẤP NHÀ NƯỚC
+// 👑 TX_LogicPen_ROYAL_EDITION
 // ============================================================
 
-// ===== LSTM NEURAL NETWORK =====
 class MiniLSTM {
     constructor(inputSize = 10, hiddenSize = 20) {
         this.inputSize = inputSize;
@@ -264,7 +111,6 @@ class MiniLSTM {
     }
 }
 
-// ===== TRANSFORMER ATTENTION =====
 class TransformerAttention {
     constructor(dim = 10, heads = 4) {
         this.dim = dim;
@@ -327,7 +173,6 @@ class TransformerAttention {
     }
 }
 
-// ===== MONTE CARLO TREE SEARCH =====
 class MonteCarloTreeSearch {
     constructor() {
         this.tree = new Map();
@@ -371,16 +216,13 @@ class MonteCarloTreeSearch {
         }
         return { 
             pred: wins > simulations * depth / 2 ? 'TAI' : 'XIU',
-            conf: 55 + Math.abs(wins - simulations * depth / 2) / (simulations * depth) * 80,
-            type: 'Monte Carlo',
-            simulations
+            conf: 55 + Math.abs(wins - simulations * depth / 2) / (simulations * depth) * 80
         };
     }
     
     predict(arr) { return this.simulate(arr); }
 }
 
-// ===== GENETIC ALGORITHM =====
 class GeneticOptimizer {
     constructor() {
         this.population = [];
@@ -462,11 +304,9 @@ class GeneticOptimizer {
     getBestGenome() { return this.bestGenome || this.population[0]; }
 }
 
-// ===== CHAOS THEORY =====
 class ChaosTheoryAnalyzer {
     constructor() {
         this.lyapunovExponent = 0;
-        this.fractalDimension = 0;
         this.strangeAttractors = [];
     }
     
@@ -531,106 +371,16 @@ class ChaosTheoryAnalyzer {
     }
 }
 
-// ===== REAL-TIME BACKTESTER =====
-class RealTimeBacktester {
-    constructor() {
-        this.backtestResults = [];
-        this.optimalStrategy = null;
-        this.maxDrawdown = 0;
-        this.sharpeRatio = 0;
-    }
-    
-    backtest(predictor, historicalData) {
-        const results = { trades: [], wins: 0, losses: 0, profit: 0, maxDrawdown: 0, winRate: 0 };
-        let balance = 1000, peak = 1000;
-        for (let i = historicalData.length - 50; i >= 1; i--) {
-            const pastData = historicalData.slice(i);
-            const actual = historicalData[i - 1];
-            const prediction = predictor.predict(pastData);
-            if (prediction && prediction.conf >= 70) {
-                const betSize = this.kellyCriterion(prediction.conf / 100, 0.95);
-                const bet = balance * betSize * 0.1;
-                if (prediction.pred === actual.ket_qua) {
-                    balance += bet * 0.95;
-                    results.wins++;
-                    results.profit += bet * 0.95;
-                } else {
-                    balance -= bet;
-                    results.losses++;
-                    results.profit -= bet;
-                }
-                results.trades.push({
-                    prediction: prediction.pred,
-                    actual: actual.ket_qua,
-                    correct: prediction.pred === actual.ket_qua,
-                    balance,
-                    confidence: prediction.conf
-                });
-                peak = Math.max(peak, balance);
-                const drawdown = (peak - balance) / peak;
-                results.maxDrawdown = Math.max(results.maxDrawdown, drawdown);
-            }
-        }
-        results.winRate = results.trades.length > 0 ? results.wins / results.trades.length : 0;
-        if (results.trades.length > 0) {
-            const returns = results.trades.map(t => t.correct ? 0.95 : -1);
-            const avgReturn = returns.reduce((a, b) => a + b, 0) / returns.length;
-            const variance = returns.reduce((a, b) => a + Math.pow(b - avgReturn, 2), 0) / returns.length;
-            const stdDev = Math.sqrt(variance);
-            results.sharpeRatio = stdDev > 0 ? avgReturn / stdDev : 0;
-        }
-        this.backtestResults.push(results);
-        return results;
-    }
-    
-    kellyCriterion(winProb, payout) {
-        const q = 1 - winProb;
-        const kelly = (payout * winProb - q) / payout;
-        return Math.max(0, Math.min(0.25, kelly));
-    }
-    
-    getOptimalConfidence() {
-        if (this.backtestResults.length === 0) return 70;
-        let bestThreshold = 70, bestProfit = -Infinity;
-        for (let threshold = 60; threshold <= 85; threshold += 5) {
-            let profit = 0, trades = 0;
-            for (const result of this.backtestResults) {
-                for (const trade of result.trades) {
-                    if (trade.confidence >= threshold) {
-                        profit += trade.correct ? 0.95 : -1;
-                        trades++;
-                    }
-                }
-            }
-            if (profit > bestProfit && trades >= 10) {
-                bestProfit = profit;
-                bestThreshold = threshold;
-            }
-        }
-        return bestThreshold;
-    }
-}
-
-// ============================================================
-// 💀 TX_LogicPen_STATE_SECURITY
-// ============================================================
-class TX_LogicPen_STATE_SECURITY {
+class TX_LogicPen_ROYAL_EDITION {
     constructor() {
         this.error_streak = 0;
-        this.consecutive_correct = 0;
         this.last_prediction = null;
         this.history = [];
-        this.sessionData = [];
         this.lstm = new MiniLSTM(10, 20);
         this.transformer = new TransformerAttention(10, 4);
         this.monteCarlo = new MonteCarloTreeSearch();
         this.genetic = new GeneticOptimizer();
         this.chaos = new ChaosTheoryAnalyzer();
-        this.backtester = new RealTimeBacktester();
-        this.qTable = new Map();
-        this.qLearningRate = 0.1;
-        this.qDiscount = 0.95;
-        this.qExploration = 0.05;
         this.markovChains = new Map();
         this.bayesianPriors = { TAI: 0.5, XIU: 0.5 };
         this.bayesianHistory = [];
@@ -647,17 +397,12 @@ class TX_LogicPen_STATE_SECURITY {
                 streak: 0, weight: this.weights[algo]
             });
         }
-        this.patternMemory = new Map();
-        this.sequenceMemory = [];
-        this.winPatterns = new Set();
-        this.losePatterns = new Set();
         this.marketState = 'UNKNOWN';
         this.volatilityIndex = 0;
         this.trendStrength = 0;
         this.optimalConfidence = 70;
         this.predictionHistory = [];
         this.errorPatterns = new Map();
-        this.backtestInterval = 50;
         this.predictionCount = 0;
         this.phien_counter = 0;
     }
@@ -665,7 +410,6 @@ class TX_LogicPen_STATE_SECURITY {
     loadData(data) {
         try {
             this.history = [...data].sort((a, b) => (b.phien || 0) - (a.phien || 0));
-            this.sessionData = this.history.slice(0, 100);
             const arr = this._arr();
             const points = this._points();
             if (arr.length >= 10) {
@@ -676,7 +420,6 @@ class TX_LogicPen_STATE_SECURITY {
                 this.updateWeights();
             }
             this.predictionCount++;
-            if (this.predictionCount % this.backtestInterval === 0) this.autoBacktest();
             if (this.history.length > 0) {
                 const latestPhien = this.history[0]?.phien || 0;
                 if (latestPhien > this.phien_counter) this.phien_counter = latestPhien;
@@ -777,20 +520,6 @@ class TX_LogicPen_STATE_SECURITY {
                 }
             }
         }
-    }
-    
-    autoBacktest() {
-        if (this.history.length < 30) return;
-        const results = this.backtester.backtest(this, this.history);
-        this.optimalConfidence = this.backtester.getOptimalConfidence();
-        if (results.winRate > 0.7) {
-            for (const [algo, perf] of this.algoPerformance) {
-                if (perf.recentCorrect / Math.max(1, perf.recentTotal) > 0.7) {
-                    this.weights[algo] *= 1.1;
-                }
-            }
-        }
-        if (this.history.length >= 50) this.genetic.evolve(this._arr());
     }
     
     lstmPredict(arr) {
@@ -917,7 +646,7 @@ class TX_LogicPen_STATE_SECURITY {
         return null;
     }
     
-    tongHopStateSecurity() {
+    tongHopRoyal() {
         const arr = this._arr();
         const points = this._points();
         if (arr.length < 2) return { pred: 'TAI', conf: 50, type: 'Default' };
@@ -930,7 +659,7 @@ class TX_LogicPen_STATE_SECURITY {
         if (transformerResult) allPredictions.push({ ...transformerResult, priority: this.weights.transformer });
         
         const monteCarloResult = this.monteCarlo.predict(arr);
-        if (monteCarloResult) allPredictions.push({ ...monteCarloResult, priority: this.weights.monteCarlo });
+        if (monteCarloResult) allPredictions.push({ ...monteCarloResult, priority: this.weights.monteCarlo, type: 'Monte Carlo' });
         
         const chaosResult = this.chaos.predict(arr);
         if (chaosResult) allPredictions.push({ ...chaosResult, priority: this.weights.chaos });
@@ -999,7 +728,7 @@ class TX_LogicPen_STATE_SECURITY {
         return {
             pred: finalPred,
             conf: confidence,
-            type: '🏛️ STATE SECURITY',
+            type: '👑 ROYAL EDITION',
             reason: `${allPredictions.length} algorithms → ${finalPred} (${(Math.max(taiProb,xiuProb)*100).toFixed(1)}%)`,
             details: {
                 totalAlgos: allPredictions.length,
@@ -1010,7 +739,6 @@ class TX_LogicPen_STATE_SECURITY {
                 marketState: this.marketState,
                 volatility: (this.volatilityIndex * 100).toFixed(1) + '%',
                 optimalConfidence: this.optimalConfidence,
-                securityLevel: 'GOVERNMENT',
                 topAlgorithms: top3.map(a => ({
                     name: a.type,
                     prediction: a.pred,
@@ -1023,7 +751,6 @@ class TX_LogicPen_STATE_SECURITY {
     
     apDungDaoChieu(p) {
         if (!p || this.history.length < 1) return p;
-        const currentResult = this._arr()[0];
         if (this.error_streak >= 2) {
             const arr = this._arr();
             const errorPattern = arr.slice(0, 3).join('');
@@ -1053,7 +780,7 @@ class TX_LogicPen_STATE_SECURITY {
     predict(data) {
         try {
             this.loadData(data);
-            let result = this.tongHopStateSecurity();
+            let result = this.tongHopRoyal();
             if (result) result = this.apDungDaoChieu(result);
             else result = { pred: this._arr()[0] || 'TAI', conf: 50, type: 'Default' };
             this.last_prediction = result.pred;
@@ -1075,20 +802,19 @@ class TX_LogicPen_STATE_SECURITY {
             const wasCorrect = this.last_prediction === a;
             if (wasCorrect) {
                 this.error_streak = 0;
-                this.consecutive_correct++;
                 stats.streak_correct++;
                 stats.streak_wrong = 0;
                 stats.best_streak = Math.max(stats.best_streak, stats.streak_correct);
                 stats.correct++;
             } else {
                 this.error_streak++;
-                this.consecutive_correct = 0;
                 stats.streak_wrong++;
                 stats.streak_correct = 0;
                 stats.worst_streak = Math.max(stats.worst_streak, stats.streak_wrong);
                 stats.wrong++;
             }
             stats.total++;
+            
             if (this.predictionHistory.length > 0) {
                 const lastPred = this.predictionHistory[this.predictionHistory.length - 1];
                 if (lastPred.details && lastPred.details.topAlgorithms) {
@@ -1102,12 +828,14 @@ class TX_LogicPen_STATE_SECURITY {
                     }
                 }
             }
+            
             if (this.predictionHistory.length > 0) {
                 const lastConf = this.predictionHistory[this.predictionHistory.length - 1].conf;
                 if (lastConf >= 80) stats.confidence_stats.high++;
                 else if (lastConf >= 65) stats.confidence_stats.medium++;
                 else stats.confidence_stats.low++;
             }
+            
             const hour = new Date().getHours();
             if (!stats.hourly_stats[hour]) stats.hourly_stats[hour] = { correct: 0, total: 0, profit: 0 };
             stats.hourly_stats[hour].total++;
@@ -1117,6 +845,7 @@ class TX_LogicPen_STATE_SECURITY {
             } else {
                 stats.hourly_stats[hour].profit -= 1;
             }
+            
             stats.history.push({
                 time: vnNow(),
                 prediction: this.last_prediction,
@@ -1125,13 +854,16 @@ class TX_LogicPen_STATE_SECURITY {
                 streak: stats.streak_correct
             });
             if (stats.history.length > 1000) stats.history.shift();
+            
             stats.accuracy_curve.push(stats.total > 0 ? stats.correct / stats.total : 0);
             if (stats.accuracy_curve.length > 100) stats.accuracy_curve.shift();
+            
             stats.learning_progress = Math.min(100, 
                 (this.markovChains.size / 500) * 40 +
                 (this.bayesianHistory.length / 100) * 30 +
                 (this.predictionHistory.length / 100) * 30
             );
+            
             this.updateWeights();
             stats.daily_profit = stats.correct * 0.95 - stats.wrong;
         } catch (e) {
@@ -1162,7 +894,6 @@ class TX_LogicPen_STATE_SECURITY {
             genetic_generation: this.genetic.generations,
             markov_states: this.markovChains.size,
             error_patterns: this.errorPatterns.size,
-            security_level: 'GOVERNMENT',
             top_weights: Object.entries(this.weights)
                 .sort((a, b) => b[1] - a[1])
                 .slice(0, 5)
@@ -1201,9 +932,9 @@ class TX_LogicPen_STATE_SECURITY {
 }
 
 // ============================================================
-// 💀 KHỞI TẠO GLOBAL PREDICTOR
+// 👑 KHỞI TẠO PREDICTOR
 // ============================================================
-const predictor = new TX_LogicPen_STATE_SECURITY();
+const predictor = new TX_LogicPen_ROYAL_EDITION();
 
 // ============================================================
 // 📡 LẤY DỮ LIỆU API
@@ -1227,12 +958,7 @@ function transformData(apiData) {
 
 async function fetchHu() {
     try {
-        const res = await axios.get('https://wtx.tele68.com/v1/tx/sessions', { 
-            timeout: 10000,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-        });
+        const res = await axios.get('https://wtx.tele68.com/v1/tx/sessions', { timeout: 10000 });
         return transformData(res.data);
     } catch (e) {
         console.log('HU fetch error:', e.message);
@@ -1242,12 +968,7 @@ async function fetchHu() {
 
 async function fetchMd5() {
     try {
-        const res = await axios.get('https://wtxmd52.tele68.com/v1/txmd5/sessions', { 
-            timeout: 10000,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-        });
+        const res = await axios.get('https://wtxmd52.tele68.com/v1/txmd5/sessions', { timeout: 10000 });
         return transformData(res.data);
     } catch (e) {
         console.log('MD5 fetch error:', e.message);
@@ -1259,7 +980,7 @@ async function fetchMd5() {
 // 💾 LƯU LỊCH SỬ - 1000 PHIÊN
 // ============================================================
 let historyData = { hu: [], md5: [] };
-const HISTORY_FILE = './history_state.json';
+const HISTORY_FILE = './history_royal.json';
 
 function loadHistory() {
     try {
@@ -1276,8 +997,7 @@ function loadHistory() {
 
 function saveHistory() {
     try {
-        const encrypted = encryptData(historyData);
-        fs.writeFileSync(HISTORY_FILE, JSON.stringify(encrypted, null, 2));
+        fs.writeFileSync(HISTORY_FILE, JSON.stringify(historyData, null, 2));
     } catch (e) { console.log('Save history error:', e.message); }
 }
 
@@ -1314,8 +1034,7 @@ function calculatePrediction(data, type) {
             algorithmCount: result.details?.totalAlgos || 0,
             reason: result.reason || '',
             marketState: result.details?.marketState || 'UNKNOWN',
-            confidence: result.conf.toFixed(0),
-            securityLevel: 'GOVERNMENT'
+            confidence: result.conf.toFixed(0)
         };
         
         if (existingIndex !== -1) {
@@ -1357,503 +1076,502 @@ function calculatePrediction(data, type) {
 }
 
 // ============================================================
-// 🏛️ RENDER GIAO DIỆN STATE SECURITY
+// 👑 RENDER GIAO DIỆN ROYAL EDITION
 // ============================================================
-const renderStatePage = (title, type) => `
+const renderRoyalPage = (title, type) => `
 <!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🏛️ STATE SECURITY - ${title}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <title>👑 ROYAL PREDICTOR - ${title}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Inter', sans-serif;
-            background: #f0f2f5;
-            color: #1a1a2e;
+            background: #0a0a0a;
+            color: #fff;
             min-height: 100vh;
             overflow-x: hidden;
         }
-        
-        /* 🏛️ Government Style Header */
-        .gov-header {
-            background: linear-gradient(135deg, #1a237e 0%, #0d47a1 50%, #01579b 100%);
-            padding: 12px 0;
-            border-bottom: 3px solid #ffd700;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            position: relative;
-            z-index: 10;
+
+        /* 🌟 Royal Background */
+        .royal-bg {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+            background: 
+                radial-gradient(ellipse at 20% 30%, rgba(212, 175, 55, 0.06) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 70%, rgba(212, 175, 55, 0.04) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(20, 20, 40, 0.9) 0%, #0a0a0a 100%);
         }
-        .gov-header .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
+        .royal-bg::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background-image: 
+                radial-gradient(1px 1px at 10% 20%, rgba(212,175,55,0.1), transparent),
+                radial-gradient(1px 1px at 30% 60%, rgba(212,175,55,0.08), transparent),
+                radial-gradient(1px 1px at 60% 30%, rgba(212,175,55,0.06), transparent),
+                radial-gradient(1px 1px at 80% 80%, rgba(212,175,55,0.07), transparent);
+            background-size: 200px 200px;
+            background-repeat: repeat;
+            animation: sparkle 6s ease-in-out infinite alternate;
+        }
+        @keyframes sparkle {
+            0% { opacity: 0.3; }
+            100% { opacity: 0.8; }
+        }
+
+        .container { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: 20px; min-height: 100vh; }
+
+        /* 👑 Royal Header */
+        .royal-header {
+            background: linear-gradient(135deg, rgba(212,175,55,0.08) 0%, rgba(212,175,55,0.02) 100%);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            border: 1px solid rgba(212,175,55,0.1);
+            padding: 20px 28px;
+            margin-bottom: 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
-            gap: 10px;
+            gap: 12px;
         }
-        .gov-logo {
+        .royal-logo {
             display: flex;
             align-items: center;
-            gap: 15px;
+            gap: 16px;
         }
-        .gov-emblem {
-            width: 48px;
-            height: 48px;
-            background: radial-gradient(circle, #ffd700 30%, #f9a825 100%);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 22px;
-            color: #1a237e;
-            font-weight: 900;
-            border: 2px solid #fff;
-            box-shadow: 0 0 30px rgba(255,215,0,0.2);
+        .royal-crown {
+            font-size: 36px;
+            color: #d4af37;
+            text-shadow: 0 0 40px rgba(212,175,55,0.2);
+            animation: crownGlow 2s ease-in-out infinite alternate;
         }
-        .gov-title {
-            color: #fff;
-            line-height: 1.2;
+        @keyframes crownGlow {
+            0% { text-shadow: 0 0 20px rgba(212,175,55,0.1); }
+            100% { text-shadow: 0 0 60px rgba(212,175,55,0.3); }
         }
-        .gov-title h1 {
-            font-size: 20px;
-            font-weight: 700;
+        .royal-title {
+            font-family: 'Playfair Display', serif;
+        }
+        .royal-title h1 {
+            font-size: 24px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #d4af37, #f5d76e, #d4af37);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
             letter-spacing: 1px;
         }
-        .gov-title small {
-            font-size: 11px;
-            opacity: 0.7;
+        .royal-title small {
+            font-size: 10px;
+            color: rgba(212,175,55,0.3);
+            letter-spacing: 3px;
+            text-transform: uppercase;
             font-weight: 300;
-            letter-spacing: 2px;
         }
-        .gov-badge {
+        .royal-badge {
             display: flex;
             align-items: center;
             gap: 8px;
-            background: rgba(255,215,0,0.15);
+            background: rgba(212,175,55,0.05);
             padding: 6px 16px;
-            border-radius: 20px;
-            border: 1px solid rgba(255,215,0,0.2);
+            border-radius: 30px;
+            border: 1px solid rgba(212,175,55,0.05);
         }
-        .gov-badge i {
-            color: #ffd700;
-            font-size: 14px;
+        .royal-badge .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #00ff88;
+            animation: pulse 1.5s ease-in-out infinite;
         }
-        .gov-badge span {
-            color: #fff;
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.2; transform: scale(0.6); }
+        }
+        .royal-badge span {
+            font-size: 11px;
+            color: rgba(255,255,255,0.3);
+        }
+        .royal-time {
             font-size: 12px;
-            font-weight: 500;
-        }
-        .gov-badge .security-level {
-            color: #ffd700;
-            font-weight: 700;
-            font-size: 10px;
+            color: rgba(255,255,255,0.15);
+            font-family: 'Playfair Display', serif;
             letter-spacing: 1px;
         }
-        .gov-time {
-            color: rgba(255,255,255,0.6);
-            font-size: 13px;
-            font-weight: 300;
+        .royal-phien {
+            font-size: 11px;
+            color: rgba(212,175,55,0.2);
+            font-family: 'Playfair Display', serif;
+            background: rgba(212,175,55,0.02);
+            padding: 4px 14px;
+            border-radius: 20px;
+            border: 1px solid rgba(212,175,55,0.03);
         }
 
-        /* 📋 Navigation */
-        .gov-nav {
-            background: #fff;
-            padding: 10px 0;
-            border-bottom: 1px solid #e8ecf1;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.03);
-        }
-        .gov-nav .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
+        .royal-nav {
             display: flex;
-            gap: 5px;
+            gap: 4px;
             flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 20px;
         }
-        .gov-nav a {
-            padding: 6px 18px;
-            border-radius: 6px;
-            color: #5a6a7e;
-            font-size: 13px;
+        .royal-nav a {
+            padding: 6px 20px;
+            border-radius: 30px;
+            font-size: 11px;
             font-weight: 500;
             text-decoration: none;
-            transition: all 0.2s;
-            border: 1px solid transparent;
+            color: rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,255,255,0.02);
+            transition: all 0.3s ease;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
         }
-        .gov-nav a:hover {
-            background: #f0f4ff;
-            color: #1a237e;
+        .royal-nav a:hover {
+            border-color: rgba(212,175,55,0.1);
+            color: rgba(212,175,55,0.5);
+            background: rgba(212,175,55,0.02);
         }
-        .gov-nav a.active {
-            background: #1a237e;
-            color: #fff;
-            border-color: #1a237e;
-        }
-
-        /* 📦 Main Content */
-        .main-content {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
+        .royal-nav a.active {
+            border-color: rgba(212,175,55,0.2);
+            color: #d4af37;
+            background: rgba(212,175,55,0.04);
         }
 
-        /* 🎯 Prediction Card */
-        .prediction-card {
-            background: #fff;
-            border-radius: 12px;
+        /* 👑 Royal Card */
+        .royal-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.005) 100%);
+            border-radius: 24px;
+            border: 1px solid rgba(212,175,55,0.04);
             padding: 32px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-            border: 1px solid #e8ecf1;
             margin-bottom: 20px;
+            backdrop-filter: blur(10px);
             position: relative;
             overflow: hidden;
         }
-        .prediction-card::before {
-            content: '🏛️';
+        .royal-card::before {
+            content: '👑';
             position: absolute;
-            top: -20px;
-            right: -10px;
-            font-size: 80px;
+            top: -30px;
+            right: -20px;
+            font-size: 120px;
             opacity: 0.02;
         }
-        .card-header {
+        .royal-card::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: linear-gradient(135deg, rgba(212,175,55,0.01) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .royal-card-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
             flex-wrap: wrap;
-            gap: 10px;
+            gap: 8px;
         }
-        .card-header .title {
-            font-size: 14px;
-            font-weight: 600;
-            color: #1a237e;
-            letter-spacing: 0.5px;
-        }
-        .card-header .title i {
-            color: #ffd700;
-            margin-right: 8px;
-        }
-        .card-header .phien-info {
-            font-size: 13px;
-            color: #5a6a7e;
-            background: #f8f9fa;
-            padding: 4px 14px;
-            border-radius: 20px;
-        }
-
-        .pred-result {
-            font-size: 80px;
-            font-weight: 800;
-            text-align: center;
-            margin: 10px 0;
-            line-height: 1.1;
-            font-family: 'Inter', sans-serif;
+        .royal-card-header .label {
+            font-size: 11px;
+            color: rgba(212,175,55,0.15);
+            text-transform: uppercase;
             letter-spacing: 2px;
+            font-weight: 300;
         }
-        .pred-result.tai { 
-            color: #0d47a1;
-            text-shadow: 0 0 40px rgba(13,71,161,0.08);
-        }
-        .pred-result.xiu { 
-            color: #c62828;
-            text-shadow: 0 0 40px rgba(198,40,40,0.08);
-        }
-        .pred-result.waiting {
-            color: #b0bec5;
-            font-size: 28px;
-            font-weight: 400;
+        .royal-card-header .label i {
+            color: #d4af37;
+            margin-right: 6px;
         }
 
-        .pred-meta {
+        .royal-result {
+            text-align: center;
+            padding: 10px 0;
+        }
+        .royal-result .value {
+            font-family: 'Playfair Display', serif;
+            font-size: 96px;
+            font-weight: 900;
+            line-height: 1;
+            letter-spacing: 4px;
+            transition: all 0.6s ease;
+        }
+        .royal-result .value.tai {
+            color: #4fc3f7;
+            text-shadow: 0 0 80px rgba(79,195,247,0.08);
+        }
+        .royal-result .value.xiu {
+            color: #ef5350;
+            text-shadow: 0 0 80px rgba(239,83,80,0.08);
+        }
+        .royal-result .value.waiting {
+            color: rgba(255,255,255,0.03);
+            font-size: 32px;
+            letter-spacing: 6px;
+        }
+
+        .royal-meta {
             display: flex;
             justify-content: center;
             gap: 40px;
-            margin: 16px 0 10px;
+            margin: 12px 0 8px;
             flex-wrap: wrap;
         }
-        .meta-item {
+        .royal-meta .item {
             text-align: center;
         }
-        .meta-item .label {
-            font-size: 11px;
-            color: #90a4ae;
+        .royal-meta .item .label {
+            font-size: 9px;
+            color: rgba(255,255,255,0.06);
             text-transform: uppercase;
-            letter-spacing: 1px;
-            font-weight: 500;
+            letter-spacing: 2px;
         }
-        .meta-item .value {
+        .royal-meta .item .value {
             font-size: 22px;
             font-weight: 700;
-            color: #1a237e;
+            font-family: 'Playfair Display', serif;
             margin-top: 2px;
         }
-        .meta-item .value.confidence {
-            color: #ffd700;
+        .royal-meta .item .value.confidence {
+            color: #d4af37;
+        }
+        .royal-meta .item .value.normal {
+            color: rgba(255,255,255,0.15);
         }
 
-        .bar-track {
+        .royal-bar {
             width: 100%;
-            height: 4px;
-            background: #e8ecf1;
+            height: 3px;
+            background: rgba(255,255,255,0.02);
             border-radius: 4px;
             overflow: hidden;
             margin: 8px 0 12px;
         }
-        .bar-fill {
+        .royal-bar .fill {
             height: 100%;
             border-radius: 4px;
-            background: linear-gradient(90deg, #1a237e, #ffd700);
+            background: linear-gradient(90deg, #d4af37, #f5d76e, #d4af37);
             transition: width 1s ease;
             width: 0%;
         }
 
-        .pred-footer {
+        .royal-footer {
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
             gap: 10px;
-            margin-top: 12px;
             padding-top: 12px;
-            border-top: 1px solid #f0f2f5;
+            border-top: 1px solid rgba(255,255,255,0.02);
         }
-        .pred-footer .reason {
-            font-size: 12px;
-            color: #78909c;
-            font-weight: 400;
-        }
-        .pred-footer .algo-badge {
-            display: flex;
-            gap: 6px;
-            align-items: center;
+        .royal-footer .reason {
             font-size: 11px;
-            color: #5a6a7e;
-            background: #f8f9fa;
-            padding: 4px 12px;
-            border-radius: 16px;
+            color: rgba(255,255,255,0.05);
+            font-weight: 300;
+            letter-spacing: 0.3px;
         }
-        .pred-footer .algo-badge i {
-            color: #ffd700;
+        .royal-footer .badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 10px;
+            color: rgba(212,175,55,0.1);
+        }
+        .royal-footer .badge i {
+            color: #d4af37;
         }
 
-        .btn-history {
+        .royal-btn {
             display: inline-block;
-            padding: 10px 28px;
-            background: #1a237e;
-            color: #fff;
-            border-radius: 8px;
-            font-size: 14px;
+            padding: 10px 32px;
+            background: linear-gradient(135deg, rgba(212,175,55,0.04), rgba(212,175,55,0.01));
+            border: 1px solid rgba(212,175,55,0.06);
+            border-radius: 30px;
+            color: rgba(212,175,55,0.3);
+            font-size: 12px;
             font-weight: 500;
             text-decoration: none;
-            transition: all 0.3s;
-            border: none;
-            cursor: pointer;
+            transition: all 0.3s ease;
+            letter-spacing: 1px;
+            text-transform: uppercase;
         }
-        .btn-history:hover {
-            background: #0d47a1;
+        .royal-btn:hover {
+            background: rgba(212,175,55,0.04);
+            border-color: rgba(212,175,55,0.1);
+            color: #d4af37;
             transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(26,35,126,0.2);
         }
 
-        .btn-history-outline {
-            display: inline-block;
-            padding: 8px 24px;
-            background: transparent;
-            color: #1a237e;
-            border: 2px solid #1a237e;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 500;
-            text-decoration: none;
-            transition: all 0.3s;
-        }
-        .btn-history-outline:hover {
-            background: #1a237e;
-            color: #fff;
-        }
-
-        /* 📊 Stats Grid */
-        .stats-grid {
+        .royal-stats {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 16px;
-            margin: 20px 0;
+            gap: 12px;
+            margin-bottom: 20px;
         }
         @media (max-width: 768px) {
-            .stats-grid { grid-template-columns: repeat(2, 1fr); }
-            .pred-result { font-size: 48px; }
-            .pred-meta { gap: 20px; }
-            .meta-item .value { font-size: 18px; }
+            .royal-stats { grid-template-columns: repeat(2, 1fr); }
+            .royal-result .value { font-size: 56px; }
+            .royal-card { padding: 20px; }
+            .royal-header { padding: 16px 20px; }
         }
         @media (max-width: 480px) {
-            .pred-result { font-size: 36px; }
-            .gov-title h1 { font-size: 16px; }
-            .gov-emblem { width: 36px; height: 36px; font-size: 16px; }
+            .royal-result .value { font-size: 40px; }
+            .royal-meta { gap: 20px; }
+            .royal-meta .item .value { font-size: 18px; }
+            .royal-title h1 { font-size: 18px; }
+            .royal-crown { font-size: 28px; }
         }
-        .stat-card {
-            background: #fff;
-            padding: 16px 20px;
-            border-radius: 10px;
-            border: 1px solid #e8ecf1;
+        .royal-stat {
+            background: rgba(255,255,255,0.01);
+            border-radius: 16px;
+            padding: 16px 12px;
             text-align: center;
-            transition: all 0.2s;
+            border: 1px solid rgba(255,255,255,0.01);
         }
-        .stat-card:hover {
-            border-color: #1a237e20;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-        }
-        .stat-number {
+        .royal-stat .number {
+            font-family: 'Playfair Display', serif;
             font-size: 28px;
             font-weight: 700;
-            color: #1a237e;
         }
-        .stat-number.good { color: #2e7d32; }
-        .stat-number.bad { color: #c62828; }
-        .stat-number.winrate { color: #f9a825; }
-        .stat-label {
-            font-size: 11px;
-            color: #90a4ae;
+        .royal-stat .number.gold { color: #d4af37; }
+        .royal-stat .number.green { color: #66bb6a; }
+        .royal-stat .number.red { color: #ef5350; }
+        .royal-stat .label {
+            font-size: 9px;
+            color: rgba(255,255,255,0.05);
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-top: 4px;
+            letter-spacing: 1px;
+            margin-top: 2px;
         }
 
-        .footer {
+        .royal-footer-text {
             text-align: center;
             padding: 20px 0 10px;
-            color: #90a4ae;
-            font-size: 12px;
-            border-top: 1px solid #e8ecf1;
+            color: rgba(255,255,255,0.01);
+            font-size: 10px;
+            border-top: 1px solid rgba(255,255,255,0.01);
             margin-top: 20px;
+            letter-spacing: 1px;
         }
-        .footer strong {
-            color: #1a237e;
+        .royal-footer-text strong {
+            color: rgba(212,175,55,0.03);
         }
 
-        /* 📱 Responsive */
-        @media (max-width: 768px) {
-            .main-content { padding: 12px; }
-            .prediction-card { padding: 20px; }
-            .gov-header .container { padding: 0 12px; }
-            .gov-nav .container { padding: 0 12px; }
-            .gov-nav a { font-size: 11px; padding: 4px 12px; }
-            .stats-grid { gap: 10px; }
-            .stat-number { font-size: 20px; }
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
         }
     </style>
 </head>
 <body>
 
-<!-- 🏛️ Government Header -->
-<header class="gov-header">
-    <div class="container">
-        <div class="gov-logo">
-            <div class="gov-emblem">🏛️</div>
-            <div class="gov-title">
-                <h1>TX PREDICTOR</h1>
-                <small>BẢO MẬT CẤP NHÀ NƯỚC</small>
-            </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
-            <div class="gov-badge">
-                <i class="fas fa-shield-alt"></i>
-                <span>Bảo mật: </span>
-                <span class="security-level">CẤP NHÀ NƯỚC</span>
-            </div>
-            <div class="gov-time" id="clockDisplay">--:--:--</div>
-        </div>
-    </div>
-</header>
+<div class="royal-bg"></div>
 
-<!-- 📋 Navigation -->
-<nav class="gov-nav">
-    <div class="container">
+<div class="container">
+
+    <header class="royal-header">
+        <div class="royal-logo">
+            <span class="royal-crown">👑</span>
+            <div class="royal-title">
+                <h1>ROYAL PREDICTOR</h1>
+                <small>ĐẲNG CẤP THƯỢNG LƯU</small>
+            </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+            <span class="royal-phien">#<span id="phienDisplay">---</span></span>
+            <div class="royal-badge">
+                <span class="dot"></span>
+                <span>LIVE</span>
+            </div>
+            <span class="royal-time" id="clockDisplay">--:--:--</span>
+        </div>
+    </header>
+
+    <nav class="royal-nav">
         <a href="/">🏠 Trang chủ</a>
         <a href="/hu" class="${type === 'hu' ? 'active' : ''}">🎲 HŨ</a>
         <a href="/md5" class="${type === 'md5' ? 'active' : ''}">🎲 MD5</a>
-        <a href="/lichsu/${type}">📊 Lịch sử</a>
-        <a href="/api/stats" target="_blank">📈 Thống kê</a>
-    </div>
-</nav>
+        <a href="/lichsu/${type}">📜 Lịch sử</a>
+    </nav>
 
-<!-- 📦 Main Content -->
-<div class="main-content">
-
-    <!-- 🎯 Prediction Card -->
-    <div class="prediction-card">
-        <div class="card-header">
-            <span class="title"><i class="fas fa-crown"></i> DỰ ĐOÁN ${title} - BẢO MẬT CẤP NHÀ NƯỚC</span>
-            <span class="phien-info"><i class="far fa-clock"></i> Phiên #<span id="phienDisplay">---</span></span>
+    <div class="royal-card">
+        <div class="royal-card-header">
+            <span class="label"><i class="fas fa-crown"></i> DỰ ĐOÁN ${title}</span>
+            <span class="label">👑 ROYAL EDITION</span>
         </div>
 
-        <div class="pred-result waiting" id="result">---</div>
+        <div class="royal-result">
+            <div class="value waiting" id="result">---</div>
+        </div>
 
-        <div class="pred-meta">
-            <div class="meta-item">
+        <div class="royal-meta">
+            <div class="item">
                 <div class="label">Độ tin cậy</div>
                 <div class="value confidence" id="conf">0%</div>
             </div>
-            <div class="meta-item">
+            <div class="item">
                 <div class="label">Thuật toán</div>
-                <div class="value" id="algos" style="font-size:16px;color:#5a6a7e;">0</div>
+                <div class="value normal" id="algos">0</div>
             </div>
-            <div class="meta-item">
+            <div class="item">
                 <div class="label">Thị trường</div>
-                <div class="value" id="market" style="font-size:14px;color:#5a6a7e;">---</div>
+                <div class="value normal" id="market" style="font-size:14px;">---</div>
             </div>
         </div>
 
-        <div class="bar-track">
-            <div class="bar-fill" id="bar"></div>
+        <div class="royal-bar">
+            <div class="fill" id="bar"></div>
         </div>
 
-        <div class="pred-footer">
-            <span class="reason" id="reason"><i class="fas fa-info-circle"></i> Đang phân tích...</span>
-            <span class="algo-badge"><i class="fas fa-microchip"></i> <span id="algoCount">0</span> thuật toán</span>
+        <div class="royal-footer">
+            <span class="reason" id="reason"><i class="fas fa-crown"></i> Đang phân tích...</span>
+            <span class="badge"><i class="fas fa-microchip"></i> <span id="algoCount">0</span> thuật toán</span>
         </div>
     </div>
 
-    <!-- 📊 Stats -->
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-number" id="totalPreds">0</div>
-            <div class="stat-label">Tổng phiên</div>
+    <div class="royal-stats">
+        <div class="royal-stat">
+            <div class="number gold" id="totalPreds">0</div>
+            <div class="label">Tổng phiên</div>
         </div>
-        <div class="stat-card">
-            <div class="stat-number good" id="totalCorrect">0</div>
-            <div class="stat-label">Thắng</div>
+        <div class="royal-stat">
+            <div class="number green" id="totalCorrect">0</div>
+            <div class="label">Thắng</div>
         </div>
-        <div class="stat-card">
-            <div class="stat-number bad" id="totalWrong">0</div>
-            <div class="stat-label">Thua</div>
+        <div class="royal-stat">
+            <div class="number red" id="totalWrong">0</div>
+            <div class="label">Thua</div>
         </div>
-        <div class="stat-card">
-            <div class="stat-number winrate" id="winRate">0%</div>
-            <div class="stat-label">Tỷ lệ thắng</div>
+        <div class="royal-stat">
+            <div class="number gold" id="winRate">0%</div>
+            <div class="label">Tỷ lệ thắng</div>
         </div>
     </div>
 
-    <!-- Actions -->
-    <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;">
-        <a href="/lichsu/${type}" class="btn-history"><i class="fas fa-history"></i> Xem lịch sử chi tiết</a>
-        <a href="/api/stats" target="_blank" class="btn-history-outline"><i class="fas fa-chart-bar"></i> Xem thống kê</a>
+    <div class="btn-group">
+        <a href="/lichsu/${type}" class="royal-btn"><i class="fas fa-history"></i> Lịch sử</a>
+        <a href="/api/stats" target="_blank" class="royal-btn"><i class="fas fa-chart-bar"></i> Thống kê</a>
     </div>
 
-    <div class="footer">
-        <p>🏛️ <strong>TX PREDICTOR STATE SECURITY</strong> © 2026 - Bảo mật cấp nhà nước</p>
-        <p style="font-size:10px;color:#b0bec5;margin-top:4px;">10+ thuật toán · LSTM · Transformer · MCTS · Genetic · Chaos</p>
+    <div class="royal-footer-text">
+        <p>👑 <strong>ROYAL PREDICTOR</strong> © 2026 - Đẳng cấp thượng lưu</p>
     </div>
 </div>
 
 <script>
-// 🛡️ Bảo mật tối đa
+// 🛡️ Bảo mật cơ bản
 document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
 document.addEventListener('touchstart', function(e) { if (e.touches.length > 1) e.preventDefault(); });
 document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
@@ -1862,14 +1580,7 @@ document.addEventListener('keydown', function(e) {
         e.preventDefault();
         return false;
     }
-    if (e.ctrlKey && e.key === 's') { e.preventDefault(); return false; }
 });
-// Bảo vệ console
-console.log = function() {};
-console.warn = function() {};
-console.error = function() {};
-console.info = function() {};
-console.debug = function() {};
 
 function updateClock() {
     document.getElementById('clockDisplay').textContent = new Date().toLocaleTimeString('vi-VN', { hour12: false });
@@ -1879,9 +1590,7 @@ updateClock();
 
 async function fetchAPI(endpoint) {
     try {
-        var res = await fetch(endpoint, {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' }
-        });
+        var res = await fetch(endpoint);
         if (!res.ok) throw new Error('Network error');
         return await res.json();
     } catch (e) { return null; }
@@ -1901,7 +1610,7 @@ async function fetchPrediction() {
 
         if (resultEl) {
             resultEl.textContent = data.duDoan || '---';
-            resultEl.className = 'pred-result';
+            resultEl.className = 'value';
             if (data.duDoan === 'TAI') resultEl.classList.add('tai');
             else if (data.duDoan === 'XIU') resultEl.classList.add('xiu');
             else resultEl.classList.add('waiting');
@@ -1909,9 +1618,9 @@ async function fetchPrediction() {
 
         if (confEl) confEl.textContent = data.doTinCay || '0%';
         if (phienEl) phienEl.textContent = data.phien || '---';
-        if (algosEl) algosEl.textContent = (data.algorithmCount || 0) + ' algos';
+        if (algosEl) algosEl.textContent = (data.algorithmCount || 0) + '';
         if (marketEl) marketEl.textContent = data.marketState || '---';
-        if (reasonEl) reasonEl.innerHTML = '<i class="fas fa-info-circle"></i> ' + (data.reason || 'Đang phân tích...');
+        if (reasonEl) reasonEl.innerHTML = '<i class="fas fa-crown"></i> ' + (data.reason || 'Đang phân tích...');
         if (algoCountEl) algoCountEl.textContent = data.algorithmCount || 0;
 
         var conf = parseInt(data.doTinCay) || 0;
@@ -1950,283 +1659,247 @@ document.addEventListener('DOMContentLoaded', function() {
 `;
 
 // ============================================================
-// 📊 RENDER LỊCH SỬ STATE SECURITY
+// 📜 RENDER LỊCH SỬ ROYAL
 // ============================================================
-const renderStateHistory = (type, title) => `
+const renderRoyalHistory = (type, title) => `
 <!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>📊 Lịch sử ${title} - STATE SECURITY</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <title>📜 Lịch sử ${title} - ROYAL PREDICTOR</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Inter', sans-serif;
-            background: #f0f2f5;
-            color: #1a1a2e;
+            background: #0a0a0a;
+            color: #fff;
             min-height: 100vh;
         }
-        .gov-header {
-            background: linear-gradient(135deg, #1a237e 0%, #0d47a1 50%, #01579b 100%);
-            padding: 12px 0;
-            border-bottom: 3px solid #ffd700;
+        .royal-bg {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+            background: radial-gradient(ellipse at 20% 30%, rgba(212,175,55,0.04) 0%, transparent 50%),
+                        radial-gradient(ellipse at 50% 50%, rgba(20,20,40,0.9) 0%, #0a0a0a 100%);
         }
-        .gov-header .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
+        .container { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .royal-header {
+            background: linear-gradient(135deg, rgba(212,175,55,0.06) 0%, rgba(212,175,55,0.01) 100%);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            border: 1px solid rgba(212,175,55,0.06);
+            padding: 16px 24px;
+            margin-bottom: 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
-            gap: 10px;
-        }
-        .gov-logo {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-        .gov-emblem {
-            width: 44px;
-            height: 44px;
-            background: radial-gradient(circle, #ffd700 30%, #f9a825 100%);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-            color: #1a237e;
-            font-weight: 900;
-            border: 2px solid #fff;
-        }
-        .gov-title {
-            color: #fff;
-            line-height: 1.2;
-        }
-        .gov-title h1 {
-            font-size: 18px;
-            font-weight: 700;
-            letter-spacing: 1px;
-        }
-        .gov-title small {
-            font-size: 10px;
-            opacity: 0.7;
-            font-weight: 300;
-            letter-spacing: 2px;
-        }
-        .gov-nav {
-            background: #fff;
-            padding: 10px 0;
-            border-bottom: 1px solid #e8ecf1;
-        }
-        .gov-nav .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
-            display: flex;
-            gap: 5px;
-            flex-wrap: wrap;
-        }
-        .gov-nav a {
-            padding: 6px 18px;
-            border-radius: 6px;
-            color: #5a6a7e;
-            font-size: 13px;
-            font-weight: 500;
-            text-decoration: none;
-            transition: all 0.2s;
-            border: 1px solid transparent;
-        }
-        .gov-nav a:hover { background: #f0f4ff; color: #1a237e; }
-        .gov-nav a.active { background: #1a237e; color: #fff; border-color: #1a237e; }
-
-        .main-content {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-
-        .page-title {
-            font-size: 24px;
-            font-weight: 700;
-            color: #1a237e;
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
             gap: 12px;
         }
-        .page-title i { color: #ffd700; }
+        .royal-logo { display: flex; align-items: center; gap: 14px; }
+        .royal-crown { font-size: 32px; color: #d4af37; }
+        .royal-title h1 { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; background: linear-gradient(135deg, #d4af37, #f5d76e); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .royal-title small { font-size: 9px; color: rgba(212,175,55,0.2); letter-spacing: 3px; text-transform: uppercase; }
+        .royal-nav {
+            display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; margin-bottom: 20px;
+        }
+        .royal-nav a {
+            padding: 6px 18px; border-radius: 30px; font-size: 11px; font-weight: 500;
+            text-decoration: none; color: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.01);
+            transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .royal-nav a:hover { border-color: rgba(212,175,55,0.05); color: rgba(212,175,55,0.3); }
+        .royal-nav a.active { border-color: rgba(212,175,55,0.08); color: #d4af37; background: rgba(212,175,55,0.02); }
 
-        .card {
-            background: #fff;
-            border-radius: 12px;
-            padding: 24px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-            border: 1px solid #e8ecf1;
+        .page-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 28px;
+            font-weight: 700;
+            color: rgba(212,175,55,0.15);
             margin-bottom: 20px;
+            letter-spacing: 2px;
+        }
+        .page-title i { color: #d4af37; margin-right: 12px; }
+
+        .royal-card {
+            background: rgba(255,255,255,0.01);
+            border-radius: 16px;
+            border: 1px solid rgba(212,175,55,0.03);
+            padding: 20px;
+            margin-bottom: 16px;
         }
 
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 16px;
-            margin-bottom: 20px;
+            gap: 12px;
         }
         @media (max-width: 768px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 480px) { .stats-grid { grid-template-columns: 1fr; } }
-
         .stat-card {
-            background: #f8f9fa;
-            padding: 16px;
-            border-radius: 10px;
             text-align: center;
+            padding: 12px;
+            background: rgba(255,255,255,0.005);
+            border-radius: 12px;
         }
         .stat-number {
+            font-family: 'Playfair Display', serif;
             font-size: 28px;
             font-weight: 700;
-            color: #1a237e;
         }
-        .stat-number.good { color: #2e7d32; }
-        .stat-number.bad { color: #c62828; }
-        .stat-number.winrate { color: #f9a825; }
+        .stat-number.gold { color: #d4af37; }
+        .stat-number.green { color: #66bb6a; }
+        .stat-number.red { color: #ef5350; }
         .stat-label {
-            font-size: 11px;
-            color: #90a4ae;
+            font-size: 9px;
+            color: rgba(255,255,255,0.05);
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-top: 4px;
+            letter-spacing: 1px;
+            margin-top: 2px;
         }
 
-        .history-table-wrapper {
-            overflow-x: auto;
-            max-height: 600px;
+        .history-wrapper {
+            max-height: 550px;
             overflow-y: auto;
         }
+        .history-wrapper::-webkit-scrollbar { width: 2px; }
+        .history-wrapper::-webkit-scrollbar-track { background: transparent; }
+        .history-wrapper::-webkit-scrollbar-thumb { background: rgba(212,175,55,0.1); border-radius: 10px; }
+
         .history-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 14px;
+            font-size: 13px;
         }
         .history-table thead {
             position: sticky;
             top: 0;
             z-index: 2;
-            background: #f8f9fa;
+            background: #0a0a0a;
         }
         .history-table th {
             text-align: left;
-            padding: 10px 12px;
-            color: #5a6a7e;
-            font-weight: 600;
-            font-size: 12px;
+            padding: 8px 12px;
+            color: rgba(255,255,255,0.05);
+            font-size: 9px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            border-bottom: 2px solid #e8ecf1;
+            letter-spacing: 1px;
+            border-bottom: 1px solid rgba(255,255,255,0.01);
+            font-weight: 500;
         }
         .history-table td {
-            padding: 8px 12px;
-            border-bottom: 1px solid #f0f2f5;
-            color: #1a1a2e;
+            padding: 6px 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.005);
+            color: rgba(255,255,255,0.1);
+            font-size: 12px;
         }
-        .history-table tr:hover td { background: #f8f9fa; }
-        .history-table .phien { font-weight: 600; color: #1a237e; }
-        .history-table .win { color: #2e7d32; font-weight: 600; }
-        .history-table .lose { color: #c62828; font-weight: 600; }
+        .history-table .phien {
+            color: rgba(212,175,55,0.2);
+            font-family: 'Playfair Display', serif;
+        }
+        .history-table .win { color: #66bb6a; }
+        .history-table .lose { color: #ef5350; }
 
         .btn-back {
             display: inline-block;
-            padding: 10px 28px;
-            background: #1a237e;
-            color: #fff;
-            border-radius: 8px;
-            font-size: 14px;
+            padding: 8px 24px;
+            background: rgba(212,175,55,0.02);
+            border: 1px solid rgba(212,175,55,0.04);
+            border-radius: 30px;
+            color: rgba(212,175,55,0.2);
+            font-size: 11px;
             font-weight: 500;
             text-decoration: none;
-            transition: all 0.3s;
+            transition: all 0.3s ease;
+            letter-spacing: 1px;
+            text-transform: uppercase;
         }
-        .btn-back:hover { background: #0d47a1; }
+        .btn-back:hover {
+            background: rgba(212,175,55,0.02);
+            border-color: rgba(212,175,55,0.06);
+            color: #d4af37;
+        }
 
-        .footer {
+        .footer-text {
             text-align: center;
             padding: 20px 0 10px;
-            color: #90a4ae;
-            font-size: 12px;
-            border-top: 1px solid #e8ecf1;
+            color: rgba(255,255,255,0.01);
+            font-size: 10px;
+            border-top: 1px solid rgba(255,255,255,0.01);
             margin-top: 20px;
+            letter-spacing: 1px;
         }
-        .footer strong { color: #1a237e; }
+        .footer-text strong { color: rgba(212,175,55,0.02); }
 
         @media (max-width: 768px) {
-            .main-content { padding: 12px; }
-            .card { padding: 16px; }
-            .page-title { font-size: 18px; }
-            .history-table { font-size: 12px; }
-            .history-table th, .history-table td { padding: 6px 8px; }
+            .container { padding: 12px; }
+            .royal-header { padding: 12px 16px; }
+            .page-title { font-size: 20px; }
+            .history-table { font-size: 11px; }
+            .history-table th, .history-table td { padding: 4px 8px; }
         }
         @media (max-width: 480px) {
-            .history-table { font-size: 10px; }
-            .history-table th, .history-table td { padding: 4px 6px; }
+            .history-table { font-size: 9px; }
+            .history-table th, .history-table td { padding: 3px 6px; }
             .stat-number { font-size: 20px; }
         }
     </style>
 </head>
 <body>
 
-<header class="gov-header">
-    <div class="container">
-        <div class="gov-logo">
-            <div class="gov-emblem">🏛️</div>
-            <div class="gov-title">
-                <h1>TX PREDICTOR</h1>
-                <small>BẢO MẬT CẤP NHÀ NƯỚC</small>
+<div class="royal-bg"></div>
+
+<div class="container">
+
+    <header class="royal-header">
+        <div class="royal-logo">
+            <span class="royal-crown">👑</span>
+            <div class="royal-title">
+                <h1>ROYAL PREDICTOR</h1>
+                <small>LỊCH SỬ</small>
             </div>
         </div>
-        <div style="display:flex;align-items:center;gap:12px;">
-            <span style="color:rgba(255,255,255,0.6);font-size:13px;" id="clockDisplay">--:--:--</span>
-            <a href="/${type}" class="btn-back" style="padding:6px 18px;font-size:12px;background:rgba(255,215,0,0.2);color:#fff;border-radius:6px;text-decoration:none;"><i class="fas fa-arrow-left"></i> Dự đoán</a>
-        </div>
-    </div>
-</header>
+        <a href="/${type}" class="btn-back"><i class="fas fa-arrow-left"></i> Dự đoán</a>
+    </header>
 
-<nav class="gov-nav">
-    <div class="container">
+    <nav class="royal-nav">
         <a href="/">🏠 Trang chủ</a>
         <a href="/hu" class="${type === 'hu' ? 'active' : ''}">🎲 HŨ</a>
         <a href="/md5" class="${type === 'md5' ? 'active' : ''}">🎲 MD5</a>
-        <a href="/lichsu/${type}" class="active">📊 Lịch sử</a>
-    </div>
-</nav>
+        <a href="/lichsu/${type}" class="active">📜 Lịch sử</a>
+    </nav>
 
-<div class="main-content">
-    <div class="page-title"><i class="fas fa-history"></i> LỊCH SỬ ${title} (1000 phiên)</div>
+    <div class="page-title"><i class="fas fa-crown"></i> LỊCH SỬ ${title} - 1000 PHIÊN</div>
 
-    <div class="card">
+    <div class="royal-card">
         <div class="stats-grid">
             <div class="stat-card">
-                <div class="stat-number" id="totalPreds">0</div>
+                <div class="stat-number gold" id="totalPreds">0</div>
                 <div class="stat-label">Tổng phiên</div>
             </div>
             <div class="stat-card">
-                <div class="stat-number good" id="totalCorrect">0</div>
+                <div class="stat-number green" id="totalCorrect">0</div>
                 <div class="stat-label">Thắng</div>
             </div>
             <div class="stat-card">
-                <div class="stat-number bad" id="totalWrong">0</div>
+                <div class="stat-number red" id="totalWrong">0</div>
                 <div class="stat-label">Thua</div>
             </div>
             <div class="stat-card">
-                <div class="stat-number winrate" id="winRate">0%</div>
+                <div class="stat-number gold" id="winRate">0%</div>
                 <div class="stat-label">Tỷ lệ thắng</div>
             </div>
         </div>
     </div>
 
-    <div class="card">
-        <div style="font-weight:600;color:#1a237e;margin-bottom:12px;"><i class="fas fa-list"></i> Chi tiết lịch sử</div>
-        <div class="history-table-wrapper">
+    <div class="royal-card">
+        <div class="history-wrapper">
             <table class="history-table">
                 <thead>
                     <tr>
@@ -2238,14 +1911,14 @@ const renderStateHistory = (type, title) => `
                     </tr>
                 </thead>
                 <tbody id="historyBody">
-                    <tr><td colspan="5" style="text-align:center;padding:30px;color:#b0bec5;">Đang tải dữ liệu...</td></tr>
+                    <tr><td colspan="5" style="text-align:center;padding:30px;color:rgba(255,255,255,0.02);">Đang tải...</td></tr>
                 </tbody>
             </table>
         </div>
     </div>
 
-    <div class="footer">
-        <p>🏛️ <strong>TX PREDICTOR STATE SECURITY</strong> © 2026 - Bảo mật cấp nhà nước</p>
+    <div class="footer-text">
+        <p>👑 <strong>ROYAL PREDICTOR</strong> © 2026 - Đẳng cấp thượng lưu</p>
     </div>
 </div>
 
@@ -2258,13 +1931,6 @@ document.addEventListener('keydown', function(e) {
         e.preventDefault(); return false;
     }
 });
-console.log = function() {}; console.warn = function() {}; console.error = function() {};
-
-function updateClock() {
-    document.getElementById('clockDisplay').textContent = new Date().toLocaleTimeString('vi-VN', { hour12: false });
-}
-setInterval(updateClock, 1000);
-updateClock();
 
 async function fetchAPI(endpoint) {
     try {
@@ -2285,7 +1951,7 @@ async function fetchHistory() {
 function renderHistory(history) {
     var tbody = document.getElementById('historyBody');
     if (!history || history.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px;color:#b0bec5;">Chưa có dữ liệu</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px;color:rgba(255,255,255,0.02);">Chưa có dữ liệu</td></tr>';
         return;
     }
     var rows = '';
@@ -2332,250 +1998,213 @@ document.addEventListener('DOMContentLoaded', function() {
 // 🚀 ROUTES
 // ============================================================
 
-// Trang chủ State Security
+// Trang chủ Royal
 app.get('/', function(req, res) {
     res.send(`<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🏛️ STATE SECURITY - TX PREDICTOR</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <title>👑 ROYAL PREDICTOR</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Inter', sans-serif;
-            background: #f0f2f5;
-            color: #1a1a2e;
+            background: #0a0a0a;
+            color: #fff;
             min-height: 100vh;
         }
-        .gov-header {
-            background: linear-gradient(135deg, #1a237e 0%, #0d47a1 50%, #01579b 100%);
-            padding: 12px 0;
-            border-bottom: 3px solid #ffd700;
+        .royal-bg {
+            position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+            background: radial-gradient(ellipse at 20% 30%, rgba(212,175,55,0.04) 0%, transparent 50%),
+                        radial-gradient(ellipse at 50% 50%, rgba(20,20,40,0.9) 0%, #0a0a0a 100%);
         }
-        .gov-header .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
+        .container { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .royal-header {
+            background: linear-gradient(135deg, rgba(212,175,55,0.06) 0%, rgba(212,175,55,0.01) 100%);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            border: 1px solid rgba(212,175,55,0.04);
+            padding: 16px 24px;
+            margin-bottom: 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
-            gap: 10px;
+            gap: 12px;
         }
-        .gov-logo {
-            display: flex;
-            align-items: center;
-            gap: 15px;
+        .royal-logo { display: flex; align-items: center; gap: 14px; }
+        .royal-crown { font-size: 36px; color: #d4af37; }
+        .royal-title h1 { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 700; background: linear-gradient(135deg, #d4af37, #f5d76e); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .royal-title small { font-size: 9px; color: rgba(212,175,55,0.2); letter-spacing: 3px; text-transform: uppercase; }
+        .royal-badge {
+            display: flex; align-items: center; gap: 8px;
+            background: rgba(212,175,55,0.02); padding: 4px 14px;
+            border-radius: 30px; border: 1px solid rgba(212,175,55,0.02);
         }
-        .gov-emblem {
-            width: 48px;
-            height: 48px;
-            background: radial-gradient(circle, #ffd700 30%, #f9a825 100%);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 22px;
-            color: #1a237e;
-            font-weight: 900;
-            border: 2px solid #fff;
+        .royal-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: #00ff88; animation: pulse 1.5s ease-in-out infinite; }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.2; } }
+        .royal-badge span { font-size: 10px; color: rgba(255,255,255,0.15); }
+        .royal-time { font-size: 12px; color: rgba(255,255,255,0.05); font-family: 'Playfair Display', serif; }
+        .royal-nav {
+            display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; margin-bottom: 20px;
         }
-        .gov-title {
-            color: #fff;
-            line-height: 1.2;
+        .royal-nav a {
+            padding: 6px 18px; border-radius: 30px; font-size: 11px; font-weight: 500;
+            text-decoration: none; color: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.01);
+            transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 0.5px;
         }
-        .gov-title h1 {
-            font-size: 20px;
-            font-weight: 700;
-            letter-spacing: 1px;
-        }
-        .gov-title small {
-            font-size: 11px;
-            opacity: 0.7;
-            font-weight: 300;
-            letter-spacing: 2px;
-        }
-        .gov-badge {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            background: rgba(255,215,0,0.15);
-            padding: 6px 16px;
-            border-radius: 20px;
-            border: 1px solid rgba(255,215,0,0.2);
-        }
-        .gov-badge i { color: #ffd700; font-size: 14px; }
-        .gov-badge span { color: #fff; font-size: 12px; font-weight: 500; }
-        .gov-badge .security-level { color: #ffd700; font-weight: 700; font-size: 10px; letter-spacing: 1px; }
-        .gov-nav {
-            background: #fff;
-            padding: 10px 0;
-            border-bottom: 1px solid #e8ecf1;
-        }
-        .gov-nav .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
-            display: flex;
-            gap: 5px;
-            flex-wrap: wrap;
-        }
-        .gov-nav a {
-            padding: 6px 18px;
-            border-radius: 6px;
-            color: #5a6a7e;
-            font-size: 13px;
-            font-weight: 500;
-            text-decoration: none;
-            transition: all 0.2s;
-            border: 1px solid transparent;
-        }
-        .gov-nav a:hover { background: #f0f4ff; color: #1a237e; }
-        .gov-nav a.active { background: #1a237e; color: #fff; border-color: #1a237e; }
-
-        .main-content {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
+        .royal-nav a:hover { border-color: rgba(212,175,55,0.03); color: rgba(212,175,55,0.2); }
+        .royal-nav a.active { border-color: rgba(212,175,55,0.04); color: #d4af37; background: rgba(212,175,55,0.01); }
         .welcome {
-            background: #fff;
-            border-radius: 12px;
+            background: rgba(255,255,255,0.005);
+            border-radius: 24px;
+            border: 1px solid rgba(212,175,55,0.02);
             padding: 40px 32px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-            border: 1px solid #e8ecf1;
             text-align: center;
             margin-bottom: 24px;
         }
         .welcome h1 {
-            font-size: 32px;
+            font-family: 'Playfair Display', serif;
+            font-size: 40px;
             font-weight: 800;
-            color: #1a237e;
+            background: linear-gradient(135deg, #d4af37, #f5d76e, #d4af37);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
             margin-bottom: 8px;
         }
-        .welcome h1 i { color: #ffd700; }
         .welcome p {
-            color: #5a6a7e;
-            font-size: 16px;
-            margin-bottom: 4px;
+            color: rgba(255,255,255,0.03);
+            font-size: 14px;
+            letter-spacing: 1px;
         }
         .welcome .version {
-            color: #b0bec5;
-            font-size: 12px;
+            color: rgba(212,175,55,0.02);
+            font-size: 10px;
             margin-top: 8px;
-            letter-spacing: 1px;
+            letter-spacing: 2px;
         }
         .grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 20px;
+            gap: 16px;
             margin-bottom: 20px;
         }
         @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
         .menu-card {
-            background: #fff;
-            border-radius: 12px;
-            padding: 30px 20px;
+            background: rgba(255,255,255,0.005);
+            border-radius: 16px;
+            border: 1px solid rgba(212,175,55,0.02);
+            padding: 28px 16px;
             text-align: center;
-            border: 1px solid #e8ecf1;
             text-decoration: none;
-            color: #1a1a2e;
-            transition: all 0.3s;
+            color: #fff;
+            transition: all 0.4s ease;
         }
         .menu-card:hover {
-            border-color: #1a237e40;
+            border-color: rgba(212,175,55,0.04);
             transform: translateY(-2px);
-            box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+            box-shadow: 0 8px 40px rgba(212,175,55,0.02);
         }
-        .menu-card .icon { font-size: 36px; display: block; margin-bottom: 10px; }
-        .menu-card .title { font-size: 16px; font-weight: 600; color: #1a237e; }
-        .menu-card .desc { font-size: 13px; color: #78909c; margin-top: 4px; }
-        .footer {
+        .menu-card .icon { font-size: 32px; display: block; margin-bottom: 8px; }
+        .menu-card .title {
+            font-family: 'Playfair Display', serif;
+            font-size: 16px;
+            font-weight: 600;
+            color: rgba(212,175,55,0.2);
+        }
+        .menu-card .desc {
+            font-size: 11px;
+            color: rgba(255,255,255,0.02);
+            margin-top: 4px;
+        }
+        .footer-text {
             text-align: center;
             padding: 20px 0 10px;
-            color: #90a4ae;
-            font-size: 12px;
-            border-top: 1px solid #e8ecf1;
+            color: rgba(255,255,255,0.01);
+            font-size: 10px;
+            border-top: 1px solid rgba(255,255,255,0.01);
             margin-top: 20px;
+            letter-spacing: 1px;
         }
-        .footer strong { color: #1a237e; }
+        .footer-text strong { color: rgba(212,175,55,0.02); }
         @media (max-width: 768px) {
-            .main-content { padding: 12px; }
+            .container { padding: 12px; }
             .welcome { padding: 24px 16px; }
-            .welcome h1 { font-size: 24px; }
-            .gov-title h1 { font-size: 16px; }
-            .gov-emblem { width: 36px; height: 36px; font-size: 16px; }
-            .gov-nav a { font-size: 11px; padding: 4px 12px; }
+            .welcome h1 { font-size: 28px; }
+            .royal-title h1 { font-size: 18px; }
+            .royal-crown { font-size: 28px; }
+            .royal-header { padding: 12px 16px; }
         }
     </style>
 </head>
 <body>
 
-<header class="gov-header">
-    <div class="container">
-        <div class="gov-logo">
-            <div class="gov-emblem">🏛️</div>
-            <div class="gov-title">
-                <h1>TX PREDICTOR</h1>
-                <small>BẢO MẬT CẤP NHÀ NƯỚC</small>
-            </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
-            <div class="gov-badge">
-                <i class="fas fa-shield-alt"></i>
-                <span>Bảo mật: </span>
-                <span class="security-level">CẤP NHÀ NƯỚC</span>
-            </div>
-            <div style="color:rgba(255,255,255,0.6);font-size:13px;" id="clockDisplay">--:--:--</div>
-        </div>
-    </div>
-</header>
+<div class="royal-bg"></div>
 
-<nav class="gov-nav">
-    <div class="container">
+<div class="container">
+
+    <header class="royal-header">
+        <div class="royal-logo">
+            <span class="royal-crown">👑</span>
+            <div class="royal-title">
+                <h1>ROYAL PREDICTOR</h1>
+                <small>ĐẲNG CẤP THƯỢNG LƯU</small>
+            </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+            <div class="royal-badge">
+                <span class="dot"></span>
+                <span>LIVE</span>
+            </div>
+            <span class="royal-time" id="clockDisplay">--:--:--</span>
+        </div>
+    </header>
+
+    <nav class="royal-nav">
         <a href="/" class="active">🏠 Trang chủ</a>
         <a href="/hu">🎲 HŨ</a>
         <a href="/md5">🎲 MD5</a>
-        <a href="/lichsu/hu">📊 Lịch sử HŨ</a>
-        <a href="/lichsu/md5">📊 Lịch sử MD5</a>
-    </div>
-</nav>
+        <a href="/lichsu/hu">📜 Lịch sử HŨ</a>
+        <a href="/lichsu/md5">📜 Lịch sử MD5</a>
+    </nav>
 
-<div class="main-content">
     <div class="welcome">
-        <h1><i class="fas fa-shield-alt"></i> TX PREDICTOR STATE SECURITY</h1>
-        <p>🚀 Hệ thống dự đoán Tài Xỉu chuẩn nhà nước</p>
-        <p class="version">🏛️ Bảo mật cấp nhà nước · 10+ thuật toán · LSTM · Transformer · MCTS · Genetic · Chaos</p>
+        <h1>👑 ROYAL PREDICTOR</h1>
+        <p>Hệ thống dự đoán Tài Xỉu đẳng cấp thượng lưu</p>
+        <p class="version">10+ thuật toán · LSTM · Transformer · MCTS · Genetic · Chaos</p>
     </div>
 
     <div class="grid">
         <a href="/hu" class="menu-card">
             <span class="icon">🎲</span>
             <div class="title">Dự đoán HŨ</div>
-            <div class="desc">10+ thuật toán bảo mật cấp nhà nước</div>
+            <div class="desc">Đẳng cấp thượng lưu</div>
         </a>
         <a href="/md5" class="menu-card">
             <span class="icon">🎲</span>
             <div class="title">Dự đoán MD5</div>
-            <div class="desc">10+ thuật toán bảo mật cấp nhà nước</div>
+            <div class="desc">Đẳng cấp thượng lưu</div>
         </a>
         <a href="/lichsu/hu" class="menu-card">
-            <span class="icon">📊</span>
+            <span class="icon">📜</span>
             <div class="title">Lịch sử HŨ</div>
-            <div class="desc">1000 phiên - Thống kê chi tiết</div>
+            <div class="desc">1000 phiên chi tiết</div>
         </a>
         <a href="/lichsu/md5" class="menu-card">
-            <span class="icon">📊</span>
+            <span class="icon">📜</span>
             <div class="title">Lịch sử MD5</div>
-            <div class="desc">1000 phiên - Thống kê chi tiết</div>
+            <div class="desc">1000 phiên chi tiết</div>
         </a>
     </div>
 
-    <div class="footer">
-        <p>🏛️ <strong>TX PREDICTOR STATE SECURITY</strong> © 2026 - Bảo mật cấp nhà nước</p>
+    <div class="footer-text">
+        <p>👑 <strong>ROYAL PREDICTOR</strong> © 2026 - Đẳng cấp thượng lưu</p>
     </div>
 </div>
 
@@ -2599,19 +2228,19 @@ updateClock();
 });
 
 app.get('/hu', function(req, res) {
-    res.send(renderStatePage('HŨ', 'hu'));
+    res.send(renderRoyalPage('HŨ', 'hu'));
 });
 
 app.get('/md5', function(req, res) {
-    res.send(renderStatePage('MD5', 'md5'));
+    res.send(renderRoyalPage('MD5', 'md5'));
 });
 
 app.get('/lichsu/hu', function(req, res) {
-    res.send(renderStateHistory('hu', 'HŨ'));
+    res.send(renderRoyalHistory('hu', 'HŨ'));
 });
 
 app.get('/lichsu/md5', function(req, res) {
-    res.send(renderStateHistory('md5', 'MD5'));
+    res.send(renderRoyalHistory('md5', 'MD5'));
 });
 
 // ============================================================
@@ -2630,8 +2259,7 @@ app.get('/api/hu', async function(req, res) {
             trangThai: result.trangThai,
             reason: result.reason || '',
             algorithmCount: result.algorithmCount || 0,
-            marketState: result.marketState || 'UNKNOWN',
-            securityLevel: 'GOVERNMENT'
+            marketState: result.marketState || 'UNKNOWN'
         });
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -2651,8 +2279,7 @@ app.get('/api/md5', async function(req, res) {
             trangThai: result.trangThai,
             reason: result.reason || '',
             algorithmCount: result.algorithmCount || 0,
-            marketState: result.marketState || 'UNKNOWN',
-            securityLevel: 'GOVERNMENT'
+            marketState: result.marketState || 'UNKNOWN'
         });
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -2693,14 +2320,12 @@ app.get('/api/reset', function(req, res) {
         hourly_stats: {},
         daily_profit: 0,
         accuracy_curve: [],
-        profit_curve: [],
         learning_progress: 0,
-        model_version: "STATE_SECURITY_v4.0",
-        last_phien: 0,
-        security_level: "GOVERNMENT"
+        model_version: "ROYAL_EDITION_v5.0",
+        last_phien: 0
     };
     saveHistory();
-    res.json({ message: '🏛️ Reset thành công - STATE SECURITY' });
+    res.json({ message: '👑 Reset thành công - ROYAL PREDICTOR' });
 });
 
 // ============================================================
@@ -2709,9 +2334,9 @@ app.get('/api/reset', function(req, res) {
 loadHistory();
 app.listen(PORT, '0.0.0.0', function() {
     console.log('========================================');
-    console.log('🏛️ TX PREDICTOR STATE SECURITY');
-    console.log('🛡️ BẢO MẬT CẤP NHÀ NƯỚC');
-    console.log('💀 10+ THUẬT TOÁN SIÊU HỦY DIỆT');
+    console.log('👑 ROYAL PREDICTOR');
+    console.log('💎 ĐẲNG CẤP THƯỢNG LƯU');
+    console.log('🧠 10+ THUẬT TOÁN SIÊU HỦY DIỆT');
     console.log('📊 1000 PHIÊN - TỰ ĐỘNG +1');
     console.log('Server: http://0.0.0.0:' + PORT);
     console.log('========================================');
