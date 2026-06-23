@@ -1,8 +1,8 @@
 /**
  * ════════════════════════════════════════════════════════════════════
- * ║  🌌 TX PREDICTOR GALAXY ULTIMATE - GOD DESTROYER             ║
- * ║  🚀 HỆ THỐNG DỰ ĐOÁN TÀI XỈU THẾ HỆ MỚI                    ║
- * ║  📊 LƯU 1000 PHIÊN - TỰ ĐỘNG +1 - BẢO MẬT TỐI ĐA          ║
+ * ║  🏛️ TX PREDICTOR STATE SECURITY - BẢO MẬT CẤP NHÀ NƯỚC     ║
+ * ║  🚀 HỆ THỐNG DỰ ĐOÁN TÀI XỈU CHUẨN GOV                       ║
+ * ║  📊 LƯU 1000 PHIÊN - GIAO DIỆN HIỆN ĐẠI                     ║
  * ════════════════════════════════════════════════════════════════════
  */
 
@@ -12,13 +12,35 @@ const fs = require('fs');
 const crypto = require('crypto');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const cors = require('cors');
+const compression = require('compression');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ============================================================
-// 🛡️ BẢO MẬT TỐI ĐA
+// 🛡️ BẢO MẬT CẤP NHÀ NƯỚC
 // ============================================================
+
+// 1. CORS Policy - Chỉ cho phép domain được ủy quyền
+app.use(cors({
+    origin: function(origin, callback) {
+        const allowedOrigins = [
+            'http://localhost:5000',
+            'https://txpredictor.gov.vn',
+            'https://txpredictor.com.vn'
+        ];
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Không được phép truy cập'));
+        }
+    },
+    credentials: true,
+    optionsSuccessStatus: 200
+}));
+
+// 2. Helmet với cấu hình bảo mật tối đa
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {
@@ -27,37 +49,116 @@ app.use(helmet({
             styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com", "https://fonts.googleapis.com"],
             fontSrc: ["'self'", "https://cdnjs.cloudflare.com", "https://fonts.gstatic.com"],
             imgSrc: ["'self'", "data:", "https:"],
-            connectSrc: ["'self'"]
+            connectSrc: ["'self'"],
+            frameSrc: ["'none'"],
+            objectSrc: ["'none'"],
+            baseUri: ["'self'"],
+            formAction: ["'self'"],
+            upgradeInsecureRequests: []
         }
     },
-    hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
-    frameguard: { action: 'deny' },
-    referrerPolicy: { policy: 'no-referrer' },
+    hsts: {
+        maxAge: 31536000,
+        includeSubDomains: true,
+        preload: true
+    },
+    frameguard: {
+        action: 'deny'
+    },
+    referrerPolicy: {
+        policy: 'no-referrer'
+    },
     noSniff: true,
-    xssFilter: true
+    xssFilter: true,
+    hidePoweredBy: true,
+    ieNoOpen: true
 }));
 
-// Rate limiting
+// 3. Rate Limiting - Chống tấn công DDoS
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100,
-    message: 'Quá nhiều request, vui lòng thử lại sau 15 phút'
+    windowMs: 15 * 60 * 1000, // 15 phút
+    max: 50, // Giới hạn 50 request/phút
+    message: '🚫 Quá nhiều yêu cầu, vui lòng thử lại sau 15 phút',
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: function(req, res) {
+        res.status(429).json({
+            error: '429',
+            message: 'Quá nhiều yêu cầu truy cập, vui lòng thử lại sau',
+            timestamp: new Date().toISOString()
+        });
+    }
 });
 app.use('/api/', limiter);
 
-// Security headers
+// 4. Compression - Tối ưu tốc độ
+app.use(compression());
+
+// 5. JSON giới hạn kích thước
+app.use(express.json({ limit: '100kb' }));
+app.use(express.urlencoded({ extended: true, limit: '100kb' }));
+
+// 6. Security Headers bổ sung
 app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-XSS-Protection', '1; mode=block');
-    res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=(), usb=(), magnetometer=(), accelerometer=()');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, private');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'");
     next();
 });
 
-app.use(express.json({ limit: '1mb' }));
+// 7. Session Security
+app.disable('x-powered-by');
+
+// 8. Request Validation
+app.use((req, res, next) => {
+    if (req.method === 'POST' || req.method === 'PUT') {
+        if (!req.headers['content-type'] || !req.headers['content-type'].includes('application/json')) {
+            if (req.method !== 'OPTIONS') {
+                return res.status(415).json({ error: 'Unsupported Media Type' });
+            }
+        }
+    }
+    next();
+});
+
+// 9. Security Monitoring
+app.use((req, res, next) => {
+    const start = Date.now();
+    res.on('finish', () => {
+        const duration = Date.now() - start;
+        if (res.statusCode >= 400) {
+            console.log(`⚠️ Security Alert: ${req.method} ${req.path} - ${res.statusCode} - ${duration}ms`);
+        }
+    });
+    next();
+});
+
+// 10. Encryption Helper
+function encryptData(data) {
+    const algorithm = 'aes-256-cbc';
+    const key = crypto.scryptSync('TX_PREDICTOR_SECURE_KEY_2026', 'salt', 32);
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv(algorithm, key, iv);
+    let encrypted = cipher.update(JSON.stringify(data), 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    return { encrypted, iv: iv.toString('hex') };
+}
+
+function decryptData(encryptedData, ivHex) {
+    const algorithm = 'aes-256-cbc';
+    const key = crypto.scryptSync('TX_PREDICTOR_SECURE_KEY_2026', 'salt', 32);
+    const iv = Buffer.from(ivHex, 'hex');
+    const decipher = crypto.createDecipheriv(algorithm, key, iv);
+    let decrypted = decipher.update(encryptedData, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    return JSON.parse(decrypted);
+}
 
 // ============================================================
 // ⏰ HÀM THỜI GIAN VIỆT NAM
@@ -76,7 +177,7 @@ function getVNTime() {
 
 function formatVNTime(date) {
     const d = date || getVNTime();
-    return d.toLocaleString('vi-VN', { hour12: false });
+    return d.toLocaleString('vi-VN', { hour12: false, timeZone: 'Asia/Ho_Chi_Minh' });
 }
 
 // ============================================================
@@ -96,12 +197,13 @@ let stats = {
     accuracy_curve: [],
     profit_curve: [],
     learning_progress: 0,
-    model_version: "GOD_DESTROYER_v3.0",
-    last_phien: 0
+    model_version: "STATE_SECURITY_v4.0",
+    last_phien: 0,
+    security_level: "GOVERNMENT"
 };
 
 // ============================================================
-// 💀 TX_LogicPen_GOD_DESTROYER — SIÊU HỦY DIỆT
+// 💀 TX_LogicPen_STATE_SECURITY — BẢO MẬT CẤP NHÀ NƯỚC
 // ============================================================
 
 // ===== LSTM NEURAL NETWORK =====
@@ -510,9 +612,9 @@ class RealTimeBacktester {
 }
 
 // ============================================================
-// 💀 TX_LogicPen_GOD_DESTROYER — SIÊU HỦY DIỆT
+// 💀 TX_LogicPen_STATE_SECURITY
 // ============================================================
-class TX_LogicPen_GOD_DESTROYER {
+class TX_LogicPen_STATE_SECURITY {
     constructor() {
         this.error_streak = 0;
         this.consecutive_correct = 0;
@@ -561,24 +663,26 @@ class TX_LogicPen_GOD_DESTROYER {
     }
     
     loadData(data) {
-        this.history = [...data].sort((a, b) => (b.phien || 0) - (a.phien || 0));
-        this.sessionData = this.history.slice(0, 100);
-        const arr = this._arr();
-        const points = this._points();
-        if (arr.length >= 10) {
-            this.trainLSTM(arr);
-            this.trainMarkov(arr);
-            this.updateBayesian(arr, points);
-            this.analyzeMarket(arr, points);
-            this.updateWeights();
-        }
-        this.predictionCount++;
-        if (this.predictionCount % this.backtestInterval === 0) this.autoBacktest();
-        
-        // Update phien counter
-        if (this.history.length > 0) {
-            const latestPhien = this.history[0]?.phien || 0;
-            if (latestPhien > this.phien_counter) this.phien_counter = latestPhien;
+        try {
+            this.history = [...data].sort((a, b) => (b.phien || 0) - (a.phien || 0));
+            this.sessionData = this.history.slice(0, 100);
+            const arr = this._arr();
+            const points = this._points();
+            if (arr.length >= 10) {
+                this.trainLSTM(arr);
+                this.trainMarkov(arr);
+                this.updateBayesian(arr, points);
+                this.analyzeMarket(arr, points);
+                this.updateWeights();
+            }
+            this.predictionCount++;
+            if (this.predictionCount % this.backtestInterval === 0) this.autoBacktest();
+            if (this.history.length > 0) {
+                const latestPhien = this.history[0]?.phien || 0;
+                if (latestPhien > this.phien_counter) this.phien_counter = latestPhien;
+            }
+        } catch (e) {
+            console.error('Load data error:', e.message);
         }
     }
     
@@ -813,7 +917,7 @@ class TX_LogicPen_GOD_DESTROYER {
         return null;
     }
     
-    tongHopHuyDiet() {
+    tongHopStateSecurity() {
         const arr = this._arr();
         const points = this._points();
         if (arr.length < 2) return { pred: 'TAI', conf: 50, type: 'Default' };
@@ -895,7 +999,7 @@ class TX_LogicPen_GOD_DESTROYER {
         return {
             pred: finalPred,
             conf: confidence,
-            type: '💀 GOD DESTROYER',
+            type: '🏛️ STATE SECURITY',
             reason: `${allPredictions.length} algorithms → ${finalPred} (${(Math.max(taiProb,xiuProb)*100).toFixed(1)}%)`,
             details: {
                 totalAlgos: allPredictions.length,
@@ -906,6 +1010,7 @@ class TX_LogicPen_GOD_DESTROYER {
                 marketState: this.marketState,
                 volatility: (this.volatilityIndex * 100).toFixed(1) + '%',
                 optimalConfidence: this.optimalConfidence,
+                securityLevel: 'GOVERNMENT',
                 topAlgorithms: top3.map(a => ({
                     name: a.type,
                     prediction: a.pred,
@@ -946,83 +1051,92 @@ class TX_LogicPen_GOD_DESTROYER {
     }
     
     predict(data) {
-        this.loadData(data);
-        let result = this.tongHopHuyDiet();
-        if (result) result = this.apDungDaoChieu(result);
-        else result = { pred: this._arr()[0] || 'TAI', conf: 50, type: 'Default' };
-        this.last_prediction = result.pred;
-        this.predictionHistory.push(result);
-        if (this.predictionHistory.length > 100) this.predictionHistory.shift();
-        stats.total_predictions_made++;
-        stats.last_prediction = result.pred;
-        return result;
+        try {
+            this.loadData(data);
+            let result = this.tongHopStateSecurity();
+            if (result) result = this.apDungDaoChieu(result);
+            else result = { pred: this._arr()[0] || 'TAI', conf: 50, type: 'Default' };
+            this.last_prediction = result.pred;
+            this.predictionHistory.push(result);
+            if (this.predictionHistory.length > 100) this.predictionHistory.shift();
+            stats.total_predictions_made++;
+            stats.last_prediction = result.pred;
+            return result;
+        } catch (e) {
+            console.error('Predict error:', e.message);
+            return { pred: 'TAI', conf: 50, type: 'Fallback' };
+        }
     }
     
     updateStatus(actual) {
         if (!this.last_prediction) return;
-        const a = actual.toUpperCase().replace('XỈU', 'XIU').replace('TÀI', 'TAI');
-        const wasCorrect = this.last_prediction === a;
-        if (wasCorrect) {
-            this.error_streak = 0;
-            this.consecutive_correct++;
-            stats.streak_correct++;
-            stats.streak_wrong = 0;
-            stats.best_streak = Math.max(stats.best_streak, stats.streak_correct);
-            stats.correct++;
-        } else {
-            this.error_streak++;
-            this.consecutive_correct = 0;
-            stats.streak_wrong++;
-            stats.streak_correct = 0;
-            stats.worst_streak = Math.max(stats.worst_streak, stats.streak_wrong);
-            stats.wrong++;
-        }
-        stats.total++;
-        if (this.predictionHistory.length > 0) {
-            const lastPred = this.predictionHistory[this.predictionHistory.length - 1];
-            if (lastPred.details && lastPred.details.topAlgorithms) {
-                for (const algo of lastPred.details.topAlgorithms) {
-                    const perf = this.algoPerformance.get(algo.name);
-                    if (perf) {
-                        perf.recentTotal++;
-                        if (algo.prediction === a) { perf.recentCorrect++; perf.streak = Math.max(0, perf.streak) + 1; }
-                        else { perf.streak = Math.min(0, perf.streak) - 1; }
+        try {
+            const a = actual.toUpperCase().replace('XỈU', 'XIU').replace('TÀI', 'TAI');
+            const wasCorrect = this.last_prediction === a;
+            if (wasCorrect) {
+                this.error_streak = 0;
+                this.consecutive_correct++;
+                stats.streak_correct++;
+                stats.streak_wrong = 0;
+                stats.best_streak = Math.max(stats.best_streak, stats.streak_correct);
+                stats.correct++;
+            } else {
+                this.error_streak++;
+                this.consecutive_correct = 0;
+                stats.streak_wrong++;
+                stats.streak_correct = 0;
+                stats.worst_streak = Math.max(stats.worst_streak, stats.streak_wrong);
+                stats.wrong++;
+            }
+            stats.total++;
+            if (this.predictionHistory.length > 0) {
+                const lastPred = this.predictionHistory[this.predictionHistory.length - 1];
+                if (lastPred.details && lastPred.details.topAlgorithms) {
+                    for (const algo of lastPred.details.topAlgorithms) {
+                        const perf = this.algoPerformance.get(algo.name);
+                        if (perf) {
+                            perf.recentTotal++;
+                            if (algo.prediction === a) { perf.recentCorrect++; perf.streak = Math.max(0, perf.streak) + 1; }
+                            else { perf.streak = Math.min(0, perf.streak) - 1; }
+                        }
                     }
                 }
             }
+            if (this.predictionHistory.length > 0) {
+                const lastConf = this.predictionHistory[this.predictionHistory.length - 1].conf;
+                if (lastConf >= 80) stats.confidence_stats.high++;
+                else if (lastConf >= 65) stats.confidence_stats.medium++;
+                else stats.confidence_stats.low++;
+            }
+            const hour = new Date().getHours();
+            if (!stats.hourly_stats[hour]) stats.hourly_stats[hour] = { correct: 0, total: 0, profit: 0 };
+            stats.hourly_stats[hour].total++;
+            if (wasCorrect) {
+                stats.hourly_stats[hour].correct++;
+                stats.hourly_stats[hour].profit += 0.95;
+            } else {
+                stats.hourly_stats[hour].profit -= 1;
+            }
+            stats.history.push({
+                time: vnNow(),
+                prediction: this.last_prediction,
+                actual: a,
+                correct: wasCorrect,
+                streak: stats.streak_correct
+            });
+            if (stats.history.length > 1000) stats.history.shift();
+            stats.accuracy_curve.push(stats.total > 0 ? stats.correct / stats.total : 0);
+            if (stats.accuracy_curve.length > 100) stats.accuracy_curve.shift();
+            stats.learning_progress = Math.min(100, 
+                (this.markovChains.size / 500) * 40 +
+                (this.bayesianHistory.length / 100) * 30 +
+                (this.predictionHistory.length / 100) * 30
+            );
+            this.updateWeights();
+            stats.daily_profit = stats.correct * 0.95 - stats.wrong;
+        } catch (e) {
+            console.error('Update status error:', e.message);
         }
-        if (this.predictionHistory.length > 0) {
-            const lastConf = this.predictionHistory[this.predictionHistory.length - 1].conf;
-            if (lastConf >= 80) stats.confidence_stats.high++;
-            else if (lastConf >= 65) stats.confidence_stats.medium++;
-            else stats.confidence_stats.low++;
-        }
-        const hour = new Date().getHours();
-        if (!stats.hourly_stats[hour]) stats.hourly_stats[hour] = { correct: 0, total: 0, profit: 0 };
-        stats.hourly_stats[hour].total++;
-        if (wasCorrect) {
-            stats.hourly_stats[hour].correct++;
-            stats.hourly_stats[hour].profit += 0.95;
-        } else {
-            stats.hourly_stats[hour].profit -= 1;
-        }
-        stats.history.push({
-            time: vnNow(),
-            prediction: this.last_prediction,
-            actual: a,
-            correct: wasCorrect,
-            streak: stats.streak_correct
-        });
-        if (stats.history.length > 1000) stats.history.shift();
-        stats.accuracy_curve.push(stats.total > 0 ? stats.correct / stats.total : 0);
-        if (stats.accuracy_curve.length > 100) stats.accuracy_curve.shift();
-        stats.learning_progress = Math.min(100, 
-            (this.markovChains.size / 500) * 40 +
-            (this.bayesianHistory.length / 100) * 30 +
-            (this.predictionHistory.length / 100) * 30
-        );
-        this.updateWeights();
-        stats.daily_profit = stats.correct * 0.95 - stats.wrong;
     }
     
     getDetailedStats() {
@@ -1048,6 +1162,7 @@ class TX_LogicPen_GOD_DESTROYER {
             genetic_generation: this.genetic.generations,
             markov_states: this.markovChains.size,
             error_patterns: this.errorPatterns.size,
+            security_level: 'GOVERNMENT',
             top_weights: Object.entries(this.weights)
                 .sort((a, b) => b[1] - a[1])
                 .slice(0, 5)
@@ -1088,7 +1203,7 @@ class TX_LogicPen_GOD_DESTROYER {
 // ============================================================
 // 💀 KHỞI TẠO GLOBAL PREDICTOR
 // ============================================================
-const predictor = new TX_LogicPen_GOD_DESTROYER();
+const predictor = new TX_LogicPen_STATE_SECURITY();
 
 // ============================================================
 // 📡 LẤY DỮ LIỆU API
@@ -1112,7 +1227,12 @@ function transformData(apiData) {
 
 async function fetchHu() {
     try {
-        const res = await axios.get('https://wtx.tele68.com/v1/tx/sessions', { timeout: 10000 });
+        const res = await axios.get('https://wtx.tele68.com/v1/tx/sessions', { 
+            timeout: 10000,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+        });
         return transformData(res.data);
     } catch (e) {
         console.log('HU fetch error:', e.message);
@@ -1122,7 +1242,12 @@ async function fetchHu() {
 
 async function fetchMd5() {
     try {
-        const res = await axios.get('https://wtxmd52.tele68.com/v1/txmd5/sessions', { timeout: 10000 });
+        const res = await axios.get('https://wtxmd52.tele68.com/v1/txmd5/sessions', { 
+            timeout: 10000,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+        });
         return transformData(res.data);
     } catch (e) {
         console.log('MD5 fetch error:', e.message);
@@ -1134,7 +1259,7 @@ async function fetchMd5() {
 // 💾 LƯU LỊCH SỬ - 1000 PHIÊN
 // ============================================================
 let historyData = { hu: [], md5: [] };
-const HISTORY_FILE = './history_galaxy.json';
+const HISTORY_FILE = './history_state.json';
 
 function loadHistory() {
     try {
@@ -1151,7 +1276,8 @@ function loadHistory() {
 
 function saveHistory() {
     try {
-        fs.writeFileSync(HISTORY_FILE, JSON.stringify(historyData, null, 2));
+        const encrypted = encryptData(historyData);
+        fs.writeFileSync(HISTORY_FILE, JSON.stringify(encrypted, null, 2));
     } catch (e) { console.log('Save history error:', e.message); }
 }
 
@@ -1159,383 +1285,586 @@ function saveHistory() {
 // 🎯 HÀM DỰ ĐOÁN - TỰ ĐỘNG +1
 // ============================================================
 function calculatePrediction(data, type) {
-    const phien = data[0]?.Phien || 0;
-    const ketQua = data[0]?.Ket_qua === 'T' ? 'TAI' : 'XIU';
-    
-    const historyDataForPredictor = data.map(item => ({
-        ket_qua: item.Ket_qua === 'T' ? 'TAI' : 'XIU',
-        tong: item.Tong,
-        phien: item.Phien
-    }));
-    
-    const result = predictor.predict(historyDataForPredictor);
-    
-    // Tự động +1 phiên
-    if (phien > stats.last_phien) {
-        stats.last_phien = phien;
-    }
-    
-    const existingIndex = historyData[type].findIndex(r => r.phien === phien);
-    
-    const record = {
-        phien: phien,
-        duDoan: result.pred,
-        doTinCay: result.conf.toFixed(0) + '%',
-        ketQua: ketQua,
-        trangThai: result.pred === ketQua ? 'WIN' : 'LOSE',
-        loai: type.toUpperCase(),
-        thoiGian: vnNow(),
-        algorithmCount: result.details?.totalAlgos || 0,
-        reason: result.reason || '',
-        marketState: result.details?.marketState || 'UNKNOWN',
-        confidence: result.conf.toFixed(0)
-    };
-    
-    if (existingIndex !== -1) {
-        historyData[type][existingIndex] = record;
-    } else {
-        historyData[type].unshift(record);
-        if (historyData[type].length > 1000) {
-            historyData[type] = historyData[type].slice(0, 1000);
+    try {
+        const phien = data[0]?.Phien || 0;
+        const ketQua = data[0]?.Ket_qua === 'T' ? 'TAI' : 'XIU';
+        
+        const historyDataForPredictor = data.map(item => ({
+            ket_qua: item.Ket_qua === 'T' ? 'TAI' : 'XIU',
+            tong: item.Tong,
+            phien: item.Phien
+        }));
+        
+        const result = predictor.predict(historyDataForPredictor);
+        
+        if (phien > stats.last_phien) {
+            stats.last_phien = phien;
         }
+        
+        const existingIndex = historyData[type].findIndex(r => r.phien === phien);
+        
+        const record = {
+            phien: phien,
+            duDoan: result.pred,
+            doTinCay: result.conf.toFixed(0) + '%',
+            ketQua: ketQua,
+            trangThai: result.pred === ketQua ? 'WIN' : 'LOSE',
+            loai: type.toUpperCase(),
+            thoiGian: vnNow(),
+            algorithmCount: result.details?.totalAlgos || 0,
+            reason: result.reason || '',
+            marketState: result.details?.marketState || 'UNKNOWN',
+            confidence: result.conf.toFixed(0),
+            securityLevel: 'GOVERNMENT'
+        };
+        
+        if (existingIndex !== -1) {
+            historyData[type][existingIndex] = record;
+        } else {
+            historyData[type].unshift(record);
+            if (historyData[type].length > 1000) {
+                historyData[type] = historyData[type].slice(0, 1000);
+            }
+        }
+        
+        predictor.updateStatus(ketQua);
+        saveHistory();
+        
+        return {
+            prediction: result.pred,
+            confidence: result.conf,
+            phien: phien,
+            ketQua: ketQua,
+            trangThai: result.pred === ketQua ? 'WIN' : 'LOSE',
+            algorithmCount: result.details?.totalAlgos || 0,
+            reason: result.reason || '',
+            marketState: result.details?.marketState || 'UNKNOWN',
+            details: result.details || {}
+        };
+    } catch (e) {
+        console.error('Calculate prediction error:', e.message);
+        return {
+            prediction: 'TAI',
+            confidence: 50,
+            phien: 0,
+            ketQua: 'TAI',
+            trangThai: 'LOSE',
+            algorithmCount: 0,
+            reason: 'Error fallback',
+            marketState: 'UNKNOWN'
+        };
     }
-    
-    predictor.updateStatus(ketQua);
-    saveHistory();
-    
-    return {
-        prediction: result.pred,
-        confidence: result.conf,
-        phien: phien,
-        ketQua: ketQua,
-        trangThai: result.pred === ketQua ? 'WIN' : 'LOSE',
-        algorithmCount: result.details?.totalAlgos || 0,
-        reason: result.reason || '',
-        marketState: result.details?.marketState || 'UNKNOWN',
-        details: result.details || {}
-    };
 }
 
 // ============================================================
-// 🌌 RENDER GIAO DIỆN GALAXY
+// 🏛️ RENDER GIAO DIỆN STATE SECURITY
 // ============================================================
-const renderGalaxyPage = (title, type) => `
+const renderStatePage = (title, type) => `
 <!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🌌 TX PREDICTOR GALAXY - ${title}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <title>🏛️ STATE SECURITY - ${title}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Roboto', sans-serif;
-            background: #0a0a1a;
-            color: #fff;
+            font-family: 'Inter', sans-serif;
+            background: #f0f2f5;
+            color: #1a1a2e;
             min-height: 100vh;
             overflow-x: hidden;
-            user-select: none;
         }
-        ::-webkit-scrollbar { width: 2px; }
-        ::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
-        ::-webkit-scrollbar-thumb { background: #ffd700; border-radius: 10px; }
-
-        /* 🌌 Galaxy Background */
-        .galaxy-bg {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            z-index: 0;
-            background: 
-                radial-gradient(ellipse at 20% 50%, rgba(88, 101, 242, 0.08) 0%, transparent 50%),
-                radial-gradient(ellipse at 80% 20%, rgba(255, 215, 0, 0.04) 0%, transparent 40%),
-                radial-gradient(ellipse at 50% 80%, rgba(255, 0, 128, 0.03) 0%, transparent 40%),
-                #0a0a1a;
+        
+        /* 🏛️ Government Style Header */
+        .gov-header {
+            background: linear-gradient(135deg, #1a237e 0%, #0d47a1 50%, #01579b 100%);
+            padding: 12px 0;
+            border-bottom: 3px solid #ffd700;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 10;
         }
-        .galaxy-bg::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background-image: 
-                radial-gradient(2px 2px at 20px 30px, #eee, transparent),
-                radial-gradient(2px 2px at 40px 70px, #fff, transparent),
-                radial-gradient(1px 1px at 90px 40px, #fff, transparent),
-                radial-gradient(1px 1px at 130px 80px, #fff, transparent),
-                radial-gradient(2px 2px at 160px 30px, #eee, transparent);
-            background-size: 200px 100px;
-            background-repeat: repeat;
-            opacity: 0.15;
-            animation: twinkle 4s ease-in-out infinite alternate;
-        }
-        @keyframes twinkle {
-            0% { opacity: 0.1; }
-            100% { opacity: 0.25; }
-        }
-
-        /* 🌟 Shooting Stars */
-        .shooting-star {
-            position: fixed;
-            width: 100px;
-            height: 1px;
-            background: linear-gradient(to right, rgba(255,255,255,0), rgba(255,215,0,0.4), rgba(255,255,255,0));
-            animation: shoot 8s linear infinite;
-            z-index: 0;
-        }
-        .shooting-star:nth-child(1) { top: 10%; left: -100px; animation-delay: 0s; }
-        .shooting-star:nth-child(2) { top: 30%; left: -100px; animation-delay: 3s; }
-        .shooting-star:nth-child(3) { top: 60%; left: -100px; animation-delay: 6s; }
-        @keyframes shoot {
-            0% { transform: translateX(0) rotate(-35deg); opacity: 0; }
-            10% { opacity: 1; }
-            80% { opacity: 1; }
-            100% { transform: translateX(120vw) rotate(-35deg); opacity: 0; }
-        }
-
-        .container { position: relative; z-index: 1; max-width: 800px; margin: 0 auto; padding: 16px; min-height: 100vh; }
-
-        /* 🪐 Header Galaxy */
-        .header {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 12px 20px;
-            background: rgba(255,255,255,0.02);
-            backdrop-filter: blur(20px);
-            border-radius: 16px;
-            border: 1px solid rgba(255,215,0,0.06);
-            margin-bottom: 16px;
+        .gov-header .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             flex-wrap: wrap;
             gap: 10px;
         }
-        .logo { display: flex; align-items: center; gap: 12px; }
-        .logo-icon {
-            width: 44px; height: 44px;
-            background: linear-gradient(135deg, #ffd700, #ff6b35);
-            border-radius: 12px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 20px; font-weight: 900; color: #fff;
-            font-family: 'Orbitron', sans-serif;
-            box-shadow: 0 0 40px rgba(255,215,0,0.15);
-            animation: glowPulse 2s ease-in-out infinite;
+        .gov-logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
         }
-        @keyframes glowPulse {
-            0%, 100% { box-shadow: 0 0 20px rgba(255,215,0,0.1); }
-            50% { box-shadow: 0 0 60px rgba(255,215,0,0.25); }
+        .gov-emblem {
+            width: 48px;
+            height: 48px;
+            background: radial-gradient(circle, #ffd700 30%, #f9a825 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            color: #1a237e;
+            font-weight: 900;
+            border: 2px solid #fff;
+            box-shadow: 0 0 30px rgba(255,215,0,0.2);
         }
-        .logo-text {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 18px; font-weight: 700;
-            background: linear-gradient(135deg, #ffd700, #ff6b35, #ff1493);
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        .gov-title {
+            color: #fff;
+            line-height: 1.2;
         }
-        .logo-sub { font-size: 8px; color: rgba(255,215,0,0.2); letter-spacing: 2px; text-transform: uppercase; }
-        .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-        .status-badge {
-            display: flex; align-items: center; gap: 6px;
-            padding: 4px 12px; background: rgba(0,255,136,0.04);
-            border-radius: 20px; font-size: 9px; color: rgba(255,255,255,0.4);
-            border: 1px solid rgba(0,255,136,0.04);
+        .gov-title h1 {
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: 1px;
         }
-        .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #00ff88; animation: dotPulse 1.5s ease-in-out infinite; }
-        @keyframes dotPulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.2; transform: scale(0.6); } }
-        .header-time { font-size: 10px; color: rgba(255,255,255,0.2); font-family: 'Orbitron', sans-serif; }
-        .phien-counter {
-            font-size: 10px; color: rgba(255,215,0,0.3);
-            font-family: 'Orbitron', sans-serif;
-            padding: 2px 10px;
-            border: 1px solid rgba(255,215,0,0.05);
-            border-radius: 12px;
+        .gov-title small {
+            font-size: 11px;
+            opacity: 0.7;
+            font-weight: 300;
+            letter-spacing: 2px;
+        }
+        .gov-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255,215,0,0.15);
+            padding: 6px 16px;
+            border-radius: 20px;
+            border: 1px solid rgba(255,215,0,0.2);
+        }
+        .gov-badge i {
+            color: #ffd700;
+            font-size: 14px;
+        }
+        .gov-badge span {
+            color: #fff;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .gov-badge .security-level {
+            color: #ffd700;
+            font-weight: 700;
+            font-size: 10px;
+            letter-spacing: 1px;
+        }
+        .gov-time {
+            color: rgba(255,255,255,0.6);
+            font-size: 13px;
+            font-weight: 300;
         }
 
-        .nav-links { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-bottom: 16px; }
-        .nav-link {
-            padding: 4px 14px; border-radius: 20px;
-            border: 1px solid rgba(255,255,255,0.03);
-            color: rgba(255,255,255,0.2); font-size: 7px;
-            text-decoration: none; font-family: 'Orbitron', sans-serif;
-            transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 0.5px;
+        /* 📋 Navigation */
+        .gov-nav {
+            background: #fff;
+            padding: 10px 0;
+            border-bottom: 1px solid #e8ecf1;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.03);
         }
-        .nav-link:hover { border-color: #ffd70044; color: #ffd70088; background: rgba(255,215,0,0.02); }
-        .nav-link.active { border-color: #ffd70066; color: #ffd700; background: rgba(255,215,0,0.04); }
+        .gov-nav .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+        .gov-nav a {
+            padding: 6px 18px;
+            border-radius: 6px;
+            color: #5a6a7e;
+            font-size: 13px;
+            font-weight: 500;
+            text-decoration: none;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+        .gov-nav a:hover {
+            background: #f0f4ff;
+            color: #1a237e;
+        }
+        .gov-nav a.active {
+            background: #1a237e;
+            color: #fff;
+            border-color: #1a237e;
+        }
 
-        /* 💎 Card Galaxy */
-        .card {
-            background: rgba(255,255,255,0.01);
-            border-radius: 20px; border: 1px solid rgba(255,255,255,0.02);
-            padding: 24px; transition: all 0.4s ease;
-            margin-bottom: 16px;
+        /* 📦 Main Content */
+        .main-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* 🎯 Prediction Card */
+        .prediction-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 32px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            border: 1px solid #e8ecf1;
+            margin-bottom: 20px;
             position: relative;
             overflow: hidden;
         }
-        .card::before {
-            content: '🌌';
+        .prediction-card::before {
+            content: '🏛️';
             position: absolute;
-            top: -30px;
+            top: -20px;
             right: -10px;
             font-size: 80px;
             opacity: 0.02;
-            transform: rotate(15deg);
         }
-        .card:hover { border-color: rgba(255,215,0,0.04); box-shadow: 0 0 60px rgba(255,215,0,0.02); transform: translateY(-1px); }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .card-header .title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1a237e;
+            letter-spacing: 0.5px;
+        }
+        .card-header .title i {
+            color: #ffd700;
+            margin-right: 8px;
+        }
+        .card-header .phien-info {
+            font-size: 13px;
+            color: #5a6a7e;
+            background: #f8f9fa;
+            padding: 4px 14px;
+            border-radius: 20px;
+        }
 
         .pred-result {
-            font-size: 72px; font-weight: 900; font-family: 'Orbitron', sans-serif;
-            margin: 0 0 4px; transition: all 0.6s ease; line-height: 1; min-height: 80px;
-            letter-spacing: 4px; text-align: center;
-        }
-        .pred-result.tai { color: #4fc3f7; text-shadow: 0 0 80px rgba(79,195,247,0.15); }
-        .pred-result.xiu { color: #ef5350; text-shadow: 0 0 80px rgba(239,83,80,0.15); }
-        .pred-result.waiting { color: rgba(255,255,255,0.03); animation: textPulse 1.8s ease-in-out infinite; font-size: 24px; letter-spacing: 6px; }
-        @keyframes textPulse { 0%,100% { opacity: 0.2; } 50% { opacity: 0.5; } }
-
-        .pred-meta { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; margin: 4px 0 6px; }
-        .meta-item { display: flex; flex-direction: column; align-items: center; gap: 1px; }
-        .meta-item .label { font-size: 7px; color: rgba(255,255,255,0.08); text-transform: uppercase; letter-spacing: 1.5px; }
-        .meta-item .value { font-size: 18px; font-weight: 700; font-family: 'Orbitron', sans-serif; }
-        .meta-item .value.confidence { color: #ffd700; }
-
-        .bar-track { width: 100%; height: 3px; background: rgba(255,255,255,0.02); border-radius: 10px; overflow: hidden; margin-top: 4px; }
-        .bar-fill { height: 100%; border-radius: 10px; background: linear-gradient(90deg, #ef5350, #ffd54f, #ffd700); transition: width 1.2s ease; width: 0%; }
-
-        .vip-badge {
+            font-size: 80px;
+            font-weight: 800;
             text-align: center;
-            font-size: 8px;
-            color: rgba(255,215,0,0.06);
-            font-family: 'Orbitron', sans-serif;
+            margin: 10px 0;
+            line-height: 1.1;
+            font-family: 'Inter', sans-serif;
             letter-spacing: 2px;
-            margin-top: 6px;
         }
-        .vip-badge i { color: #ffd70033; margin: 0 3px; }
+        .pred-result.tai { 
+            color: #0d47a1;
+            text-shadow: 0 0 40px rgba(13,71,161,0.08);
+        }
+        .pred-result.xiu { 
+            color: #c62828;
+            text-shadow: 0 0 40px rgba(198,40,40,0.08);
+        }
+        .pred-result.waiting {
+            color: #b0bec5;
+            font-size: 28px;
+            font-weight: 400;
+        }
+
+        .pred-meta {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin: 16px 0 10px;
+            flex-wrap: wrap;
+        }
+        .meta-item {
+            text-align: center;
+        }
+        .meta-item .label {
+            font-size: 11px;
+            color: #90a4ae;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 500;
+        }
+        .meta-item .value {
+            font-size: 22px;
+            font-weight: 700;
+            color: #1a237e;
+            margin-top: 2px;
+        }
+        .meta-item .value.confidence {
+            color: #ffd700;
+        }
+
+        .bar-track {
+            width: 100%;
+            height: 4px;
+            background: #e8ecf1;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 8px 0 12px;
+        }
+        .bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            background: linear-gradient(90deg, #1a237e, #ffd700);
+            transition: width 1s ease;
+            width: 0%;
+        }
+
+        .pred-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #f0f2f5;
+        }
+        .pred-footer .reason {
+            font-size: 12px;
+            color: #78909c;
+            font-weight: 400;
+        }
+        .pred-footer .algo-badge {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            font-size: 11px;
+            color: #5a6a7e;
+            background: #f8f9fa;
+            padding: 4px 12px;
+            border-radius: 16px;
+        }
+        .pred-footer .algo-badge i {
+            color: #ffd700;
+        }
 
         .btn-history {
-            display: inline-block; padding: 6px 20px; border-radius: 20px;
-            border: 1px solid #ffd70022; background: rgba(255,215,0,0.02);
-            color: #ffd70088; font-size: 9px; font-weight: 500; cursor: pointer;
-            transition: all 0.3s ease; text-decoration: none;
-            font-family: 'Orbitron', sans-serif; letter-spacing: 0.5px;
+            display: inline-block;
+            padding: 10px 28px;
+            background: #1a237e;
+            color: #fff;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            text-decoration: none;
+            transition: all 0.3s;
+            border: none;
+            cursor: pointer;
         }
-        .btn-history:hover { background: rgba(255,215,0,0.04); border-color: #ffd70044; }
+        .btn-history:hover {
+            background: #0d47a1;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(26,35,126,0.2);
+        }
 
-        .footer { text-align: center; padding: 12px 20px 4px; color: rgba(255,255,255,0.02); font-size: 7px; border-top: 1px solid rgba(255,255,255,0.01); margin-top: 12px; font-family: 'Orbitron', sans-serif; letter-spacing: 1px; }
-        .footer strong { color: #ffd70033; }
+        .btn-history-outline {
+            display: inline-block;
+            padding: 8px 24px;
+            background: transparent;
+            color: #1a237e;
+            border: 2px solid #1a237e;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+        .btn-history-outline:hover {
+            background: #1a237e;
+            color: #fff;
+        }
 
+        /* 📊 Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin: 20px 0;
+        }
         @media (max-width: 768px) {
-            .container { padding: 8px; }
-            .header { padding: 8px 12px; flex-direction: column; align-items: stretch; gap: 4px; }
-            .logo-text { font-size: 14px; }
-            .logo-icon { width: 32px; height: 32px; font-size: 14px; }
-            .header-right { justify-content: space-between; }
-            .pred-result { font-size: 44px; min-height: 50px; }
-            .pred-meta { gap: 14px; }
-            .meta-item .value { font-size: 14px; }
-            .card { padding: 14px; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .pred-result { font-size: 48px; }
+            .pred-meta { gap: 20px; }
+            .meta-item .value { font-size: 18px; }
         }
         @media (max-width: 480px) {
-            .container { padding: 4px; }
-            .pred-result { font-size: 32px; min-height: 38px; }
-            .phien-counter { font-size: 8px; }
+            .pred-result { font-size: 36px; }
+            .gov-title h1 { font-size: 16px; }
+            .gov-emblem { width: 36px; height: 36px; font-size: 16px; }
+        }
+        .stat-card {
+            background: #fff;
+            padding: 16px 20px;
+            border-radius: 10px;
+            border: 1px solid #e8ecf1;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        .stat-card:hover {
+            border-color: #1a237e20;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        .stat-number {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1a237e;
+        }
+        .stat-number.good { color: #2e7d32; }
+        .stat-number.bad { color: #c62828; }
+        .stat-number.winrate { color: #f9a825; }
+        .stat-label {
+            font-size: 11px;
+            color: #90a4ae;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 4px;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 20px 0 10px;
+            color: #90a4ae;
+            font-size: 12px;
+            border-top: 1px solid #e8ecf1;
+            margin-top: 20px;
+        }
+        .footer strong {
+            color: #1a237e;
+        }
+
+        /* 📱 Responsive */
+        @media (max-width: 768px) {
+            .main-content { padding: 12px; }
+            .prediction-card { padding: 20px; }
+            .gov-header .container { padding: 0 12px; }
+            .gov-nav .container { padding: 0 12px; }
+            .gov-nav a { font-size: 11px; padding: 4px 12px; }
+            .stats-grid { gap: 10px; }
+            .stat-number { font-size: 20px; }
         }
     </style>
 </head>
 <body>
 
-<!-- 🌌 Galaxy Background -->
-<div class="galaxy-bg"></div>
-<div class="shooting-star"></div>
-<div class="shooting-star"></div>
-<div class="shooting-star"></div>
-
-<div class="container">
-
-    <header class="header">
-        <div class="logo">
-            <div class="logo-icon">🌌</div>
-            <div>
-                <div class="logo-text">GALAXY PREDICTOR</div>
-                <div class="logo-sub">ĐẠI CA KHÔI · GOD DESTROYER</div>
+<!-- 🏛️ Government Header -->
+<header class="gov-header">
+    <div class="container">
+        <div class="gov-logo">
+            <div class="gov-emblem">🏛️</div>
+            <div class="gov-title">
+                <h1>TX PREDICTOR</h1>
+                <small>BẢO MẬT CẤP NHÀ NƯỚC</small>
             </div>
         </div>
-        <div class="header-right">
-            <span class="phien-counter">#<span id="phienDisplay">---</span></span>
-            <span class="status-badge">
-                <span class="status-dot"></span>
-                <span>Live</span>
-            </span>
-            <span class="header-time" id="clockDisplay">--:--:--</span>
-        </div>
-    </header>
-
-    <div class="nav-links">
-        <a href="/" class="nav-link">🏠 Trang chủ</a>
-        <a href="/hu" class="nav-link ${type === 'hu' ? 'active' : ''}">🎲 HŨ</a>
-        <a href="/md5" class="nav-link ${type === 'md5' ? 'active' : ''}">🎲 MD5</a>
-        <a href="/lichsu/${type}" class="nav-link">📊 Lịch sử</a>
-    </div>
-
-    <div class="card">
-        <div style="text-align:center;margin-bottom:8px;">
-            <span style="font-family:'Orbitron',sans-serif;font-size:10px;color:rgba(255,215,0,0.06);letter-spacing:2px;">
-                💀 GOD DESTROYER · DỰ ĐOÁN ${title}
-            </span>
-        </div>
-        <div class="pred-area">
-            <div class="pred-result waiting" id="result">---</div>
-            <div class="pred-meta">
-                <div class="meta-item">
-                    <span class="label">Độ tin cậy</span>
-                    <span class="value confidence" id="conf">0%</span>
-                </div>
-                <div class="meta-item">
-                    <span class="label">Thuật toán</span>
-                    <span class="value" id="algos" style="color:rgba(255,255,255,0.15);font-size:13px;">0</span>
-                </div>
-                <div class="meta-item">
-                    <span class="label">Thị trường</span>
-                    <span class="value" id="market" style="color:rgba(255,255,255,0.1);font-size:11px;">---</span>
-                </div>
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+            <div class="gov-badge">
+                <i class="fas fa-shield-alt"></i>
+                <span>Bảo mật: </span>
+                <span class="security-level">CẤP NHÀ NƯỚC</span>
             </div>
-            <div class="bar-track">
-                <div class="bar-fill" id="bar"></div>
-            </div>
-            <div class="vip-badge">
-                <i class="fas fa-crown"></i> 10+ THUẬT TOÁN GOD DESTROYER <i class="fas fa-crown"></i>
-            </div>
-            <div style="text-align:center;margin-top:6px;">
-                <span id="reason" style="font-size:7px;color:rgba(255,255,255,0.05);font-family:'Orbitron',sans-serif;">---</span>
-            </div>
+            <div class="gov-time" id="clockDisplay">--:--:--</div>
         </div>
     </div>
+</header>
 
-    <div style="text-align:center;">
-        <a href="/lichsu/${type}" class="btn-history"><i class="fas fa-history"></i> Xem lịch sử ${title}</a>
+<!-- 📋 Navigation -->
+<nav class="gov-nav">
+    <div class="container">
+        <a href="/">🏠 Trang chủ</a>
+        <a href="/hu" class="${type === 'hu' ? 'active' : ''}">🎲 HŨ</a>
+        <a href="/md5" class="${type === 'md5' ? 'active' : ''}">🎲 MD5</a>
+        <a href="/lichsu/${type}">📊 Lịch sử</a>
+        <a href="/api/stats" target="_blank">📈 Thống kê</a>
+    </div>
+</nav>
+
+<!-- 📦 Main Content -->
+<div class="main-content">
+
+    <!-- 🎯 Prediction Card -->
+    <div class="prediction-card">
+        <div class="card-header">
+            <span class="title"><i class="fas fa-crown"></i> DỰ ĐOÁN ${title} - BẢO MẬT CẤP NHÀ NƯỚC</span>
+            <span class="phien-info"><i class="far fa-clock"></i> Phiên #<span id="phienDisplay">---</span></span>
+        </div>
+
+        <div class="pred-result waiting" id="result">---</div>
+
+        <div class="pred-meta">
+            <div class="meta-item">
+                <div class="label">Độ tin cậy</div>
+                <div class="value confidence" id="conf">0%</div>
+            </div>
+            <div class="meta-item">
+                <div class="label">Thuật toán</div>
+                <div class="value" id="algos" style="font-size:16px;color:#5a6a7e;">0</div>
+            </div>
+            <div class="meta-item">
+                <div class="label">Thị trường</div>
+                <div class="value" id="market" style="font-size:14px;color:#5a6a7e;">---</div>
+            </div>
+        </div>
+
+        <div class="bar-track">
+            <div class="bar-fill" id="bar"></div>
+        </div>
+
+        <div class="pred-footer">
+            <span class="reason" id="reason"><i class="fas fa-info-circle"></i> Đang phân tích...</span>
+            <span class="algo-badge"><i class="fas fa-microchip"></i> <span id="algoCount">0</span> thuật toán</span>
+        </div>
+    </div>
+
+    <!-- 📊 Stats -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-number" id="totalPreds">0</div>
+            <div class="stat-label">Tổng phiên</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number good" id="totalCorrect">0</div>
+            <div class="stat-label">Thắng</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number bad" id="totalWrong">0</div>
+            <div class="stat-label">Thua</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number winrate" id="winRate">0%</div>
+            <div class="stat-label">Tỷ lệ thắng</div>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;">
+        <a href="/lichsu/${type}" class="btn-history"><i class="fas fa-history"></i> Xem lịch sử chi tiết</a>
+        <a href="/api/stats" target="_blank" class="btn-history-outline"><i class="fas fa-chart-bar"></i> Xem thống kê</a>
     </div>
 
     <div class="footer">
-        <p>🌌 <strong>GALAXY PREDICTOR ULTIMATE</strong> © ĐẠI CA KHÔI</p>
-        <p style="font-size:5px;color:rgba(255,255,255,0.01);margin-top:2px;">10+ Thuật toán · AI · LSTM · Transformer · MCTS · Genetic · Chaos</p>
+        <p>🏛️ <strong>TX PREDICTOR STATE SECURITY</strong> © 2026 - Bảo mật cấp nhà nước</p>
+        <p style="font-size:10px;color:#b0bec5;margin-top:4px;">10+ thuật toán · LSTM · Transformer · MCTS · Genetic · Chaos</p>
     </div>
-
 </div>
 
 <script>
 // 🛡️ Bảo mật tối đa
 document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
 document.addEventListener('touchstart', function(e) { if (e.touches.length > 1) e.preventDefault(); });
-var lastTouchEnd = 0;
-document.addEventListener('touchend', function(e) {
-    var now = Date.now();
-    if (now - lastTouchEnd <= 300) e.preventDefault();
-    lastTouchEnd = now;
-}, false);
 document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
 document.addEventListener('keydown', function(e) {
     if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && ['I','J','C'].indexOf(e.key) > -1) || (e.ctrlKey && e.key === 'U')) {
         e.preventDefault();
         return false;
     }
+    if (e.ctrlKey && e.key === 's') { e.preventDefault(); return false; }
 });
-// Chống console
+// Bảo vệ console
 console.log = function() {};
 console.warn = function() {};
 console.error = function() {};
@@ -1550,7 +1879,9 @@ updateClock();
 
 async function fetchAPI(endpoint) {
     try {
-        var res = await fetch(endpoint);
+        var res = await fetch(endpoint, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
         if (!res.ok) throw new Error('Network error');
         return await res.json();
     } catch (e) { return null; }
@@ -1566,6 +1897,7 @@ async function fetchPrediction() {
         var algosEl = document.getElementById('algos');
         var marketEl = document.getElementById('market');
         var reasonEl = document.getElementById('reason');
+        var algoCountEl = document.getElementById('algoCount');
 
         if (resultEl) {
             resultEl.textContent = data.duDoan || '---';
@@ -1579,10 +1911,21 @@ async function fetchPrediction() {
         if (phienEl) phienEl.textContent = data.phien || '---';
         if (algosEl) algosEl.textContent = (data.algorithmCount || 0) + ' algos';
         if (marketEl) marketEl.textContent = data.marketState || '---';
-        if (reasonEl) reasonEl.textContent = data.reason || '---';
+        if (reasonEl) reasonEl.innerHTML = '<i class="fas fa-info-circle"></i> ' + (data.reason || 'Đang phân tích...');
+        if (algoCountEl) algoCountEl.textContent = data.algorithmCount || 0;
 
         var conf = parseInt(data.doTinCay) || 0;
         if (barEl) barEl.style.width = Math.min(100, conf) + '%';
+    }
+}
+
+async function fetchStats() {
+    var data = await fetchAPI('/api/stats');
+    if (data) {
+        document.getElementById('totalPreds').textContent = data.total || 0;
+        document.getElementById('totalCorrect').textContent = data.correct || 0;
+        document.getElementById('totalWrong').textContent = data.wrong || 0;
+        document.getElementById('winRate').textContent = data.accuracy || '0%';
     }
 }
 
@@ -1590,7 +1933,10 @@ var isRefreshing = false;
 async function refreshAll() {
     if (isRefreshing) return;
     isRefreshing = true;
-    try { await fetchPrediction(); } catch (e) {}
+    try {
+        await fetchPrediction();
+        await fetchStats();
+    } catch (e) {}
     isRefreshing = false;
 }
 
@@ -1604,207 +1950,260 @@ document.addEventListener('DOMContentLoaded', function() {
 `;
 
 // ============================================================
-// 📊 RENDER LỊCH SỬ GALAXY
+// 📊 RENDER LỊCH SỬ STATE SECURITY
 // ============================================================
-const renderGalaxyHistory = (type, title) => `
+const renderStateHistory = (type, title) => `
 <!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>📊 Lịch sử ${title} - GALAXY PREDICTOR</title>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <title>📊 Lịch sử ${title} - STATE SECURITY</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Roboto', sans-serif;
-            background: #0a0a1a;
-            color: #fff;
+            font-family: 'Inter', sans-serif;
+            background: #f0f2f5;
+            color: #1a1a2e;
             min-height: 100vh;
-            overflow-x: hidden;
-            user-select: none;
         }
-        ::-webkit-scrollbar { width: 2px; }
-        ::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
-        ::-webkit-scrollbar-thumb { background: #ffd700; border-radius: 10px; }
-
-        .galaxy-bg {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            z-index: 0;
-            background: radial-gradient(ellipse at 20% 50%, rgba(88,101,242,0.06), transparent 50%),
-                        radial-gradient(ellipse at 80% 20%, rgba(255,215,0,0.03), transparent 40%),
-                        #0a0a1a;
+        .gov-header {
+            background: linear-gradient(135deg, #1a237e 0%, #0d47a1 50%, #01579b 100%);
+            padding: 12px 0;
+            border-bottom: 3px solid #ffd700;
         }
-        .galaxy-bg::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background-image: radial-gradient(1px 1px at 20px 30px, #eee, transparent),
-                              radial-gradient(1px 1px at 40px 70px, #fff, transparent);
-            background-size: 200px 100px;
-            background-repeat: repeat;
-            opacity: 0.08;
-        }
-
-        .container { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 16px; min-height: 100vh; }
-
-        .header {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 12px 20px;
-            background: rgba(255,255,255,0.01);
-            backdrop-filter: blur(20px);
-            border-radius: 16px;
-            border: 1px solid rgba(255,215,0,0.04);
-            margin-bottom: 16px;
+        .gov-header .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             flex-wrap: wrap;
             gap: 10px;
         }
-        .logo { display: flex; align-items: center; gap: 12px; }
-        .logo-icon {
-            width: 40px; height: 40px;
-            background: linear-gradient(135deg, #ffd700, #ff6b35);
-            border-radius: 12px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 18px; font-weight: 900; color: #fff;
-            font-family: 'Orbitron', sans-serif;
+        .gov-logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
         }
-        .logo-text {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 16px; font-weight: 700;
-            background: linear-gradient(135deg, #ffd700, #ff6b35);
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        .gov-emblem {
+            width: 44px;
+            height: 44px;
+            background: radial-gradient(circle, #ffd700 30%, #f9a825 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: #1a237e;
+            font-weight: 900;
+            border: 2px solid #fff;
         }
-        .logo-sub { font-size: 7px; color: rgba(255,215,0,0.15); letter-spacing: 2px; text-transform: uppercase; }
-        .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-        .header-time { font-size: 10px; color: rgba(255,255,255,0.15); font-family: 'Orbitron', sans-serif; }
-
-        .nav-links { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-bottom: 16px; }
-        .nav-link {
-            padding: 4px 14px; border-radius: 20px;
-            border: 1px solid rgba(255,255,255,0.02);
-            color: rgba(255,255,255,0.15); font-size: 7px;
-            text-decoration: none; font-family: 'Orbitron', sans-serif;
-            transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 0.5px;
+        .gov-title {
+            color: #fff;
+            line-height: 1.2;
         }
-        .nav-link:hover { border-color: #ffd70033; color: #ffd70066; }
-        .nav-link.active { border-color: #ffd70044; color: #ffd700; }
-
-        .page-title {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 20px; font-weight: 700;
-            color: #ffd70066;
-            text-align: center;
-            margin-bottom: 16px;
-            letter-spacing: 2px;
-        }
-
-        .card {
-            background: rgba(255,255,255,0.01);
-            border-radius: 16px; border: 1px solid rgba(255,255,255,0.02);
-            padding: 16px; transition: all 0.3s ease;
-            margin-bottom: 12px;
-        }
-        .card:hover { border-color: rgba(255,215,0,0.03); }
-        .card-title {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 9px; color: rgba(255,255,255,0.1);
-            margin-bottom: 10px; display: flex; align-items: center; gap: 8px;
+        .gov-title h1 {
+            font-size: 18px;
+            font-weight: 700;
             letter-spacing: 1px;
         }
-        .card-title i { color: #ffd70044; }
-
-        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 12px; }
-        @media (max-width: 600px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
-        .stat-card {
-            background: rgba(255,255,255,0.005); border-radius: 10px;
-            padding: 10px 6px; text-align: center;
-            border: 1px solid rgba(255,255,255,0.005);
+        .gov-title small {
+            font-size: 10px;
+            opacity: 0.7;
+            font-weight: 300;
+            letter-spacing: 2px;
         }
-        .stat-number { font-size: 22px; font-weight: 700; font-family: 'Orbitron', sans-serif; color: #ffd70066; }
-        .stat-number.good { color: #66bb6a88; }
-        .stat-number.bad { color: #ef535088; }
-        .stat-number.winrate { color: #ffd54f88; }
-        .stat-label { font-size: 7px; color: rgba(255,255,255,0.06); text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
-
-        .history-container { max-height: 500px; overflow-y: auto; margin-top: 4px; }
-        .history-table { width: 100%; border-collapse: collapse; font-size: 10px; }
-        .history-table thead { position: sticky; top: 0; z-index: 2; }
-        .history-table th {
-            text-align: left; padding: 4px 6px;
-            color: rgba(255,255,255,0.06); font-size: 7px; text-transform: uppercase;
-            letter-spacing: 1px; border-bottom: 1px solid rgba(255,255,255,0.01);
-            background: rgba(10,10,26,0.95);
+        .gov-nav {
+            background: #fff;
+            padding: 10px 0;
+            border-bottom: 1px solid #e8ecf1;
+        }
+        .gov-nav .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+        .gov-nav a {
+            padding: 6px 18px;
+            border-radius: 6px;
+            color: #5a6a7e;
+            font-size: 13px;
             font-weight: 500;
+            text-decoration: none;
+            transition: all 0.2s;
+            border: 1px solid transparent;
         }
-        .history-table td { padding: 3px 6px; border-bottom: 1px solid rgba(255,255,255,0.005); color: rgba(255,255,255,0.2); font-size: 9px; }
-        .history-table .phien { color: rgba(255,255,255,0.3); font-family: 'Orbitron', sans-serif; font-size: 8px; }
-        .history-table .win { color: #66bb6a88; font-weight: 600; }
-        .history-table .lose { color: #ef535088; font-weight: 600; }
+        .gov-nav a:hover { background: #f0f4ff; color: #1a237e; }
+        .gov-nav a.active { background: #1a237e; color: #fff; border-color: #1a237e; }
+
+        .main-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .page-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: #1a237e;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .page-title i { color: #ffd700; }
+
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            border: 1px solid #e8ecf1;
+            margin-bottom: 20px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        @media (max-width: 768px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 480px) { .stats-grid { grid-template-columns: 1fr; } }
+
+        .stat-card {
+            background: #f8f9fa;
+            padding: 16px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1a237e;
+        }
+        .stat-number.good { color: #2e7d32; }
+        .stat-number.bad { color: #c62828; }
+        .stat-number.winrate { color: #f9a825; }
+        .stat-label {
+            font-size: 11px;
+            color: #90a4ae;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 4px;
+        }
+
+        .history-table-wrapper {
+            overflow-x: auto;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        .history-table thead {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            background: #f8f9fa;
+        }
+        .history-table th {
+            text-align: left;
+            padding: 10px 12px;
+            color: #5a6a7e;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid #e8ecf1;
+        }
+        .history-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #f0f2f5;
+            color: #1a1a2e;
+        }
+        .history-table tr:hover td { background: #f8f9fa; }
+        .history-table .phien { font-weight: 600; color: #1a237e; }
+        .history-table .win { color: #2e7d32; font-weight: 600; }
+        .history-table .lose { color: #c62828; font-weight: 600; }
 
         .btn-back {
-            display: inline-block; padding: 6px 18px; border-radius: 20px;
-            border: 1px solid #ffd70022; background: rgba(255,215,0,0.02);
-            color: #ffd70066; font-size: 9px; font-weight: 500; cursor: pointer;
-            transition: all 0.3s ease; text-decoration: none;
-            font-family: 'Orbitron', sans-serif; letter-spacing: 0.5px;
+            display: inline-block;
+            padding: 10px 28px;
+            background: #1a237e;
+            color: #fff;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            text-decoration: none;
+            transition: all 0.3s;
         }
-        .btn-back:hover { background: rgba(255,215,0,0.03); border-color: #ffd70033; }
+        .btn-back:hover { background: #0d47a1; }
 
-        .footer { text-align: center; padding: 12px 20px 4px; color: rgba(255,255,255,0.02); font-size: 7px; border-top: 1px solid rgba(255,255,255,0.01); margin-top: 12px; font-family: 'Orbitron', sans-serif; letter-spacing: 1px; }
+        .footer {
+            text-align: center;
+            padding: 20px 0 10px;
+            color: #90a4ae;
+            font-size: 12px;
+            border-top: 1px solid #e8ecf1;
+            margin-top: 20px;
+        }
+        .footer strong { color: #1a237e; }
 
         @media (max-width: 768px) {
-            .container { padding: 8px; }
-            .header { padding: 8px 12px; flex-direction: column; align-items: stretch; gap: 4px; }
-            .logo-text { font-size: 14px; }
-            .page-title { font-size: 16px; }
-            .stat-number { font-size: 18px; }
-            .history-table { font-size: 8px; }
-            .history-table th, .history-table td { padding: 2px 4px; }
+            .main-content { padding: 12px; }
+            .card { padding: 16px; }
+            .page-title { font-size: 18px; }
+            .history-table { font-size: 12px; }
+            .history-table th, .history-table td { padding: 6px 8px; }
         }
         @media (max-width: 480px) {
-            .container { padding: 4px; }
-            .page-title { font-size: 13px; }
-            .stat-number { font-size: 14px; }
-            .history-table { font-size: 7px; }
-            .history-table th, .history-table td { padding: 1px 3px; }
+            .history-table { font-size: 10px; }
+            .history-table th, .history-table td { padding: 4px 6px; }
+            .stat-number { font-size: 20px; }
         }
     </style>
 </head>
 <body>
 
-<div class="galaxy-bg"></div>
-
-<div class="container">
-
-    <header class="header">
-        <div class="logo">
-            <div class="logo-icon">📊</div>
-            <div>
-                <div class="logo-text">GALAXY PREDICTOR</div>
-                <div class="logo-sub">ĐẠI CA KHÔI · GOD DESTROYER</div>
+<header class="gov-header">
+    <div class="container">
+        <div class="gov-logo">
+            <div class="gov-emblem">🏛️</div>
+            <div class="gov-title">
+                <h1>TX PREDICTOR</h1>
+                <small>BẢO MẬT CẤP NHÀ NƯỚC</small>
             </div>
         </div>
-        <div class="header-right">
-            <span class="header-time" id="clockDisplay">--:--:--</span>
-            <a href="/${type}" class="btn-back"><i class="fas fa-arrow-left"></i> Dự đoán</a>
+        <div style="display:flex;align-items:center;gap:12px;">
+            <span style="color:rgba(255,255,255,0.6);font-size:13px;" id="clockDisplay">--:--:--</span>
+            <a href="/${type}" class="btn-back" style="padding:6px 18px;font-size:12px;background:rgba(255,215,0,0.2);color:#fff;border-radius:6px;text-decoration:none;"><i class="fas fa-arrow-left"></i> Dự đoán</a>
         </div>
-    </header>
-
-    <div class="nav-links">
-        <a href="/" class="nav-link">🏠 Trang chủ</a>
-        <a href="/hu" class="nav-link ${type === 'hu' ? 'active' : ''}">🎲 HŨ</a>
-        <a href="/md5" class="nav-link ${type === 'md5' ? 'active' : ''}">🎲 MD5</a>
-        <a href="/lichsu/${type}" class="nav-link active">📊 Lịch sử</a>
     </div>
+</header>
 
-    <div class="page-title">📊 LỊCH SỬ ${title} (1000 phiên)</div>
+<nav class="gov-nav">
+    <div class="container">
+        <a href="/">🏠 Trang chủ</a>
+        <a href="/hu" class="${type === 'hu' ? 'active' : ''}">🎲 HŨ</a>
+        <a href="/md5" class="${type === 'md5' ? 'active' : ''}">🎲 MD5</a>
+        <a href="/lichsu/${type}" class="active">📊 Lịch sử</a>
+    </div>
+</nav>
+
+<div class="main-content">
+    <div class="page-title"><i class="fas fa-history"></i> LỊCH SỬ ${title} (1000 phiên)</div>
 
     <div class="card">
-        <div class="card-title"><i class="fas fa-chart-line"></i> THỐNG KÊ ${title}</div>
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-number" id="totalPreds">0</div>
@@ -1826,8 +2225,8 @@ const renderGalaxyHistory = (type, title) => `
     </div>
 
     <div class="card">
-        <div class="card-title"><i class="fas fa-history"></i> CHI TIẾT ${title}</div>
-        <div class="history-container">
+        <div style="font-weight:600;color:#1a237e;margin-bottom:12px;"><i class="fas fa-list"></i> Chi tiết lịch sử</div>
+        <div class="history-table-wrapper">
             <table class="history-table">
                 <thead>
                     <tr>
@@ -1839,20 +2238,18 @@ const renderGalaxyHistory = (type, title) => `
                     </tr>
                 </thead>
                 <tbody id="historyBody">
-                    <tr><td colspan="5" style="text-align:center;padding:20px;color:rgba(255,255,255,0.03);font-size:9px;"><i class="fas fa-spinner fa-spin"></i> Đang tải...</td></tr>
+                    <tr><td colspan="5" style="text-align:center;padding:30px;color:#b0bec5;">Đang tải dữ liệu...</td></tr>
                 </tbody>
             </table>
         </div>
     </div>
 
     <div class="footer">
-        <p>🌌 <strong>GALAXY PREDICTOR ULTIMATE</strong> © ĐẠI CA KHÔI</p>
+        <p>🏛️ <strong>TX PREDICTOR STATE SECURITY</strong> © 2026 - Bảo mật cấp nhà nước</p>
     </div>
-
 </div>
 
 <script>
-// 🛡️ Bảo mật
 document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
 document.addEventListener('touchstart', function(e) { if (e.touches.length > 1) e.preventDefault(); });
 document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
@@ -1861,7 +2258,7 @@ document.addEventListener('keydown', function(e) {
         e.preventDefault(); return false;
     }
 });
-console.log = function() {}; console.warn = function() {}; console.error = function() {}; console.info = function() {};
+console.log = function() {}; console.warn = function() {}; console.error = function() {};
 
 function updateClock() {
     document.getElementById('clockDisplay').textContent = new Date().toLocaleTimeString('vi-VN', { hour12: false });
@@ -1888,7 +2285,7 @@ async function fetchHistory() {
 function renderHistory(history) {
     var tbody = document.getElementById('historyBody');
     if (!history || history.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:rgba(255,255,255,0.03);">Chưa có dữ liệu</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px;color:#b0bec5;">Chưa có dữ liệu</td></tr>';
         return;
     }
     var rows = '';
@@ -1909,9 +2306,7 @@ function renderHistory(history) {
 
 function updateStats(history) {
     if (!history || history.length === 0) {
-        document.getElementById('totalPreds').textContent = 0;
-        document.getElementById('totalCorrect').textContent = 0;
-        document.getElementById('totalWrong').textContent = 0;
+        ['totalPreds','totalCorrect','totalWrong'].forEach(id => document.getElementById(id).textContent = 0);
         document.getElementById('winRate').textContent = '0%';
         return;
     }
@@ -1937,168 +2332,253 @@ document.addEventListener('DOMContentLoaded', function() {
 // 🚀 ROUTES
 // ============================================================
 
-// Trang chủ Galaxy
+// Trang chủ State Security
 app.get('/', function(req, res) {
     res.send(`<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🌌 GALAXY PREDICTOR ULTIMATE</title>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <title>🏛️ STATE SECURITY - TX PREDICTOR</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Roboto', sans-serif;
-            background: #0a0a1a;
-            color: #fff;
+            font-family: 'Inter', sans-serif;
+            background: #f0f2f5;
+            color: #1a1a2e;
             min-height: 100vh;
-            overflow-x: hidden;
-            user-select: none;
         }
-        .galaxy-bg {
-            position: fixed; top: 0; left: 0;
-            width: 100%; height: 100%;
-            z-index: 0;
-            background: radial-gradient(ellipse at 20% 50%, rgba(88,101,242,0.06), transparent 50%),
-                        radial-gradient(ellipse at 80% 20%, rgba(255,215,0,0.03), transparent 40%),
-                        #0a0a1a;
+        .gov-header {
+            background: linear-gradient(135deg, #1a237e 0%, #0d47a1 50%, #01579b 100%);
+            padding: 12px 0;
+            border-bottom: 3px solid #ffd700;
         }
-        .galaxy-bg::before {
-            content: ''; position: absolute; top: 0; left: 0;
-            width: 100%; height: 100%;
-            background-image: radial-gradient(1px 1px at 20px 30px, #eee, transparent),
-                              radial-gradient(1px 1px at 40px 70px, #fff, transparent);
-            background-size: 200px 100px;
-            background-repeat: repeat;
-            opacity: 0.06;
-        }
-        .container { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 16px; min-height: 100vh; }
-        .header {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 12px 20px;
-            background: rgba(255,255,255,0.01);
-            backdrop-filter: blur(20px);
-            border-radius: 16px;
-            border: 1px solid rgba(255,215,0,0.03);
-            margin-bottom: 16px;
+        .gov-header .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             flex-wrap: wrap;
             gap: 10px;
         }
-        .logo { display: flex; align-items: center; gap: 12px; }
-        .logo-icon {
-            width: 44px; height: 44px;
-            background: linear-gradient(135deg, #ffd700, #ff6b35);
-            border-radius: 12px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 20px; font-weight: 900; color: #fff;
-            font-family: 'Orbitron', sans-serif;
+        .gov-logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
         }
-        .logo-text {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 20px; font-weight: 700;
-            background: linear-gradient(135deg, #ffd700, #ff6b35, #ff1493);
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        .gov-emblem {
+            width: 48px;
+            height: 48px;
+            background: radial-gradient(circle, #ffd700 30%, #f9a825 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            color: #1a237e;
+            font-weight: 900;
+            border: 2px solid #fff;
         }
-        .logo-sub { font-size: 8px; color: rgba(255,215,0,0.15); letter-spacing: 2px; text-transform: uppercase; }
-        .header-time { font-size: 10px; color: rgba(255,255,255,0.15); font-family: 'Orbitron', sans-serif; }
-        .nav-links { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-bottom: 16px; }
-        .nav-link {
-            padding: 4px 14px; border-radius: 20px;
-            border: 1px solid rgba(255,255,255,0.02);
-            color: rgba(255,255,255,0.15); font-size: 7px;
-            text-decoration: none; font-family: 'Orbitron', sans-serif;
-            transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 0.5px;
+        .gov-title {
+            color: #fff;
+            line-height: 1.2;
         }
-        .nav-link:hover { border-color: #ffd70033; color: #ffd70066; }
-        .nav-link.active { border-color: #ffd70044; color: #ffd700; }
+        .gov-title h1 {
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+        .gov-title small {
+            font-size: 11px;
+            opacity: 0.7;
+            font-weight: 300;
+            letter-spacing: 2px;
+        }
+        .gov-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255,215,0,0.15);
+            padding: 6px 16px;
+            border-radius: 20px;
+            border: 1px solid rgba(255,215,0,0.2);
+        }
+        .gov-badge i { color: #ffd700; font-size: 14px; }
+        .gov-badge span { color: #fff; font-size: 12px; font-weight: 500; }
+        .gov-badge .security-level { color: #ffd700; font-weight: 700; font-size: 10px; letter-spacing: 1px; }
+        .gov-nav {
+            background: #fff;
+            padding: 10px 0;
+            border-bottom: 1px solid #e8ecf1;
+        }
+        .gov-nav .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+        .gov-nav a {
+            padding: 6px 18px;
+            border-radius: 6px;
+            color: #5a6a7e;
+            font-size: 13px;
+            font-weight: 500;
+            text-decoration: none;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+        .gov-nav a:hover { background: #f0f4ff; color: #1a237e; }
+        .gov-nav a.active { background: #1a237e; color: #fff; border-color: #1a237e; }
+
+        .main-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
         .welcome {
+            background: #fff;
+            border-radius: 12px;
+            padding: 40px 32px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            border: 1px solid #e8ecf1;
             text-align: center;
-            padding: 40px 20px;
-            background: rgba(255,255,255,0.01);
-            border-radius: 16px;
-            border: 1px solid rgba(255,255,255,0.01);
-            margin-bottom: 16px;
+            margin-bottom: 24px;
         }
         .welcome h1 {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 32px; font-weight: 900;
-            background: linear-gradient(135deg, #ffd700, #ff6b35, #ff1493);
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            font-size: 32px;
+            font-weight: 800;
+            color: #1a237e;
             margin-bottom: 8px;
         }
-        .welcome p { color: rgba(255,215,0,0.2); font-size: 12px; letter-spacing: 1px; }
-        .welcome .version { color: rgba(255,215,0,0.06); font-size: 8px; margin-top: 6px; font-family: 'Orbitron', sans-serif; letter-spacing: 2px; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+        .welcome h1 i { color: #ffd700; }
+        .welcome p {
+            color: #5a6a7e;
+            font-size: 16px;
+            margin-bottom: 4px;
+        }
+        .welcome .version {
+            color: #b0bec5;
+            font-size: 12px;
+            margin-top: 8px;
+            letter-spacing: 1px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
         @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
         .menu-card {
-            background: rgba(255,255,255,0.005);
-            border-radius: 16px; border: 1px solid rgba(255,255,255,0.01);
-            padding: 24px 16px;
+            background: #fff;
+            border-radius: 12px;
+            padding: 30px 20px;
             text-align: center;
-            transition: all 0.3s ease;
+            border: 1px solid #e8ecf1;
             text-decoration: none;
-            color: #fff;
-            display: block;
-            position: relative;
-            overflow: hidden;
+            color: #1a1a2e;
+            transition: all 0.3s;
         }
-        .menu-card::before {
-            content: '🌌';
-            position: absolute; top: -10px; right: -10px;
-            font-size: 50px; opacity: 0.02;
+        .menu-card:hover {
+            border-color: #1a237e40;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.06);
         }
-        .menu-card:hover { border-color: rgba(255,215,0,0.04); transform: translateY(-2px); }
-        .menu-card .icon { font-size: 32px; margin-bottom: 8px; display: block; }
-        .menu-card .title { font-family: 'Orbitron', sans-serif; font-size: 14px; font-weight: 700; color: #ffd70066; }
-        .menu-card .desc { font-size: 9px; color: rgba(255,215,0,0.08); margin-top: 3px; }
-        .footer { text-align: center; padding: 12px 20px 4px; color: rgba(255,255,255,0.02); font-size: 7px; border-top: 1px solid rgba(255,255,255,0.01); margin-top: 12px; font-family: 'Orbitron', sans-serif; letter-spacing: 1px; }
-        .footer strong { color: #ffd70022; }
+        .menu-card .icon { font-size: 36px; display: block; margin-bottom: 10px; }
+        .menu-card .title { font-size: 16px; font-weight: 600; color: #1a237e; }
+        .menu-card .desc { font-size: 13px; color: #78909c; margin-top: 4px; }
+        .footer {
+            text-align: center;
+            padding: 20px 0 10px;
+            color: #90a4ae;
+            font-size: 12px;
+            border-top: 1px solid #e8ecf1;
+            margin-top: 20px;
+        }
+        .footer strong { color: #1a237e; }
         @media (max-width: 768px) {
-            .container { padding: 8px; }
-            .header { padding: 8px 12px; flex-direction: column; align-items: stretch; gap: 4px; }
-            .logo-text { font-size: 16px; }
-            .logo-icon { width: 36px; height: 36px; font-size: 16px; }
+            .main-content { padding: 12px; }
+            .welcome { padding: 24px 16px; }
             .welcome h1 { font-size: 24px; }
+            .gov-title h1 { font-size: 16px; }
+            .gov-emblem { width: 36px; height: 36px; font-size: 16px; }
+            .gov-nav a { font-size: 11px; padding: 4px 12px; }
         }
     </style>
 </head>
 <body>
-<div class="galaxy-bg"></div>
-<div class="container">
-    <header class="header">
-        <div class="logo">
-            <div class="logo-icon">🌌</div>
-            <div>
-                <div class="logo-text">GALAXY PREDICTOR</div>
-                <div class="logo-sub">ĐẠI CA KHÔI · GOD DESTROYER</div>
+
+<header class="gov-header">
+    <div class="container">
+        <div class="gov-logo">
+            <div class="gov-emblem">🏛️</div>
+            <div class="gov-title">
+                <h1>TX PREDICTOR</h1>
+                <small>BẢO MẬT CẤP NHÀ NƯỚC</small>
             </div>
         </div>
-        <div class="header-right">
-            <span class="header-time" id="clockDisplay">--:--:--</span>
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+            <div class="gov-badge">
+                <i class="fas fa-shield-alt"></i>
+                <span>Bảo mật: </span>
+                <span class="security-level">CẤP NHÀ NƯỚC</span>
+            </div>
+            <div style="color:rgba(255,255,255,0.6);font-size:13px;" id="clockDisplay">--:--:--</div>
         </div>
-    </header>
-    <div class="nav-links">
-        <a href="/" class="nav-link active">🏠 Trang chủ</a>
-        <a href="/hu" class="nav-link">🎲 HŨ</a>
-        <a href="/md5" class="nav-link">🎲 MD5</a>
-        <a href="/lichsu/hu" class="nav-link">📊 Lịch sử HŨ</a>
-        <a href="/lichsu/md5" class="nav-link">📊 Lịch sử MD5</a>
     </div>
+</header>
+
+<nav class="gov-nav">
+    <div class="container">
+        <a href="/" class="active">🏠 Trang chủ</a>
+        <a href="/hu">🎲 HŨ</a>
+        <a href="/md5">🎲 MD5</a>
+        <a href="/lichsu/hu">📊 Lịch sử HŨ</a>
+        <a href="/lichsu/md5">📊 Lịch sử MD5</a>
+    </div>
+</nav>
+
+<div class="main-content">
     <div class="welcome">
-        <h1>🌌 GALAXY PREDICTOR ULTIMATE</h1>
-        <p>🚀 Hệ thống dự đoán Tài Xỉu thế hệ mới</p>
-        <p class="version">💀 GOD DESTROYER · 10+ Thuật toán · LSTM · Transformer · MCTS · Genetic · Chaos</p>
+        <h1><i class="fas fa-shield-alt"></i> TX PREDICTOR STATE SECURITY</h1>
+        <p>🚀 Hệ thống dự đoán Tài Xỉu chuẩn nhà nước</p>
+        <p class="version">🏛️ Bảo mật cấp nhà nước · 10+ thuật toán · LSTM · Transformer · MCTS · Genetic · Chaos</p>
     </div>
+
     <div class="grid">
-        <a href="/hu" class="menu-card"><span class="icon">🎲</span><div class="title">Dự đoán HŨ</div><div class="desc">10+ thuật toán GOD DESTROYER</div></a>
-        <a href="/md5" class="menu-card"><span class="icon">🎲</span><div class="title">Dự đoán MD5</div><div class="desc">10+ thuật toán GOD DESTROYER</div></a>
-        <a href="/lichsu/hu" class="menu-card"><span class="icon">📊</span><div class="title">Lịch sử HŨ</div><div class="desc">1000 phiên - Thống kê thực tế</div></a>
-        <a href="/lichsu/md5" class="menu-card"><span class="icon">📊</span><div class="title">Lịch sử MD5</div><div class="desc">1000 phiên - Thống kê thực tế</div></a>
+        <a href="/hu" class="menu-card">
+            <span class="icon">🎲</span>
+            <div class="title">Dự đoán HŨ</div>
+            <div class="desc">10+ thuật toán bảo mật cấp nhà nước</div>
+        </a>
+        <a href="/md5" class="menu-card">
+            <span class="icon">🎲</span>
+            <div class="title">Dự đoán MD5</div>
+            <div class="desc">10+ thuật toán bảo mật cấp nhà nước</div>
+        </a>
+        <a href="/lichsu/hu" class="menu-card">
+            <span class="icon">📊</span>
+            <div class="title">Lịch sử HŨ</div>
+            <div class="desc">1000 phiên - Thống kê chi tiết</div>
+        </a>
+        <a href="/lichsu/md5" class="menu-card">
+            <span class="icon">📊</span>
+            <div class="title">Lịch sử MD5</div>
+            <div class="desc">1000 phiên - Thống kê chi tiết</div>
+        </a>
     </div>
-    <div class="footer"><p>🌌 <strong>GALAXY PREDICTOR ULTIMATE</strong> © ĐẠI CA KHÔI</p></div>
+
+    <div class="footer">
+        <p>🏛️ <strong>TX PREDICTOR STATE SECURITY</strong> © 2026 - Bảo mật cấp nhà nước</p>
+    </div>
 </div>
+
 <script>
 document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
 document.addEventListener('touchstart', function(e) { if (e.touches.length > 1) e.preventDefault(); });
@@ -2119,19 +2599,19 @@ updateClock();
 });
 
 app.get('/hu', function(req, res) {
-    res.send(renderGalaxyPage('HŨ', 'hu'));
+    res.send(renderStatePage('HŨ', 'hu'));
 });
 
 app.get('/md5', function(req, res) {
-    res.send(renderGalaxyPage('MD5', 'md5'));
+    res.send(renderStatePage('MD5', 'md5'));
 });
 
 app.get('/lichsu/hu', function(req, res) {
-    res.send(renderGalaxyHistory('hu', 'HŨ'));
+    res.send(renderStateHistory('hu', 'HŨ'));
 });
 
 app.get('/lichsu/md5', function(req, res) {
-    res.send(renderGalaxyHistory('md5', 'MD5'));
+    res.send(renderStateHistory('md5', 'MD5'));
 });
 
 // ============================================================
@@ -2150,7 +2630,8 @@ app.get('/api/hu', async function(req, res) {
             trangThai: result.trangThai,
             reason: result.reason || '',
             algorithmCount: result.algorithmCount || 0,
-            marketState: result.marketState || 'UNKNOWN'
+            marketState: result.marketState || 'UNKNOWN',
+            securityLevel: 'GOVERNMENT'
         });
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -2170,7 +2651,8 @@ app.get('/api/md5', async function(req, res) {
             trangThai: result.trangThai,
             reason: result.reason || '',
             algorithmCount: result.algorithmCount || 0,
-            marketState: result.marketState || 'UNKNOWN'
+            marketState: result.marketState || 'UNKNOWN',
+            securityLevel: 'GOVERNMENT'
         });
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -2213,11 +2695,12 @@ app.get('/api/reset', function(req, res) {
         accuracy_curve: [],
         profit_curve: [],
         learning_progress: 0,
-        model_version: "GOD_DESTROYER_v3.0",
-        last_phien: 0
+        model_version: "STATE_SECURITY_v4.0",
+        last_phien: 0,
+        security_level: "GOVERNMENT"
     };
     saveHistory();
-    res.json({ message: '🌌 Reset thành công - GALAXY PREDICTOR' });
+    res.json({ message: '🏛️ Reset thành công - STATE SECURITY' });
 });
 
 // ============================================================
@@ -2226,10 +2709,10 @@ app.get('/api/reset', function(req, res) {
 loadHistory();
 app.listen(PORT, '0.0.0.0', function() {
     console.log('========================================');
-    console.log('🌌 GALAXY PREDICTOR ULTIMATE');
-    console.log('💀 GOD DESTROYER - 10+ THUẬT TOÁN SIÊU HỦY DIỆT');
-    console.log('📊 1000 PHIÊN - TỰ ĐỘNG +1 - LƯU TRỮ ĐẦY ĐỦ');
-    console.log('🛡️ BẢO MẬT TỐI ĐA');
+    console.log('🏛️ TX PREDICTOR STATE SECURITY');
+    console.log('🛡️ BẢO MẬT CẤP NHÀ NƯỚC');
+    console.log('💀 10+ THUẬT TOÁN SIÊU HỦY DIỆT');
+    console.log('📊 1000 PHIÊN - TỰ ĐỘNG +1');
     console.log('Server: http://0.0.0.0:' + PORT);
     console.log('========================================');
 });
