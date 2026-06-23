@@ -56,7 +56,7 @@ let stats = {
 };
 
 // ============================================================
-// THUẬT TOÁN TX_LogicPen_UltimateVIP
+// THUẬT TOÁN TX_LogicPen_UltimateVIP - FIX LỖI
 // ============================================================
 class TX_LogicPen_UltimateVIP {
     constructor() {
@@ -120,10 +120,13 @@ class TX_LogicPen_UltimateVIP {
             .map(s => s.tong);
     }
     
+    // ========== CÁC HÀM PHÂN TÍCH ==========
+    
     analyzeMultiLayer() {
         const arr = this._arr();
         const points = this._points();
         
+        // Short term (5-10 phiên)
         if (arr.length >= 5) {
             this.multiLayerAnalysis.shortTerm = {
                 data: arr.slice(0, 10),
@@ -133,6 +136,7 @@ class TX_LogicPen_UltimateVIP {
             };
         }
         
+        // Medium term (10-30 phiên)
         if (arr.length >= 15) {
             this.multiLayerAnalysis.mediumTerm = {
                 data: arr.slice(0, 30),
@@ -142,6 +146,7 @@ class TX_LogicPen_UltimateVIP {
             };
         }
         
+        // Long term (30-50 phiên)
         if (arr.length >= 30) {
             this.multiLayerAnalysis.longTerm = {
                 data: arr.slice(0, 50),
@@ -151,8 +156,117 @@ class TX_LogicPen_UltimateVIP {
             };
         }
         
+        // Tính toán chỉ số biến động
         this.multiLayerAnalysis.volatilityIndex = this.calculateVolatilityIndex(arr);
         this.multiLayerAnalysis.trendStrength = this.calculateOverallTrendStrength();
+    }
+    
+    // ========== CÁC HÀM HỖ TRỢ ==========
+    
+    getCurrentStreak(arr) {
+        let streak = 1;
+        for (let i = 1; i < arr.length; i++) {
+            if (arr[i] === arr[0]) streak++;
+            else break;
+        }
+        return streak;
+    }
+    
+    calculateMomentum(points) {
+        if (points.length < 5) return 0;
+        const shortMA = points.slice(0, 3).reduce((a,b) => a+b, 0) / 3;
+        const longMA = points.slice(0, 5).reduce((a,b) => a+b, 0) / 5;
+        return shortMA - longMA;
+    }
+    
+    calculateRSI(points) {
+        if (points.length < 14) return 50;
+        let gains = 0, losses = 0;
+        
+        for (let i = 0; i < 13; i++) {
+            const diff = points[i] - points[i+1];
+            if (diff > 0) gains += diff;
+            else losses -= diff;
+        }
+        
+        const avgGain = gains / 14;
+        const avgLoss = losses / 14;
+        
+        if (avgLoss === 0) return 100;
+        const rs = avgGain / avgLoss;
+        return 100 - (100 / (1 + rs));
+    }
+    
+    calculateStability(arr) {
+        let changes = 0;
+        for (let i = 1; i < arr.length; i++) {
+            if (arr[i] !== arr[i-1]) changes++;
+        }
+        return 1 - (changes / (arr.length - 1));
+    }
+    
+    calculateVolatilityIndex(arr) {
+        let changes = 0;
+        for (let i = 1; i < Math.min(arr.length, 20); i++) {
+            if (arr[i] !== arr[i-1]) changes++;
+        }
+        return changes / Math.min(arr.length - 1, 19);
+    }
+    
+    calculateOverallTrendStrength() {
+        const arr = this._arr();
+        if (arr.length < 10) return 0;
+        
+        const taiRatio = arr.slice(0, 10).filter(x => x === 'TAI').length / 10;
+        return Math.abs(taiRatio - 0.5) * 2;
+    }
+    
+    // ===== HÀM calculateTrendStrength - ĐÃ FIX =====
+    calculateTrendStrength(arr) {
+        if (!arr || arr.length < 10) return 0;
+        
+        const taiRatio = arr.filter(x => x === 'TAI').length / arr.length;
+        const trendStrength = Math.abs(taiRatio - 0.5) * 2;
+        
+        // Xem xét độ dài của xu hướng
+        let streak = 1;
+        for (let i = 1; i < arr.length; i++) {
+            if (arr[i] === arr[0]) streak++;
+            else break;
+        }
+        
+        // Kết hợp cả tỷ lệ và độ dài chuỗi
+        return Math.min(1, trendStrength * 0.6 + Math.min(streak / 10, 0.4));
+    }
+    
+    detectDominantPattern(arr) {
+        const patterns = {};
+        for (let i = 0; i < arr.length - 1; i++) {
+            const pair = arr[i] + arr[i+1];
+            patterns[pair] = (patterns[pair] || 0) + 1;
+        }
+        
+        const total = Object.values(patterns).reduce((a,b) => a+b, 0);
+        const dominant = Object.entries(patterns).sort((a,b) => b[1] - a[1])[0];
+        
+        return {
+            pattern: dominant[0],
+            frequency: dominant[1] / total
+        };
+    }
+    
+    detectCycles(arr) {
+        for (let period = 2; period <= 8; period++) {
+            let matches = 0;
+            for (let i = period; i < arr.length; i++) {
+                if (arr[i] === arr[i - period]) matches++;
+            }
+            const accuracy = matches / (arr.length - period);
+            if (accuracy > 0.65) {
+                return { period, accuracy };
+            }
+        }
+        return null;
     }
     
     updateAIMemory() {
@@ -197,6 +311,8 @@ class TX_LogicPen_UltimateVIP {
         }
     }
 
+    // ========== CÁC THUẬT TOÁN DỰ ĐOÁN ==========
+    
     cauSapPro(arr) {
         if (arr.length < 2) return null;
         let length = 1;
@@ -568,95 +684,7 @@ class TX_LogicPen_UltimateVIP {
         return null;
     }
 
-    // Hàm hỗ trợ
-    getCurrentStreak(arr) {
-        let streak = 1;
-        for (let i = 1; i < arr.length; i++) {
-            if (arr[i] === arr[0]) streak++;
-            else break;
-        }
-        return streak;
-    }
-    
-    calculateMomentum(points) {
-        if (points.length < 5) return 0;
-        const shortMA = points.slice(0, 3).reduce((a,b) => a+b, 0) / 3;
-        const longMA = points.slice(0, 5).reduce((a,b) => a+b, 0) / 5;
-        return shortMA - longMA;
-    }
-    
-    calculateRSI(points) {
-        if (points.length < 14) return 50;
-        let gains = 0, losses = 0;
-        
-        for (let i = 0; i < 13; i++) {
-            const diff = points[i] - points[i+1];
-            if (diff > 0) gains += diff;
-            else losses -= diff;
-        }
-        
-        const avgGain = gains / 14;
-        const avgLoss = losses / 14;
-        
-        if (avgLoss === 0) return 100;
-        const rs = avgGain / avgLoss;
-        return 100 - (100 / (1 + rs));
-    }
-    
-    calculateStability(arr) {
-        let changes = 0;
-        for (let i = 1; i < arr.length; i++) {
-            if (arr[i] !== arr[i-1]) changes++;
-        }
-        return 1 - (changes / (arr.length - 1));
-    }
-    
-    calculateVolatilityIndex(arr) {
-        let changes = 0;
-        for (let i = 1; i < Math.min(arr.length, 20); i++) {
-            if (arr[i] !== arr[i-1]) changes++;
-        }
-        return changes / Math.min(arr.length - 1, 19);
-    }
-    
-    calculateOverallTrendStrength() {
-        const arr = this._arr();
-        if (arr.length < 10) return 0;
-        
-        const taiRatio = arr.slice(0, 10).filter(x => x === 'TAI').length / 10;
-        return Math.abs(taiRatio - 0.5) * 2;
-    }
-    
-    detectDominantPattern(arr) {
-        const patterns = {};
-        for (let i = 0; i < arr.length - 1; i++) {
-            const pair = arr[i] + arr[i+1];
-            patterns[pair] = (patterns[pair] || 0) + 1;
-        }
-        
-        const total = Object.values(patterns).reduce((a,b) => a+b, 0);
-        const dominant = Object.entries(patterns).sort((a,b) => b[1] - a[1])[0];
-        
-        return {
-            pattern: dominant[0],
-            frequency: dominant[1] / total
-        };
-    }
-    
-    detectCycles(arr) {
-        for (let period = 2; period <= 8; period++) {
-            let matches = 0;
-            for (let i = period; i < arr.length; i++) {
-                if (arr[i] === arr[i - period]) matches++;
-            }
-            const accuracy = matches / (arr.length - period);
-            if (accuracy > 0.65) {
-                return { period, accuracy };
-            }
-        }
-        return null;
-    }
-
+    // ===== TỔNG HỢP SIÊU VIP =====
     tongHopSieuVIP() {
         const arr = this._arr();
         if (arr.length < 2) return null;
@@ -684,7 +712,9 @@ class TX_LogicPen_UltimateVIP {
                         algoName: algo.name
                     });
                 }
-            } catch (e) {}
+            } catch (e) {
+                // Skip failed algorithms
+            }
         }
         
         if (allPredictions.length === 0) {
@@ -763,6 +793,7 @@ class TX_LogicPen_UltimateVIP {
         return p;
     }
 
+    // ===== HÀM CHÍNH =====
     predict(data) {
         this.loadData(data);
         
@@ -951,25 +982,6 @@ function loadHistory() {
             const data = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8'));
             historyData = data;
             console.log('✅ Loaded history:', historyData.hu.length, 'HU,', historyData.md5.length, 'MD5');
-            
-            // Khôi phục stats từ history
-            for (const type of ['hu', 'md5']) {
-                for (const record of historyData[type]) {
-                    if (record.trangThai === 'WIN') {
-                        stats.correct++;
-                        stats.total++;
-                        stats.streak_correct++;
-                        stats.streak_wrong = 0;
-                        stats.best_streak = Math.max(stats.best_streak, stats.streak_correct);
-                    } else if (record.trangThai === 'LOSE') {
-                        stats.wrong++;
-                        stats.total++;
-                        stats.streak_wrong++;
-                        stats.streak_correct = 0;
-                        stats.worst_streak = Math.max(stats.worst_streak, stats.streak_wrong);
-                    }
-                }
-            }
         }
     } catch (e) { console.log('Load history error:', e.message); }
 }
@@ -1067,8 +1079,7 @@ const renderPredictionPage = (title, type, color) => `
             z-index: 0;
             background: 
                 radial-gradient(ellipse at 20% 30%, rgba(124,77,255,0.05), transparent 50%),
-                radial-gradient(ellipse at 80% 70%, rgba(0,245,255,0.03), transparent 50%),
-                radial-gradient(ellipse at 50% 50%, rgba(255,215,0,0.02), transparent 40%);
+                radial-gradient(ellipse at 80% 70%, rgba(0,245,255,0.03), transparent 50%);
         }
 
         .container { position: relative; z-index: 1; max-width: 800px; margin: 0 auto; padding: 16px; min-height: 100vh; }
@@ -1985,9 +1996,6 @@ updateClock();
 </html>`);
 });
 
-// ============================================================
-// ROUTES
-// ============================================================
 app.get('/hu', function(req, res) {
     res.send(renderPredictionPage('HŨ', 'hu', '#ffd700'));
 });
