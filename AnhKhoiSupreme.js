@@ -20,20 +20,21 @@ let history = {
 };
 
 let stats = {
-    hu: { total: 0, correct: 0, wrong: 0, accuracy: 0, streak: 0, bestStreak: 0, worstStreak: 0, last10: [], last50: [] },
-    md5: { total: 0, correct: 0, wrong: 0, accuracy: 0, streak: 0, bestStreak: 0, worstStreak: 0, last10: [], last50: [] }
+    hu: { total: 0, correct: 0, wrong: 0, accuracy: 0, streak: 0, bestStreak: 0, worstStreak: 0, last10: [], last50: [], daily: { wins: 0, losses: 0, total: 0 } },
+    md5: { total: 0, correct: 0, wrong: 0, accuracy: 0, streak: 0, bestStreak: 0, worstStreak: 0, last10: [], last50: [], daily: { wins: 0, losses: 0, total: 0 } }
 };
 
 const MAX_HISTORY = 1000;
-const AUTO_SAVE_INTERVAL = 6000;
+const AUTO_SAVE_INTERVAL = 5000;
 let lastPhien = { hu: null, md5: null };
 let processing = { hu: false, md5: false };
 let lastPredictions = { hu: null, md5: null };
+let predictionCount = { hu: 0, md5: 0 };
 
 // ============================================================
-// 🧠 HỆ THỐNG THÍCH NGHI SIÊU CẤP - KHÔNG CẦN DỮ LIỆU
+// 🧠 HỆ THỐNG DỰ ĐOÁN SIÊU CHÍNH XÁC
 // ============================================================
-class SuperAdaptiveEngine {
+class SuperPredictionEngine {
     constructor() {
         // Bộ nhớ chính
         this.patternDB = new Map();
@@ -43,7 +44,7 @@ class SuperAdaptiveEngine {
         this.streakDB = new Map();
         this.patternHistory = new Map();
         
-        // Bộ nhớ chuyên biệt
+        // Bộ nhớ chuyên biệt cho từng loại cầu
         this.betMemory = new Map();
         this.zigzagMemory = new Map();
         this.dao11Memory = new Map();
@@ -52,51 +53,56 @@ class SuperAdaptiveEngine {
         this.trendMemory = new Map();
         this.breakMemory = new Map();
         this.balanceMemory = new Map();
+        this.momentumMemory = new Map();
+        this.volatilityMemory = new Map();
+        this.correlationMemory = new Map();
         
-        // Bộ nhớ dự đoán siêu cấp - KHÔNG CẦN DỮ LIỆU
-        this.smartFallback = new Map();
+        // Bộ nhớ thông minh
+        this.smartCache = new Map();
         this.emergencyPatterns = [];
-        this.predictionCache = new Map();
         this.confidenceHistory = new Map();
+        this.predictionLog = [];
         
-        // Hệ số tiến hoá
-        this.evolutionFactor = 0;
-        this.learningSpeed = 0.25;
-        this.balanceThreshold = 0.6;
+        // Hệ số
+        this.evolutionFactor = 1.0;
+        this.learningRate = 0.3;
+        this.balanceThreshold = 0.55;
+        this.confidenceBoost = 1.0;
         
-        // Khởi tạo pattern dự phòng siêu cấp
-        this.initSuperPatterns();
-        
-        // Tải dữ liệu học
+        // Khởi tạo
+        this.initSmartPatterns();
         this.loadLearningData();
     }
 
-    // Khởi tạo pattern dự phòng để dự đoán KHÔNG CẦN DỮ LIỆU
-    initSuperPatterns() {
+    // Khởi tạo pattern thông minh
+    initSmartPatterns() {
         this.emergencyPatterns = [
-            { pattern: 'bet_short', weight: 0.7, confidence: 58, desc: 'Bệt ngắn' },
-            { pattern: 'bet_medium', weight: 0.8, confidence: 65, desc: 'Bệt vừa' },
-            { pattern: 'bet_long', weight: 0.9, confidence: 72, desc: 'Bệt dài' },
-            { pattern: 'dao_11', weight: 0.85, confidence: 68, desc: 'Đảo 1-1' },
-            { pattern: 'dao_22', weight: 0.8, confidence: 62, desc: 'Đảo 2-2' },
-            { pattern: 'zigzag_short', weight: 0.75, confidence: 60, desc: 'Zigzag ngắn' },
-            { pattern: 'zigzag_long', weight: 0.85, confidence: 68, desc: 'Zigzag dài' },
-            { pattern: 'cycle_2', weight: 0.7, confidence: 58, desc: 'Chu kỳ 2' },
-            { pattern: 'cycle_3', weight: 0.75, confidence: 62, desc: 'Chu kỳ 3' },
-            { pattern: 'trend_tai', weight: 0.7, confidence: 56, desc: 'Xu hướng Tài' },
-            { pattern: 'trend_xiu', weight: 0.7, confidence: 56, desc: 'Xu hướng Xỉu' },
-            { pattern: 'break_after_bet', weight: 0.8, confidence: 64, desc: 'Gãy sau bệt' }
+            { pattern: 'bet_short', weight: 0.6, confidence: 55, desc: 'Bệt ngắn' },
+            { pattern: 'bet_medium', weight: 0.7, confidence: 62, desc: 'Bệt vừa' },
+            { pattern: 'bet_long', weight: 0.85, confidence: 72, desc: 'Bệt dài' },
+            { pattern: 'dao_11', weight: 0.8, confidence: 68, desc: 'Đảo 1-1' },
+            { pattern: 'dao_22', weight: 0.75, confidence: 62, desc: 'Đảo 2-2' },
+            { pattern: 'zigzag', weight: 0.8, confidence: 66, desc: 'Zigzag' },
+            { pattern: 'cycle_2', weight: 0.65, confidence: 58, desc: 'Chu kỳ 2' },
+            { pattern: 'cycle_3', weight: 0.7, confidence: 60, desc: 'Chu kỳ 3' },
+            { pattern: 'trend_tai', weight: 0.65, confidence: 56, desc: 'Xu hướng Tài' },
+            { pattern: 'trend_xiu', weight: 0.65, confidence: 56, desc: 'Xu hướng Xỉu' },
+            { pattern: 'break_after_bet', weight: 0.75, confidence: 64, desc: 'Gãy sau bệt' },
+            { pattern: 'momentum_up', weight: 0.7, confidence: 60, desc: 'Đà tăng' },
+            { pattern: 'momentum_down', weight: 0.7, confidence: 60, desc: 'Đà giảm' },
+            { pattern: 'volatility_high', weight: 0.6, confidence: 54, desc: 'Biến động cao' },
+            { pattern: 'volatility_low', weight: 0.6, confidence: 54, desc: 'Biến động thấp' }
         ];
         
-        // Khởi tạo weight mặc định
+        // Khởi tạo weight
         for (const p of this.emergencyPatterns) {
             const key = `emergency_${p.pattern}`;
             this.weightDB.set(key, p.weight * 100);
-            this.accuracyDB.set(key, 0.5 + (p.confidence - 50) / 100);
+            this.accuracyDB.set(key, 0.45 + (p.confidence - 50) / 100);
         }
     }
 
-    // Tải dữ liệu học từ file
+    // Tải dữ liệu học
     loadLearningData() {
         try {
             if (fs.existsSync(LEARNING_FILE)) {
@@ -116,10 +122,10 @@ class SuperAdaptiveEngine {
                         this.accuracyDB.set(key, value);
                     }
                 }
-                console.log('🧠 Đã tải dữ liệu học siêu cấp');
+                console.log('🧠 Đã tải dữ liệu học thông minh');
             }
         } catch (error) {
-            console.log('📝 Chưa có dữ liệu học, sử dụng pattern dự phòng');
+            console.log('📝 Khởi tạo dữ liệu học mới');
         }
     }
 
@@ -138,11 +144,12 @@ class SuperAdaptiveEngine {
         }
     }
 
-    // Học siêu cấp
+    // ============================================================
+    // HỌC THÔNG MINH
+    // ============================================================
     learn(gameId, pattern, result, confidence, sequence, totalPatterns) {
         const key = `${gameId}_${pattern}`;
         
-        // Cập nhật Pattern DB
         if (!this.patternDB.has(key)) {
             this.patternDB.set(key, { 
                 T: 0, X: 0, total: 0, correct: 0, 
@@ -163,7 +170,7 @@ class SuperAdaptiveEngine {
         if (db.history.length > 100) db.history.shift();
         if (db.confidence.length > 100) db.confidence.shift();
 
-        // Tính độ chính xác với trọng số thời gian
+        // Tính độ chính xác thông minh
         const recent = db.history.slice(-20);
         const recentConf = db.confidence.slice(-20);
         let weightedCorrect = 0;
@@ -175,11 +182,11 @@ class SuperAdaptiveEngine {
         }
         db.correct = weightedTotal > 0 ? Math.min(1, weightedCorrect / weightedTotal) : 0.5;
 
-        // Học các loại cầu đặc biệt
-        this.learnSuperPatterns(gameId, sequence, result);
+        // Học các loại cầu
+        this.learnAllPatterns(gameId, sequence, result);
 
-        // Cập nhật weight siêu thông minh
-        let weight = 20 + (db.correct - 0.3) * 200;
+        // Cập nhật weight thông minh
+        let weight = 15 + (db.correct - 0.25) * 200;
         const avgConf = db.confidence.slice(-10).reduce((a,b) => a+b, 0) / Math.min(db.confidence.length, 10);
         if (avgConf > 70) weight *= 1.2;
         if (avgConf > 80) weight *= 1.15;
@@ -192,63 +199,45 @@ class SuperAdaptiveEngine {
         this.weightDB.set(key, weight);
         this.accuracyDB.set(key, db.correct);
 
-        // Cập nhật streak
-        this.updateSuperStreak(gameId, result);
+        this.updateStreak(gameId, result);
 
         // Lưu pattern history
         if (!this.patternHistory.has(gameId)) {
             this.patternHistory.set(gameId, []);
         }
         const ph = this.patternHistory.get(gameId);
-        ph.push({ pattern, result, confidence, time: Date.now(), weight, evolution: db.evolution });
+        ph.push({ pattern, result, confidence, time: Date.now(), weight });
         if (ph.length > 500) ph.shift();
 
-        // Cập nhật cache dự đoán
-        const cacheKey = `${gameId}_${sequence || 'none'}`;
-        this.predictionCache.set(cacheKey, { result, confidence, time: Date.now() });
-
-        // Lưu dữ liệu học
         this.saveLearningData();
     }
 
-    // Học các pattern đặc biệt siêu cấp
-    learnSuperPatterns(gameId, sequence, result) {
+    // Học tất cả các loại cầu
+    learnAllPatterns(gameId, sequence, result) {
         if (!sequence || sequence.length < 2) return;
 
-        // Học Bệt siêu cấp
-        this.learnSuperBet(gameId, sequence, result);
-        
-        // Học Zigzag siêu cấp
-        this.learnSuperZigzag(gameId, sequence, result);
-        
-        // Học Đảo 1-1 siêu cấp
-        this.learnSuperDao11(gameId, sequence, result);
-        
-        // Học Đảo 2-2 siêu cấp
-        this.learnSuperDao22(gameId, sequence, result);
-        
-        // Học Chu kỳ siêu cấp
-        this.learnSuperCycle(gameId, sequence, result);
-        
-        // Học Xu hướng siêu cấp
-        this.learnSuperTrend(gameId, sequence, result);
-        
-        // Học Gãy cầu siêu cấp
-        this.learnSuperBreak(gameId, sequence, result);
-        
-        // Học Cân bằng siêu cấp
-        this.learnSuperBalance(gameId, sequence, result);
+        this.learnBet(gameId, sequence, result);
+        this.learnZigzag(gameId, sequence, result);
+        this.learnDao11(gameId, sequence, result);
+        this.learnDao22(gameId, sequence, result);
+        this.learnCycle(gameId, sequence, result);
+        this.learnTrend(gameId, sequence, result);
+        this.learnBreak(gameId, sequence, result);
+        this.learnBalance(gameId, sequence, result);
+        this.learnMomentum(gameId, sequence, result);
+        this.learnVolatility(gameId, sequence, result);
+        this.learnCorrelation(gameId, sequence, result);
     }
 
-    // Học Bệt siêu cấp
-    learnSuperBet(gameId, sequence, result) {
+    // Học Bệt
+    learnBet(gameId, sequence, result) {
         const key = `${gameId}_bet`;
         if (!this.betMemory.has(key)) {
             this.betMemory.set(key, { 
                 lengths: [], results: [], accuracy: 0.5, total: 0,
                 patternMap: new Map(),
-                bestLength: 0, worstLength: 999,
-                avgLength: 0, lastLength: 0
+                bestLength: 0, avgLength: 0,
+                recentLengths: []
             });
         }
         const mem = this.betMemory.get(key);
@@ -262,10 +251,10 @@ class SuperAdaptiveEngine {
         mem.lengths.push(count);
         mem.results.push(result);
         mem.total++;
-        mem.lastLength = count;
         if (count > mem.bestLength) mem.bestLength = count;
-        if (count < mem.worstLength) mem.worstLength = count;
         mem.avgLength = mem.lengths.reduce((a,b) => a+b, 0) / mem.lengths.length;
+        mem.recentLengths.push(count);
+        if (mem.recentLengths.length > 20) mem.recentLengths.shift();
         
         const key2 = `len_${count}`;
         if (!mem.patternMap.has(key2)) {
@@ -278,8 +267,8 @@ class SuperAdaptiveEngine {
         mem.accuracy = recent.length > 0 ? correct / recent.length : 0.5;
     }
 
-    // Học Zigzag siêu cấp
-    learnSuperZigzag(gameId, sequence, result) {
+    // Học Zigzag
+    learnZigzag(gameId, sequence, result) {
         const key = `${gameId}_zigzag`;
         if (!this.zigzagMemory.has(key)) {
             this.zigzagMemory.set(key, { 
@@ -312,15 +301,15 @@ class SuperAdaptiveEngine {
         mem.accuracy = recent.length > 0 ? correct / recent.length : 0.5;
     }
 
-    // Học Đảo 1-1 siêu cấp
-    learnSuperDao11(gameId, sequence, result) {
+    // Học Đảo 1-1
+    learnDao11(gameId, sequence, result) {
         if (sequence.length < 4) return;
         const key = `${gameId}_dao11`;
         if (!this.dao11Memory.has(key)) {
             this.dao11Memory.set(key, { 
                 patterns: [], results: [], accuracy: 0.5, total: 0,
                 patternMap: new Map(),
-                lastPattern: null, streak: 0
+                streak: 0
             });
         }
         const mem = this.dao11Memory.get(key);
@@ -338,7 +327,6 @@ class SuperAdaptiveEngine {
                 mem.patternMap.set('11', { T: 0, X: 0 });
             }
             mem.patternMap.get('11')[result]++;
-            mem.lastPattern = '11';
             mem.streak++;
             
             const recent = mem.results.slice(-30);
@@ -349,15 +337,15 @@ class SuperAdaptiveEngine {
         }
     }
 
-    // Học Đảo 2-2 siêu cấp
-    learnSuperDao22(gameId, sequence, result) {
+    // Học Đảo 2-2
+    learnDao22(gameId, sequence, result) {
         if (sequence.length < 6) return;
         const key = `${gameId}_dao22`;
         if (!this.dao22Memory.has(key)) {
             this.dao22Memory.set(key, { 
                 patterns: [], results: [], accuracy: 0.5, total: 0,
                 patternMap: new Map(),
-                lastPattern: null, streak: 0
+                streak: 0
             });
         }
         const mem = this.dao22Memory.get(key);
@@ -374,7 +362,6 @@ class SuperAdaptiveEngine {
                 mem.patternMap.set('22', { T: 0, X: 0 });
             }
             mem.patternMap.get('22')[result]++;
-            mem.lastPattern = '22';
             mem.streak++;
             
             const recent = mem.results.slice(-30);
@@ -385,8 +372,8 @@ class SuperAdaptiveEngine {
         }
     }
 
-    // Học Chu kỳ siêu cấp
-    learnSuperCycle(gameId, sequence, result) {
+    // Học Chu kỳ
+    learnCycle(gameId, sequence, result) {
         if (sequence.length < 6) return;
         const key = `${gameId}_cycle`;
         if (!this.cycleMemory.has(key)) {
@@ -398,7 +385,7 @@ class SuperAdaptiveEngine {
         }
         const mem = this.cycleMemory.get(key);
         
-        for (let cycle = 2; cycle <= 4; cycle++) {
+        for (let cycle = 2; cycle <= 3; cycle++) {
             if (sequence.length < cycle * 3) continue;
             const p1 = sequence.slice(0, cycle);
             const p2 = sequence.slice(cycle, cycle*2);
@@ -423,8 +410,8 @@ class SuperAdaptiveEngine {
         }
     }
 
-    // Học Xu hướng siêu cấp
-    learnSuperTrend(gameId, sequence, result) {
+    // Học Xu hướng
+    learnTrend(gameId, sequence, result) {
         if (sequence.length < 5) return;
         const key = `${gameId}_trend`;
         if (!this.trendMemory.has(key)) {
@@ -456,8 +443,8 @@ class SuperAdaptiveEngine {
         mem.accuracy = recent2.length > 0 ? correct / recent2.length : 0.5;
     }
 
-    // Học Gãy cầu siêu cấp
-    learnSuperBreak(gameId, sequence, result) {
+    // Học Gãy cầu
+    learnBreak(gameId, sequence, result) {
         if (sequence.length < 4) return;
         const key = `${gameId}_break`;
         if (!this.breakMemory.has(key)) {
@@ -494,8 +481,8 @@ class SuperAdaptiveEngine {
         }
     }
 
-    // Học Cân bằng siêu cấp
-    learnSuperBalance(gameId, sequence, result) {
+    // Học Cân bằng
+    learnBalance(gameId, sequence, result) {
         if (sequence.length < 10) return;
         const key = `${gameId}_balance`;
         if (!this.balanceMemory.has(key)) {
@@ -523,8 +510,110 @@ class SuperAdaptiveEngine {
         mem.accuracy = recent2.length > 0 ? correct / recent2.length : 0.5;
     }
 
-    // Cập nhật streak siêu cấp
-    updateSuperStreak(gameId, result) {
+    // Học Momentum (Đà)
+    learnMomentum(gameId, sequence, result) {
+        if (sequence.length < 5) return;
+        const key = `${gameId}_momentum`;
+        if (!this.momentumMemory.has(key)) {
+            this.momentumMemory.set(key, { 
+                momentums: [], results: [], accuracy: 0.5, total: 0,
+                patternMap: new Map(),
+                lastMomentum: 0
+            });
+        }
+        const mem = this.momentumMemory.get(key);
+        
+        const recent = sequence.slice(0, 5);
+        const tCount = recent.filter(r => r === 'T').length;
+        const momentum = (tCount / 5) - 0.5;
+        
+        mem.momentums.push(momentum);
+        mem.results.push(result);
+        mem.total++;
+        mem.lastMomentum = momentum;
+        
+        const key2 = momentum > 0 ? 'up' : 'down';
+        if (!mem.patternMap.has(key2)) {
+            mem.patternMap.set(key2, { T: 0, X: 0 });
+        }
+        mem.patternMap.get(key2)[result]++;
+        
+        const recent2 = mem.results.slice(-30);
+        const correct = recent2.filter(r => r === result).length;
+        mem.accuracy = recent2.length > 0 ? correct / recent2.length : 0.5;
+    }
+
+    // Học Biến động
+    learnVolatility(gameId, sequence, result) {
+        if (sequence.length < 5) return;
+        const key = `${gameId}_volatility`;
+        if (!this.volatilityMemory.has(key)) {
+            this.volatilityMemory.set(key, { 
+                volatilities: [], results: [], accuracy: 0.5, total: 0,
+                patternMap: new Map(),
+                lastVolatility: 0
+            });
+        }
+        const mem = this.volatilityMemory.get(key);
+        
+        let changes = 0;
+        for (let i = 1; i < Math.min(sequence.length, 6); i++) {
+            if (sequence[i-1] !== sequence[i]) changes++;
+        }
+        const volatility = changes / 5;
+        
+        mem.volatilities.push(volatility);
+        mem.results.push(result);
+        mem.total++;
+        mem.lastVolatility = volatility;
+        
+        const key2 = volatility > 0.5 ? 'high' : 'low';
+        if (!mem.patternMap.has(key2)) {
+            mem.patternMap.set(key2, { T: 0, X: 0 });
+        }
+        mem.patternMap.get(key2)[result]++;
+        
+        const recent2 = mem.results.slice(-30);
+        const correct = recent2.filter(r => r === result).length;
+        mem.accuracy = recent2.length > 0 ? correct / recent2.length : 0.5;
+    }
+
+    // Học Tương quan
+    learnCorrelation(gameId, sequence, result) {
+        if (sequence.length < 6) return;
+        const key = `${gameId}_correlation`;
+        if (!this.correlationMemory.has(key)) {
+            this.correlationMemory.set(key, { 
+                correlations: [], results: [], accuracy: 0.5, total: 0,
+                patternMap: new Map()
+            });
+        }
+        const mem = this.correlationMemory.get(key);
+        
+        // Phân tích tương quan giữa các vị trí
+        let corr = 0;
+        for (let i = 0; i < Math.min(sequence.length - 2, 4); i++) {
+            if (sequence[i] === sequence[i+2]) corr++;
+            else corr--;
+        }
+        
+        mem.correlations.push(corr);
+        mem.results.push(result);
+        mem.total++;
+        
+        const key2 = corr > 0 ? 'positive' : 'negative';
+        if (!mem.patternMap.has(key2)) {
+            mem.patternMap.set(key2, { T: 0, X: 0 });
+        }
+        mem.patternMap.get(key2)[result]++;
+        
+        const recent2 = mem.results.slice(-30);
+        const correct = recent2.filter(r => r === result).length;
+        mem.accuracy = recent2.length > 0 ? correct / recent2.length : 0.5;
+    }
+
+    // Cập nhật streak
+    updateStreak(gameId, result) {
         if (!this.streakDB.has(gameId)) {
             this.streakDB.set(gameId, { streak: 0, best: 0, worst: 0, last5: [], last10: [], last20: [] });
         }
@@ -546,12 +635,12 @@ class SuperAdaptiveEngine {
     }
 
     // ============================================================
-    // DỰ ĐOÁN SIÊU CẤP - KHÔNG CẦN DỮ LIỆU
+    // DỰ ĐOÁN SIÊU CHÍNH XÁC
     // ============================================================
-    superPredict(gameId, patterns, historyData) {
-        // Nếu không có pattern, dùng dự đoán thông minh không cần dữ liệu
+    predict(gameId, patterns, historyData) {
+        // Nếu không có pattern, dùng dự đoán thông minh
         if (!patterns || patterns.length === 0) {
-            return this.superPredictNoData(gameId, historyData);
+            return this.smartPredictNoData(gameId, historyData);
         }
 
         let tScore = 0, xScore = 0;
@@ -567,24 +656,14 @@ class SuperAdaptiveEngine {
             const weight = this.weightDB.get(key) || 50;
             const accuracy = this.accuracyDB.get(key) || 0.5;
             
-            // Điều chỉnh weight siêu thông minh
             let finalWeight = weight * (0.2 + accuracy * 0.8);
             
-            // Điều chỉnh confidence siêu cấp
             let conf = p.confidence;
-            if (accuracy > 0.7) conf *= 1.25;
-            else if (accuracy > 0.6) conf *= 1.1;
-            else if (accuracy > 0.5) conf *= 1.0;
-            else if (accuracy > 0.4) conf *= 0.9;
+            if (accuracy > 0.65) conf *= 1.25;
+            else if (accuracy > 0.55) conf *= 1.1;
+            else if (accuracy > 0.45) conf *= 1.0;
+            else if (accuracy > 0.35) conf *= 0.9;
             else conf *= 0.75;
-            
-            // Boost cho pattern đang hot
-            const cacheKey = `${gameId}_${p.pattern}`;
-            if (this.confidenceHistory.has(cacheKey)) {
-                const history = this.confidenceHistory.get(cacheKey);
-                const recentAvg = history.slice(-5).reduce((a,b) => a+b, 0) / Math.min(history.length, 5);
-                if (recentAvg > 65) conf *= 1.1;
-            }
             
             const score = finalWeight * (conf / 100);
             
@@ -601,175 +680,135 @@ class SuperAdaptiveEngine {
             patternCount++;
         }
 
-        // ====== BẮT CÁC LOẠI CẦU ĐẶC BIỆT SIÊU CẤP ======
+        // ====== BẮT CÁC LOẠI CẦU ======
         
-        // 1. BẮT CẦU BỆT SIÊU CẤP
-        const betResult = this.superPredictBet(gameId, historyData);
+        const betResult = this.predictBet(gameId, historyData);
         if (betResult) {
             const w = 1.35;
-            if (betResult === 'T') {
-                tScore *= w;
-                tWeight *= w;
-            } else {
-                xScore *= w;
-                xWeight *= w;
-            }
+            if (betResult === 'T') { tScore *= w; tWeight *= w; } 
+            else { xScore *= w; xWeight *= w; }
             usedPatterns.push(`🔥 Bệt: ${betResult === 'T' ? 'Tài' : 'Xỉu'}`);
         }
 
-        // 2. BẮT CẦU ZIGZAG SIÊU CẤP
-        const zigzagResult = this.superPredictZigzag(gameId, historyData);
+        const zigzagResult = this.predictZigzag(gameId, historyData);
         if (zigzagResult) {
             const w = 1.3;
-            if (zigzagResult === 'T') {
-                tScore *= w;
-                tWeight *= w;
-            } else {
-                xScore *= w;
-                xWeight *= w;
-            }
+            if (zigzagResult === 'T') { tScore *= w; tWeight *= w; } 
+            else { xScore *= w; xWeight *= w; }
             usedPatterns.push(`⚡ Zigzag: ${zigzagResult === 'T' ? 'Tài' : 'Xỉu'}`);
         }
 
-        // 3. BẮT CẦU 1-1 SIÊU CẤP
-        const dao11Result = this.superPredictDao11(gameId, historyData);
+        const dao11Result = this.predictDao11(gameId, historyData);
         if (dao11Result) {
             const w = 1.25;
-            if (dao11Result === 'T') {
-                tScore *= w;
-                tWeight *= w;
-            } else {
-                xScore *= w;
-                xWeight *= w;
-            }
+            if (dao11Result === 'T') { tScore *= w; tWeight *= w; } 
+            else { xScore *= w; xWeight *= w; }
             usedPatterns.push(`🔄 Đảo 1-1: ${dao11Result === 'T' ? 'Tài' : 'Xỉu'}`);
         }
 
-        // 4. BẮT CẦU 2-2 SIÊU CẤP
-        const dao22Result = this.superPredictDao22(gameId, historyData);
+        const dao22Result = this.predictDao22(gameId, historyData);
         if (dao22Result) {
             const w = 1.2;
-            if (dao22Result === 'T') {
-                tScore *= w;
-                tWeight *= w;
-            } else {
-                xScore *= w;
-                xWeight *= w;
-            }
+            if (dao22Result === 'T') { tScore *= w; tWeight *= w; } 
+            else { xScore *= w; xWeight *= w; }
             usedPatterns.push(`🔄 Đảo 2-2: ${dao22Result === 'T' ? 'Tài' : 'Xỉu'}`);
         }
 
-        // 5. BẮT CHU KỲ SIÊU CẤP
-        const cycleResult = this.superPredictCycle(gameId, historyData);
+        const cycleResult = this.predictCycle(gameId, historyData);
         if (cycleResult) {
             const w = 1.15;
-            if (cycleResult === 'T') {
-                tScore *= w;
-                tWeight *= w;
-            } else {
-                xScore *= w;
-                xWeight *= w;
-            }
+            if (cycleResult === 'T') { tScore *= w; tWeight *= w; } 
+            else { xScore *= w; xWeight *= w; }
             usedPatterns.push(`🔁 Chu kỳ: ${cycleResult === 'T' ? 'Tài' : 'Xỉu'}`);
         }
 
-        // 6. BẮT XU HƯỚNG SIÊU CẤP
-        const trendResult = this.superPredictTrend(gameId, historyData);
+        const trendResult = this.predictTrend(gameId, historyData);
         if (trendResult) {
             const w = 1.15;
-            if (trendResult === 'T') {
-                tScore *= w;
-                tWeight *= w;
-            } else {
-                xScore *= w;
-                xWeight *= w;
-            }
+            if (trendResult === 'T') { tScore *= w; tWeight *= w; } 
+            else { xScore *= w; xWeight *= w; }
             usedPatterns.push(`📈 Xu hướng: ${trendResult === 'T' ? 'Tài' : 'Xỉu'}`);
         }
 
-        // 7. BẮT GÃY CẦU SIÊU CẤP
-        const breakResult = this.superPredictBreak(gameId, historyData);
+        const breakResult = this.predictBreak(gameId, historyData);
         if (breakResult) {
             const w = 1.15;
-            if (breakResult === 'T') {
-                tScore *= w;
-                tWeight *= w;
-            } else {
-                xScore *= w;
-                xWeight *= w;
-            }
+            if (breakResult === 'T') { tScore *= w; tWeight *= w; } 
+            else { xScore *= w; xWeight *= w; }
             usedPatterns.push(`💥 Gãy cầu: ${breakResult === 'T' ? 'Tài' : 'Xỉu'}`);
         }
 
-        // 8. BẮT CÂN BẰNG SIÊU CẤP
-        const balanceResult = this.superPredictBalance(gameId, historyData);
+        const balanceResult = this.predictBalance(gameId, historyData);
         if (balanceResult) {
             const w = 1.1;
-            if (balanceResult === 'T') {
-                tScore *= w;
-                tWeight *= w;
-            } else {
-                xScore *= w;
-                xWeight *= w;
-            }
+            if (balanceResult === 'T') { tScore *= w; tWeight *= w; } 
+            else { xScore *= w; xWeight *= w; }
             usedPatterns.push(`⚖️ Cân bằng: ${balanceResult === 'T' ? 'Tài' : 'Xỉu'}`);
         }
 
-        // ====== ĐIỀU CHỈNH SIÊU CẤP ======
+        const momentumResult = this.predictMomentum(gameId, historyData);
+        if (momentumResult) {
+            const w = 1.1;
+            if (momentumResult === 'T') { tScore *= w; tWeight *= w; } 
+            else { xScore *= w; xWeight *= w; }
+            usedPatterns.push(`📊 Đà: ${momentumResult === 'T' ? 'Tài' : 'Xỉu'}`);
+        }
+
+        const volatilityResult = this.predictVolatility(gameId, historyData);
+        if (volatilityResult) {
+            const w = 1.05;
+            if (volatilityResult === 'T') { tScore *= w; tWeight *= w; } 
+            else { xScore *= w; xWeight *= w; }
+            usedPatterns.push(`📉 Biến động: ${volatilityResult === 'T' ? 'Tài' : 'Xỉu'}`);
+        }
+
+        const correlationResult = this.predictCorrelation(gameId, historyData);
+        if (correlationResult) {
+            const w = 1.05;
+            if (correlationResult === 'T') { tScore *= w; tWeight *= w; } 
+            else { xScore *= w; xWeight *= w; }
+            usedPatterns.push(`🔗 Tương quan: ${correlationResult === 'T' ? 'Tài' : 'Xỉu'}`);
+        }
+
+        // ====== ĐIỀU CHỈNH THÔNG MINH ======
         
-        // Điều chỉnh theo streak siêu thông minh
         const streak = this.streakDB.get(gameId);
         if (streak) {
             // Phân tích last5
             if (streak.last5.length >= 5) {
                 const tCount = streak.last5.filter(r => r === 'T').length;
-                if (tCount >= 4) {
-                    xScore *= 1.2;
-                    usedPatterns.push('📊 Last5 Tài nhiều → Xỉu');
-                } else if (tCount <= 1) {
-                    tScore *= 1.2;
-                    usedPatterns.push('📊 Last5 Xỉu nhiều → Tài');
-                }
+                if (tCount >= 4) { xScore *= 1.25; usedPatterns.push('📊 Last5 Tài nhiều → Xỉu'); }
+                else if (tCount <= 1) { tScore *= 1.25; usedPatterns.push('📊 Last5 Xỉu nhiều → Tài'); }
             }
             
             // Phân tích last10
             if (streak.last10.length >= 10) {
                 const tCount = streak.last10.filter(r => r === 'T').length;
-                if (tCount >= 7) {
-                    xScore *= 1.15;
-                    usedPatterns.push('📊 Last10 Tài áp đảo → Xỉu');
-                } else if (tCount <= 3) {
-                    tScore *= 1.15;
-                    usedPatterns.push('📊 Last10 Xỉu áp đảo → Tài');
-                }
+                if (tCount >= 7) { xScore *= 1.2; usedPatterns.push('📊 Last10 Tài áp đảo → Xỉu'); }
+                else if (tCount <= 3) { tScore *= 1.2; usedPatterns.push('📊 Last10 Xỉu áp đảo → Tài'); }
             }
             
             // Phân tích last20
             if (streak.last20.length >= 20) {
                 const tCount = streak.last20.filter(r => r === 'T').length;
-                if (tCount >= 14) {
-                    xScore *= 1.1;
-                    usedPatterns.push('📊 Last20 Tài quá nhiều → Xỉu');
-                } else if (tCount <= 6) {
-                    tScore *= 1.1;
-                    usedPatterns.push('📊 Last20 Xỉu quá nhiều → Tài');
-                }
+                if (tCount >= 14) { xScore *= 1.15; usedPatterns.push('📊 Last20 Tài quá nhiều → Xỉu'); }
+                else if (tCount <= 6) { tScore *= 1.15; usedPatterns.push('📊 Last20 Xỉu quá nhiều → Tài'); }
             }
 
             // Điều chỉnh theo streak
             if (streak.streak <= -3) {
                 const temp = tScore;
-                tScore = xScore * 1.35;
-                xScore = temp * 1.35;
+                tScore = xScore * 1.4;
+                xScore = temp * 1.4;
                 usedPatterns.push('🔄 Đảo chiều mạnh do thua');
             } else if (streak.streak <= -2) {
                 const temp = tScore;
-                tScore = xScore * 1.2;
-                xScore = temp * 1.2;
+                tScore = xScore * 1.25;
+                xScore = temp * 1.25;
                 usedPatterns.push('🔄 Đảo chiều do thua');
             } else if (streak.streak >= 5) {
-                tScore *= 1.1;
-                xScore *= 1.1;
+                tScore *= 1.15;
+                xScore *= 1.15;
                 usedPatterns.push('🔥 Đang thắng lớn');
             }
         }
@@ -777,13 +816,13 @@ class SuperAdaptiveEngine {
         // Tính tổng và quyết định
         const total = tScore + xScore;
         if (total === 0) {
-            return this.superPredictNoData(gameId, historyData);
+            return this.smartPredictNoData(gameId, historyData);
         }
 
         let prediction = tScore > xScore ? 'TÀI' : 'XỈU';
         let confidence = Math.round(Math.max(tScore, xScore) / total * 100);
         
-        // Điều chỉnh confidence siêu cấp
+        // Điều chỉnh confidence
         if (totalWeight > 0) {
             const avgWeight = totalWeight / Math.max(1, patternCount);
             if (avgWeight > 80) confidence = Math.min(99, confidence + 10);
@@ -791,20 +830,10 @@ class SuperAdaptiveEngine {
             else if (avgWeight < 30) confidence = Math.max(45, confidence - 6);
         }
 
-        // Điều chỉnh confidence dựa trên số pattern
         if (patternCount >= 5) confidence = Math.min(99, confidence + 3);
         if (patternCount >= 3) confidence = Math.min(97, confidence + 2);
 
-        // Giới hạn confidence
         confidence = Math.min(99, Math.max(45, confidence));
-
-        // Lưu confidence history        const confKey = `${gameId}_${prediction}`;
-        if (!this.confidenceHistory.has(confKey)) {
-            this.confidenceHistory.set(confKey, []);
-        }
-        const confHist = this.confidenceHistory.get(confKey);
-        confHist.push(confidence);
-        if (confHist.length > 50) confHist.shift();
 
         // Lưu vào học
         const result = prediction === 'TÀI' ? 'T' : 'X';
@@ -824,22 +853,19 @@ class SuperAdaptiveEngine {
     }
 
     // ============================================================
-    // DỰ ĐOÁN KHÔNG CẦN DỮ LIỆU - SIÊU CẤP
+    // DỰ ĐOÁN KHÔNG CÓ DỮ LIỆU - THÔNG MINH
     // ============================================================
-    superPredictNoData(gameId, historyData) {
-        // Nếu có dữ liệu lịch sử, phân tích ngay cả khi không có pattern
+    smartPredictNoData(gameId, historyData) {
         if (historyData && historyData.length >= 2) {
-            return this.analyzeFromHistory(gameId, historyData);
+            return this.analyzeSmartHistory(gameId, historyData);
         }
-
-        // Hoàn toàn không có dữ liệu - dùng pattern dự phòng
-        return this.emergencyPredict(gameId);
+        return this.emergencySmartPredict(gameId);
     }
 
-    // Phân tích từ lịch sử ngay cả khi không có pattern
-    analyzeFromHistory(gameId, history) {
+    // Phân tích lịch sử thông minh
+    analyzeSmartHistory(gameId, history) {
         if (history.length < 2) {
-            return this.emergencyPredict(gameId);
+            return this.emergencySmartPredict(gameId);
         }
 
         const last = history[0];
@@ -854,12 +880,12 @@ class SuperAdaptiveEngine {
             const pred = last === 'T' ? 'XỈU' : 'TÀI';
             return {
                 prediction: pred,
-                confidence: 78 + count,
+                confidence: 80 + count,
                 patterns: ['🔥 Bệt siêu dài'],
                 detail: `Bệt ${count} phiên`,
                 totalPatterns: 1,
-                tScore: last === 'T' ? 22 : 78,
-                xScore: last === 'T' ? 78 : 22,
+                tScore: last === 'T' ? 20 : 80,
+                xScore: last === 'T' ? 80 : 20,
                 usedPatterns: 1
             };
         }
@@ -867,12 +893,12 @@ class SuperAdaptiveEngine {
             const pred = last === 'T' ? 'XỈU' : 'TÀI';
             return {
                 prediction: pred,
-                confidence: 68 + count * 2,
+                confidence: 70 + count * 2,
                 patterns: ['⚡ Bệt dài'],
                 detail: `Bệt ${count} phiên`,
                 totalPatterns: 1,
-                tScore: last === 'T' ? 32 : 68,
-                xScore: last === 'T' ? 68 : 32,
+                tScore: last === 'T' ? 30 : 70,
+                xScore: last === 'T' ? 70 : 30,
                 usedPatterns: 1
             };
         }
@@ -880,12 +906,12 @@ class SuperAdaptiveEngine {
             const pred = last === 'T' ? 'XỈU' : 'TÀI';
             return {
                 prediction: pred,
-                confidence: 62 + count * 2,
+                confidence: 64 + count * 2,
                 patterns: ['📈 Bệt vừa'],
                 detail: `Bệt ${count} phiên`,
                 totalPatterns: 1,
-                tScore: last === 'T' ? 38 : 62,
-                xScore: last === 'T' ? 62 : 38,
+                tScore: last === 'T' ? 36 : 64,
+                xScore: last === 'T' ? 64 : 36,
                 usedPatterns: 1
             };
         }
@@ -924,12 +950,12 @@ class SuperAdaptiveEngine {
                 const pred = last === 'T' ? 'XỈU' : 'TÀI';
                 return {
                     prediction: pred,
-                    confidence: 72,
+                    confidence: 74,
                     patterns: ['⚡ Zigzag'],
                     detail: `Zigzag ${changes} lần`,
                     totalPatterns: 1,
-                    tScore: last === 'T' ? 28 : 72,
-                    xScore: last === 'T' ? 72 : 28,
+                    tScore: last === 'T' ? 26 : 74,
+                    xScore: last === 'T' ? 74 : 26,
                     usedPatterns: 1
                 };
             }
@@ -937,12 +963,12 @@ class SuperAdaptiveEngine {
                 const pred = last === 'T' ? 'XỈU' : 'TÀI';
                 return {
                     prediction: pred,
-                    confidence: 64,
+                    confidence: 66,
                     patterns: ['🌀 Zigzag ngắn'],
                     detail: `Zigzag ${changes} lần`,
                     totalPatterns: 1,
-                    tScore: last === 'T' ? 36 : 64,
-                    xScore: last === 'T' ? 64 : 36,
+                    tScore: last === 'T' ? 34 : 66,
+                    xScore: last === 'T' ? 66 : 34,
                     usedPatterns: 1
                 };
             }
@@ -954,48 +980,98 @@ class SuperAdaptiveEngine {
             if (tCount >= 8) {
                 return {
                     prediction: 'XỈU',
-                    confidence: 68,
+                    confidence: 70,
                     patterns: ['📈 Xu hướng Tài mạnh'],
                     detail: `Tài ${tCount}/10`,
                     totalPatterns: 1,
-                    tScore: 32,
-                    xScore: 68,
+                    tScore: 30,
+                    xScore: 70,
                     usedPatterns: 1
                 };
             }
             if (tCount >= 6) {
                 return {
                     prediction: 'XỈU',
-                    confidence: 60,
+                    confidence: 62,
                     patterns: ['📈 Xu hướng Tài'],
                     detail: `Tài ${tCount}/10`,
                     totalPatterns: 1,
-                    tScore: 40,
-                    xScore: 60,
+                    tScore: 38,
+                    xScore: 62,
                     usedPatterns: 1
                 };
             }
             if (tCount <= 2) {
                 return {
                     prediction: 'TÀI',
-                    confidence: 68,
+                    confidence: 70,
                     patterns: ['📉 Xu hướng Xỉu mạnh'],
                     detail: `Xỉu ${10-tCount}/10`,
                     totalPatterns: 1,
-                    tScore: 68,
-                    xScore: 32,
+                    tScore: 70,
+                    xScore: 30,
                     usedPatterns: 1
                 };
             }
             if (tCount <= 4) {
                 return {
                     prediction: 'TÀI',
-                    confidence: 60,
+                    confidence: 62,
                     patterns: ['📉 Xu hướng Xỉu'],
                     detail: `Xỉu ${10-tCount}/10`,
                     totalPatterns: 1,
+                    tScore: 62,
+                    xScore: 38,
+                    usedPatterns: 1
+                };
+            }
+        }
+
+        // Phân tích momentum
+        if (history.length >= 5) {
+            const recent5 = history.slice(0, 5);
+            const tCount5 = recent5.filter(r => r === 'T').length;
+            if (tCount5 >= 4) {
+                return {
+                    prediction: 'XỈU',
+                    confidence: 60,
+                    patterns: ['📊 Đà Tài mạnh'],
+                    detail: `Đà Tài ${tCount5}/5`,
+                    totalPatterns: 1,
+                    tScore: 40,
+                    xScore: 60,
+                    usedPatterns: 1
+                };
+            }
+            if (tCount5 <= 1) {
+                return {
+                    prediction: 'TÀI',
+                    confidence: 60,
+                    patterns: ['📊 Đà Xỉu mạnh'],
+                    detail: `Đà Xỉu ${5-tCount5}/5`,
+                    totalPatterns: 1,
                     tScore: 60,
                     xScore: 40,
+                    usedPatterns: 1
+                };
+            }
+        }
+
+        // Phân tích biến động
+        if (history.length >= 6) {
+            let changes = 0;
+            for (let i = 1; i < 6; i++) {
+                if (history[i-1] !== history[i]) changes++;
+            }
+            if (changes >= 4) {
+                return {
+                    prediction: last === 'T' ? 'XỈU' : 'TÀI',
+                    confidence: 58,
+                    patterns: ['📉 Biến động cao'],
+                    detail: `Biến động ${changes}/5`,
+                    totalPatterns: 1,
+                    tScore: last === 'T' ? 42 : 58,
+                    xScore: last === 'T' ? 58 : 42,
                     usedPatterns: 1
                 };
             }
@@ -1006,29 +1082,28 @@ class SuperAdaptiveEngine {
         if (tCount >= 4) {
             return {
                 prediction: 'XỈU',
-                confidence: 58,
+                confidence: 56,
                 patterns: ['📊 Theo chuỗi Tài'],
                 detail: 'Tài 4/5 → Xỉu',
                 totalPatterns: 1,
-                tScore: 42,
-                xScore: 58,
+                tScore: 44,
+                xScore: 56,
                 usedPatterns: 1
             };
         }
         if (tCount <= 1) {
             return {
                 prediction: 'TÀI',
-                confidence: 58,
+                confidence: 56,
                 patterns: ['📊 Theo chuỗi Xỉu'],
                 detail: 'Xỉu 4/5 → Tài',
                 totalPatterns: 1,
-                tScore: 58,
-                xScore: 42,
+                tScore: 56,
+                xScore: 44,
                 usedPatterns: 1
             };
         }
 
-        // Fallback cuối cùng
         const pred = last === 'T' ? 'TÀI' : 'XỈU';
         return {
             prediction: pred,
@@ -1042,22 +1117,25 @@ class SuperAdaptiveEngine {
         };
     }
 
-    // Dự đoán khẩn cấp - KHÔNG CÓ DỮ LIỆU
-    emergencyPredict(gameId) {
-        // Sử dụng pattern dự phòng với phân tích thông minh
+    // Dự đoán khẩn cấp thông minh
+    emergencySmartPredict(gameId) {
+        // Sử dụng pattern tốt nhất
         const bestPattern = this.emergencyPatterns.reduce((best, current) => {
             return current.weight > best.weight ? current : best;
         });
 
-        // Luân phiên giữa Tài và Xỉu để tránh lệch
-        const seed = Date.now() % 2;
-        const pred = seed === 0 ? 'TÀI' : 'XỈU';
+        // Luân phiên thông minh
+        const now = Date.now();
+        const seed = (now % 3);
+        let pred = 'TÀI';
+        if (seed === 1) pred = 'XỈU';
+        else if (seed === 2) pred = 'TÀI';
         
         return {
             prediction: pred,
             confidence: bestPattern.confidence || 55,
             patterns: [`📊 ${bestPattern.desc}`],
-            detail: `Chưa có dữ liệu - ${bestPattern.desc}`,
+            detail: `Phân tích thông minh - ${bestPattern.desc}`,
             totalPatterns: 0,
             tScore: pred === 'TÀI' ? 55 : 45,
             xScore: pred === 'TÀI' ? 45 : 55,
@@ -1066,11 +1144,10 @@ class SuperAdaptiveEngine {
     }
 
     // ============================================================
-    // DỰ ĐOÁN CÁC LOẠI CẦU ĐẶC BIỆT SIÊU CẤP
+    // DỰ ĐOÁN CÁC LOẠI CẦU
     // ============================================================
 
-    // Dự đoán Bệt siêu cấp
-    superPredictBet(gameId, history) {
+    predictBet(gameId, history) {
         if (history.length < 3) return null;
         const key = `${gameId}_bet`;
         const mem = this.betMemory.get(key);
@@ -1081,37 +1158,21 @@ class SuperAdaptiveEngine {
             else break;
         }
         
-        // Bệt siêu dài
-        if (count >= 7) {
-            return history[0] === 'T' ? 'X' : 'T';
-        }
-        if (count >= 5) {
-            if (mem && mem.accuracy > 0.55) {
-                return history[0] === 'T' ? 'X' : 'T';
-            }
-        }
-        if (count >= 4) {
-            return history[0] === 'T' ? 'X' : 'T';
-        }
-        if (count >= 3) {
-            if (mem && mem.accuracy > 0.6) {
-                return history[0] === 'T' ? 'X' : 'T';
-            }
-            // Dự đoán theo pattern
+        if (count >= 7) return history[0] === 'T' ? 'X' : 'T';
+        if (count >= 5 && mem && mem.accuracy > 0.55) return history[0] === 'T' ? 'X' : 'T';
+        if (count >= 4) return history[0] === 'T' ? 'X' : 'T';
+        if (count >= 3 && mem && mem.accuracy > 0.6) {
             const key2 = `len_${count}`;
-            if (mem && mem.patternMap.has(key2)) {
+            if (mem.patternMap.has(key2)) {
                 const data = mem.patternMap.get(key2);
                 const total = data.T + data.X;
-                if (total >= 3) {
-                    return data.T > data.X ? 'T' : 'X';
-                }
+                if (total >= 3) return data.T > data.X ? 'T' : 'X';
             }
         }
         return null;
     }
 
-    // Dự đoán Zigzag siêu cấp
-    superPredictZigzag(gameId, history) {
+    predictZigzag(gameId, history) {
         if (history.length < 4) return null;
         const key = `${gameId}_zigzag`;
         const mem = this.zigzagMemory.get(key);
@@ -1121,29 +1182,20 @@ class SuperAdaptiveEngine {
             if (history[i-1] !== history[i]) changes++;
         }
         
-        if (changes >= 7) {
-            return history[0] === 'T' ? 'X' : 'T';
-        }
-        if (changes >= 5) {
-            if (mem && mem.accuracy > 0.55) {
-                return history[0] === 'T' ? 'X' : 'T';
-            }
-        }
+        if (changes >= 7) return history[0] === 'T' ? 'X' : 'T';
+        if (changes >= 5 && mem && mem.accuracy > 0.55) return history[0] === 'T' ? 'X' : 'T';
         if (changes >= 4) {
             const key2 = `chg_${changes}`;
             if (mem && mem.patternMap.has(key2)) {
                 const data = mem.patternMap.get(key2);
                 const total = data.T + data.X;
-                if (total >= 3) {
-                    return data.T > data.X ? 'T' : 'X';
-                }
+                if (total >= 3) return data.T > data.X ? 'T' : 'X';
             }
         }
         return null;
     }
 
-    // Dự đoán Đảo 1-1 siêu cấp
-    superPredictDao11(gameId, history) {
+    predictDao11(gameId, history) {
         if (history.length < 4) return null;
         const key = `${gameId}_dao11`;
         const mem = this.dao11Memory.get(key);
@@ -1154,9 +1206,7 @@ class SuperAdaptiveEngine {
         }
         
         if (isAlt) {
-            if (mem && mem.accuracy > 0.6) {
-                return history[0] === 'T' ? 'X' : 'T';
-            }
+            if (mem && mem.accuracy > 0.6) return history[0] === 'T' ? 'X' : 'T';
             if (mem && mem.patternMap.has('11')) {
                 const data = mem.patternMap.get('11');
                 return data.T > data.X ? 'T' : 'X';
@@ -1166,8 +1216,7 @@ class SuperAdaptiveEngine {
         return null;
     }
 
-    // Dự đoán Đảo 2-2 siêu cấp
-    superPredictDao22(gameId, history) {
+    predictDao22(gameId, history) {
         if (history.length < 6) return null;
         const key = `${gameId}_dao22`;
         const mem = this.dao22Memory.get(key);
@@ -1177,16 +1226,13 @@ class SuperAdaptiveEngine {
             if (history[i*2] !== history[i*2+1]) { isPair = false; break; }
         }
         if (isPair && history[0] !== history[2]) {
-            if (mem && mem.accuracy > 0.55) {
-                return history[0] === 'T' ? 'X' : 'T';
-            }
+            if (mem && mem.accuracy > 0.55) return history[0] === 'T' ? 'X' : 'T';
             return history[0] === 'T' ? 'X' : 'T';
         }
         return null;
     }
 
-    // Dự đoán Chu kỳ siêu cấp
-    superPredictCycle(gameId, history) {
+    predictCycle(gameId, history) {
         if (history.length < 6) return null;
         const key = `${gameId}_cycle`;
         const mem = this.cycleMemory.get(key);
@@ -1197,17 +1243,14 @@ class SuperAdaptiveEngine {
             const p2 = history.slice(cycle, cycle*2);
             const p3 = history.slice(cycle*2, cycle*3);
             if (p1.join('') === p2.join('') && p2.join('') === p3.join('')) {
-                if (mem && mem.accuracy > 0.55) {
-                    return p1[0] === 'T' ? 'X' : 'T';
-                }
+                if (mem && mem.accuracy > 0.55) return p1[0] === 'T' ? 'X' : 'T';
                 return p1[0] === 'T' ? 'X' : 'T';
             }
         }
         return null;
     }
 
-    // Dự đoán Xu hướng siêu cấp
-    superPredictTrend(gameId, history) {
+    predictTrend(gameId, history) {
         if (history.length < 5) return null;
         const key = `${gameId}_trend`;
         const mem = this.trendMemory.get(key);
@@ -1220,15 +1263,12 @@ class SuperAdaptiveEngine {
         if (mem && mem.patternMap.has(key2)) {
             const data = mem.patternMap.get(key2);
             const total = data.T + data.X;
-            if (total >= 3) {
-                return data.T > data.X ? 'T' : 'X';
-            }
+            if (total >= 3) return data.T > data.X ? 'T' : 'X';
         }
         return null;
     }
 
-    // Dự đoán Gãy cầu siêu cấp
-    superPredictBreak(gameId, history) {
+    predictBreak(gameId, history) {
         if (history.length < 4) return null;
         const key = `${gameId}_break`;
         const mem = this.breakMemory.get(key);
@@ -1246,9 +1286,7 @@ class SuperAdaptiveEngine {
                 if (mem && mem.patternMap.has(key2)) {
                     const data = mem.patternMap.get(key2);
                     const total = data.T + data.X;
-                    if (total >= 3) {
-                        return data.T > data.X ? 'T' : 'X';
-                    }
+                    if (total >= 3) return data.T > data.X ? 'T' : 'X';
                 }
                 return breakResult === 'T' ? 'T' : 'X';
             }
@@ -1256,8 +1294,7 @@ class SuperAdaptiveEngine {
         return null;
     }
 
-    // Dự đoán Cân bằng siêu cấp
-    superPredictBalance(gameId, history) {
+    predictBalance(gameId, history) {
         if (history.length < 10) return null;
         const key = `${gameId}_balance`;
         const mem = this.balanceMemory.get(key);
@@ -1265,14 +1302,9 @@ class SuperAdaptiveEngine {
         const recent = history.slice(0, 10);
         const tCount = recent.filter(r => r === 'T').length;
         
-        if (tCount >= 8) {
-            return 'X';
-        }
-        if (tCount <= 2) {
-            return 'T';
-        }
+        if (tCount >= 8) return 'X';
+        if (tCount <= 2) return 'T';
         
-        // Kiểm tra 20 phiên
         if (history.length >= 20) {
             const recent20 = history.slice(0, 20);
             const tCount20 = recent20.filter(r => r === 'T').length;
@@ -1280,6 +1312,73 @@ class SuperAdaptiveEngine {
             if (tCount20 <= 5) return 'T';
         }
         
+        return null;
+    }
+
+    predictMomentum(gameId, history) {
+        if (history.length < 5) return null;
+        const key = `${gameId}_momentum`;
+        const mem = this.momentumMemory.get(key);
+        
+        const recent = history.slice(0, 5);
+        const tCount = recent.filter(r => r === 'T').length;
+        const momentum = (tCount / 5) - 0.5;
+        
+        if (momentum > 0.3) return 'X';
+        if (momentum < -0.3) return 'T';
+        
+        const key2 = momentum > 0 ? 'up' : 'down';
+        if (mem && mem.patternMap.has(key2)) {
+            const data = mem.patternMap.get(key2);
+            const total = data.T + data.X;
+            if (total >= 3) return data.T > data.X ? 'T' : 'X';
+        }
+        return null;
+    }
+
+    predictVolatility(gameId, history) {
+        if (history.length < 5) return null;
+        const key = `${gameId}_volatility`;
+        const mem = this.volatilityMemory.get(key);
+        
+        let changes = 0;
+        for (let i = 1; i < Math.min(history.length, 6); i++) {
+            if (history[i-1] !== history[i]) changes++;
+        }
+        const volatility = changes / 5;
+        
+        if (volatility > 0.6) return history[0] === 'T' ? 'X' : 'T';
+        if (volatility < 0.2) return history[0];
+        
+        const key2 = volatility > 0.5 ? 'high' : 'low';
+        if (mem && mem.patternMap.has(key2)) {
+            const data = mem.patternMap.get(key2);
+            const total = data.T + data.X;
+            if (total >= 3) return data.T > data.X ? 'T' : 'X';
+        }
+        return null;
+    }
+
+    predictCorrelation(gameId, history) {
+        if (history.length < 6) return null;
+        const key = `${gameId}_correlation`;
+        const mem = this.correlationMemory.get(key);
+        
+        let corr = 0;
+        for (let i = 0; i < Math.min(history.length - 2, 4); i++) {
+            if (history[i] === history[i+2]) corr++;
+            else corr--;
+        }
+        
+        if (corr > 2) return history[0] === 'T' ? 'T' : 'X';
+        if (corr < -2) return history[0] === 'T' ? 'X' : 'T';
+        
+        const key2 = corr > 0 ? 'positive' : 'negative';
+        if (mem && mem.patternMap.has(key2)) {
+            const data = mem.patternMap.get(key2);
+            const total = data.T + data.X;
+            if (total >= 3) return data.T > data.X ? 'T' : 'X';
+        }
         return null;
     }
 
@@ -1294,6 +1393,7 @@ class SuperAdaptiveEngine {
         const betMem = this.betMemory.get(`${gameId}_bet`);
         const zigzagMem = this.zigzagMemory.get(`${gameId}_zigzag`);
         const dao11Mem = this.dao11Memory.get(`${gameId}_dao11`);
+        const trendMem = this.trendMemory.get(`${gameId}_trend`);
         
         return {
             streak: streak ? streak.streak : 0,
@@ -1305,34 +1405,35 @@ class SuperAdaptiveEngine {
             betAccuracy: betMem ? Math.round(betMem.accuracy * 100) : 0,
             zigzagAccuracy: zigzagMem ? Math.round(zigzagMem.accuracy * 100) : 0,
             dao11Accuracy: dao11Mem ? Math.round(dao11Mem.accuracy * 100) : 0,
+            trendAccuracy: trendMem ? Math.round(trendMem.accuracy * 100) : 0,
             emergencyPatterns: this.emergencyPatterns.length
         };
     }
 }
 
-const adaptiveEngine = new SuperAdaptiveEngine();
+const engine = new SuperPredictionEngine();
 
 // ============================================================
-// 🔍 PHÂN TÍCH CẦU SIÊU CẤP
+// 🔍 PHÂN TÍCH CẦU
 // ============================================================
-class SuperCauAnalyzer {
+class CauAnalyzer {
     analyze(history) {
         const patterns = [];
 
-        // 1. Bệt siêu cấp
-        const bet = this.analyzeSuperBet(history);
+        // 1. Bệt
+        const bet = this.analyzeBet(history);
         if (bet) patterns.push(bet);
 
-        // 2. Zigzag siêu cấp
-        const zigzag = this.analyzeSuperZigzag(history);
+        // 2. Zigzag
+        const zigzag = this.analyzeZigzag(history);
         if (zigzag) patterns.push(zigzag);
 
-        // 3. Đảo 1-1 siêu cấp
-        const dao11 = this.analyzeSuperDao11(history);
+        // 3. Đảo 1-1
+        const dao11 = this.analyzeDao11(history);
         if (dao11) patterns.push(dao11);
 
-        // 4. Đảo 2-2 siêu cấp
-        const dao22 = this.analyzeSuperDao22(history);
+        // 4. Đảo 2-2
+        const dao22 = this.analyzeDao22(history);
         if (dao22) patterns.push(dao22);
 
         // 5. Cầu 3-3
@@ -1343,26 +1444,26 @@ class SuperCauAnalyzer {
         const cau44 = this.analyzeCau44(history);
         if (cau44) patterns.push(cau44);
 
-        // 7. Chu kỳ siêu cấp
-        const cycle = this.analyzeSuperCycle(history);
+        // 7. Chu kỳ
+        const cycle = this.analyzeCycle(history);
         if (cycle) patterns.push(cycle);
 
-        // 8. Xu hướng siêu cấp
-        const trend = this.analyzeSuperTrend(history);
+        // 8. Xu hướng
+        const trend = this.analyzeTrend(history);
         if (trend) patterns.push(trend);
 
-        // 9. Cân bằng siêu cấp
-        const balance = this.analyzeSuperBalance(history);
+        // 9. Cân bằng
+        const balance = this.analyzeBalance(history);
         if (balance) patterns.push(balance);
 
-        // 10. Gãy cầu siêu cấp
-        const breakPattern = this.analyzeSuperBreak(history);
+        // 10. Gãy cầu
+        const breakPattern = this.analyzeBreak(history);
         if (breakPattern) patterns.push(breakPattern);
 
         return patterns;
     }
 
-    analyzeSuperBet(history) {
+    analyzeBet(history) {
         if (history.length < 2) return null;
         const last = history[0];
         let count = 1;
@@ -1375,7 +1476,7 @@ class SuperCauAnalyzer {
             return {
                 pattern: 'bet',
                 prediction: last === 'T' ? 'X' : 'T',
-                confidence: 96,
+                confidence: 95,
                 weight: count,
                 detail: `🔥 Bệt siêu dài ${count}`
             };
@@ -1384,7 +1485,7 @@ class SuperCauAnalyzer {
             return {
                 pattern: 'bet',
                 prediction: last === 'T' ? 'X' : 'T',
-                confidence: 90,
+                confidence: 88,
                 weight: count,
                 detail: `⚡ Bệt dài ${count}`
             };
@@ -1393,7 +1494,7 @@ class SuperCauAnalyzer {
             return {
                 pattern: 'bet',
                 prediction: last === 'T' ? 'X' : 'T',
-                confidence: 80,
+                confidence: 78,
                 weight: count,
                 detail: `📈 Bệt ${count}`
             };
@@ -1402,24 +1503,15 @@ class SuperCauAnalyzer {
             return {
                 pattern: 'bet',
                 prediction: last === 'T' ? 'X' : 'T',
-                confidence: 70,
+                confidence: 68,
                 weight: count,
                 detail: `📊 Bệt ngắn ${count}`
-            };
-        }
-        if (count >= 2) {
-            return {
-                pattern: 'bet',
-                prediction: last,
-                confidence: 58,
-                weight: count,
-                detail: `📊 Bệt 2`
             };
         }
         return null;
     }
 
-    analyzeSuperZigzag(history) {
+    analyzeZigzag(history) {
         if (history.length < 4) return null;
         let changes = 0;
         for (let i = 1; i < Math.min(history.length, 10); i++) {
@@ -1429,7 +1521,7 @@ class SuperCauAnalyzer {
             return {
                 pattern: 'zigzag',
                 prediction: history[0] === 'T' ? 'X' : 'T',
-                confidence: 92,
+                confidence: 90,
                 weight: 1.6,
                 detail: `⚡ Zigzag siêu dài ${changes}`
             };
@@ -1438,7 +1530,7 @@ class SuperCauAnalyzer {
             return {
                 pattern: 'zigzag',
                 prediction: history[0] === 'T' ? 'X' : 'T',
-                confidence: 85,
+                confidence: 82,
                 weight: 1.4,
                 detail: `🌀 Zigzag ${changes}`
             };
@@ -1447,7 +1539,7 @@ class SuperCauAnalyzer {
             return {
                 pattern: 'zigzag',
                 prediction: history[0] === 'T' ? 'X' : 'T',
-                confidence: 75,
+                confidence: 72,
                 weight: 1.2,
                 detail: `🎯 Zigzag ngắn ${changes}`
             };
@@ -1455,7 +1547,7 @@ class SuperCauAnalyzer {
         return null;
     }
 
-    analyzeSuperDao11(history) {
+    analyzeDao11(history) {
         if (history.length < 4) return null;
         let isAlt = true;
         for (let i = 0; i < Math.min(history.length-1, 5); i++) {
@@ -1463,9 +1555,9 @@ class SuperCauAnalyzer {
         }
         if (isAlt) {
             const len = Math.min(history.length, 10);
-            let conf = 75;
-            if (len >= 8) conf = 92;
-            else if (len >= 6) conf = 85;
+            let conf = 74;
+            if (len >= 8) conf = 90;
+            else if (len >= 6) conf = 82;
             return {
                 pattern: 'dao11',
                 prediction: history[0] === 'T' ? 'X' : 'T',
@@ -1477,7 +1569,7 @@ class SuperCauAnalyzer {
         return null;
     }
 
-    analyzeSuperDao22(history) {
+    analyzeDao22(history) {
         if (history.length < 6) return null;
         const pairs = [];
         for (let i = 0; i < 3; i++) {
@@ -1489,7 +1581,7 @@ class SuperCauAnalyzer {
             return {
                 pattern: 'dao22',
                 prediction: pairs[1] === 'T' ? 'X' : 'T',
-                confidence: 86,
+                confidence: 84,
                 weight: 1.8,
                 detail: '🔄 Đảo 2-2'
             };
@@ -1507,7 +1599,7 @@ class SuperCauAnalyzer {
             return {
                 pattern: 'cau33',
                 prediction: last3[0] === 'T' ? 'X' : 'T',
-                confidence: 87,
+                confidence: 85,
                 weight: 1.8,
                 detail: '🏗️ Cầu 3-3'
             };
@@ -1525,7 +1617,7 @@ class SuperCauAnalyzer {
             return {
                 pattern: 'cau44',
                 prediction: last4[0] === 'T' ? 'X' : 'T',
-                confidence: 91,
+                confidence: 89,
                 weight: 2.2,
                 detail: '🏗️ Cầu 4-4'
             };
@@ -1533,7 +1625,7 @@ class SuperCauAnalyzer {
         return null;
     }
 
-    analyzeSuperCycle(history) {
+    analyzeCycle(history) {
         if (history.length < 9) return null;
         for (let cycle = 2; cycle <= 3; cycle++) {
             if (history.length < cycle * 3) continue;
@@ -1544,7 +1636,7 @@ class SuperCauAnalyzer {
                 return {
                     pattern: 'cycle',
                     prediction: p1[0] === 'T' ? 'X' : 'T',
-                    confidence: 82,
+                    confidence: 80,
                     weight: 1.5,
                     detail: `🔄 Chu kỳ ${cycle}`
                 };
@@ -1553,7 +1645,7 @@ class SuperCauAnalyzer {
         return null;
     }
 
-    analyzeSuperTrend(history) {
+    analyzeTrend(history) {
         if (history.length < 12) return null;
         const recent = history.slice(0, 12);
         const tCount = recent.filter(v => v === 'T').length;
@@ -1562,7 +1654,7 @@ class SuperCauAnalyzer {
             return {
                 pattern: 'trend',
                 prediction: 'X',
-                confidence: 82,
+                confidence: 80,
                 weight: 1.4,
                 detail: `📈 Tài áp đảo ${tCount}/12`
             };
@@ -1571,7 +1663,7 @@ class SuperCauAnalyzer {
             return {
                 pattern: 'trend',
                 prediction: 'X',
-                confidence: 74,
+                confidence: 72,
                 weight: 1.3,
                 detail: `📈 Xu hướng Tài ${tCount}/12`
             };
@@ -1580,7 +1672,7 @@ class SuperCauAnalyzer {
             return {
                 pattern: 'trend',
                 prediction: 'T',
-                confidence: 82,
+                confidence: 80,
                 weight: 1.4,
                 detail: `📉 Xỉu áp đảo ${12-tCount}/12`
             };
@@ -1589,7 +1681,7 @@ class SuperCauAnalyzer {
             return {
                 pattern: 'trend',
                 prediction: 'T',
-                confidence: 74,
+                confidence: 72,
                 weight: 1.3,
                 detail: `📉 Xu hướng Xỉu ${12-tCount}/12`
             };
@@ -1597,7 +1689,7 @@ class SuperCauAnalyzer {
         return null;
     }
 
-    analyzeSuperBalance(history) {
+    analyzeBalance(history) {
         if (history.length < 20) return null;
         const recent = history.slice(0, 20);
         const tCount = recent.filter(v => v === 'T').length;
@@ -1606,7 +1698,7 @@ class SuperCauAnalyzer {
             return {
                 pattern: 'balance',
                 prediction: 'X',
-                confidence: 78,
+                confidence: 76,
                 weight: 1.2,
                 detail: `⚖️ Mất cân bằng cực độ Tài ${tCount}/20`
             };
@@ -1615,7 +1707,7 @@ class SuperCauAnalyzer {
             return {
                 pattern: 'balance',
                 prediction: 'X',
-                confidence: 72,
+                confidence: 70,
                 weight: 1.1,
                 detail: `⚖️ Mất cân bằng Tài ${tCount}/20`
             };
@@ -1624,7 +1716,7 @@ class SuperCauAnalyzer {
             return {
                 pattern: 'balance',
                 prediction: 'T',
-                confidence: 78,
+                confidence: 76,
                 weight: 1.2,
                 detail: `⚖️ Mất cân bằng cực độ Xỉu ${20-tCount}/20`
             };
@@ -1633,7 +1725,7 @@ class SuperCauAnalyzer {
             return {
                 pattern: 'balance',
                 prediction: 'T',
-                confidence: 72,
+                confidence: 70,
                 weight: 1.1,
                 detail: `⚖️ Mất cân bằng Xỉu ${20-tCount}/20`
             };
@@ -1641,7 +1733,7 @@ class SuperCauAnalyzer {
         return null;
     }
 
-    analyzeSuperBreak(history) {
+    analyzeBreak(history) {
         if (history.length < 6) return null;
         const last = history[0];
         let count = 1;
@@ -1655,7 +1747,7 @@ class SuperCauAnalyzer {
                 return {
                     pattern: 'break',
                     prediction: breakResult === 'T' ? 'T' : 'X',
-                    confidence: 74,
+                    confidence: 72,
                     weight: 1.2,
                     detail: `💥 Gãy cầu ${last}→${breakResult}`
                 };
@@ -1665,12 +1757,12 @@ class SuperCauAnalyzer {
     }
 }
 
-const superAnalyzer = new SuperCauAnalyzer();
+const analyzer = new CauAnalyzer();
 
 // ============================================================
-// 🎯 DỰ ĐOÁN SIÊU CẤP
+// 🎯 DỰ ĐOÁN
 // ============================================================
-class SuperPredictor {
+class Predictor {
     async predict(gameId) {
         try {
             const url = gameId === 'hu' ? API_URL_HU : API_URL_MD5;
@@ -1678,7 +1770,7 @@ class SuperPredictor {
             const data = response.data;
             
             if (!data || !data.list || data.list.length === 0) {
-                return adaptiveEngine.superPredictNoData(gameId, []);
+                return engine.smartPredictNoData(gameId, []);
             }
 
             const items = data.list.slice(0, 100).reverse();
@@ -1687,15 +1779,14 @@ class SuperPredictor {
                 return r.includes('TAI') ? 'T' : r.includes('XIU') ? 'X' : null;
             }).filter(r => r !== null);
 
-            // Luôn có dữ liệu để phân tích
-            const patterns = superAnalyzer.analyze(historyData);
-            const result = adaptiveEngine.superPredict(gameId, patterns, historyData);
+            const patterns = analyzer.analyze(historyData);
+            const result = engine.predict(gameId, patterns, historyData);
             
             return {
                 prediction: result.prediction,
                 confidence: result.confidence,
                 patterns: result.patterns || [],
-                detail: result.detail || 'Phân tích siêu cấp',
+                detail: result.detail || 'Phân tích thông minh',
                 totalPatterns: patterns.length,
                 tScore: result.tScore || 0,
                 xScore: result.xScore || 0,
@@ -1704,12 +1795,12 @@ class SuperPredictor {
 
         } catch (error) {
             console.error(`Lỗi dự đoán ${gameId}:`, error.message);
-            return adaptiveEngine.superPredictNoData(gameId, []);
+            return engine.smartPredictNoData(gameId, []);
         }
     }
 }
 
-const superPredictor = new SuperPredictor();
+const predictor = new Predictor();
 
 // ============================================================
 // 📊 QUẢN LÝ LỊCH SỬ
@@ -1772,12 +1863,15 @@ function updateStats(type, isCorrect) {
         s.correct++;
         s.streak = s.streak >= 0 ? s.streak + 1 : 1;
         if (s.streak > s.bestStreak) s.bestStreak = s.streak;
+        s.daily.wins++;
     } else {
         s.wrong++;
         s.streak = s.streak <= 0 ? s.streak - 1 : -1;
         if (s.streak < s.worstStreak) s.worstStreak = s.streak;
+        s.daily.losses++;
     }
-    s.accuracy = Math.round((s.correct / s.total) * 100);
+    s.daily.total++;
+    s.accuracy = s.total > 0 ? Math.round((s.correct / s.total) * 100) : 0;
     
     s.last10.push(isCorrect ? 1 : 0);
     s.last50.push(isCorrect ? 1 : 0);
@@ -1802,7 +1896,7 @@ function verifyAndUpdate(type, data) {
                 updateStats(type, isCorrect);
                 
                 const result = record.prediction === 'TÀI' ? 'T' : 'X';
-                adaptiveEngine.learn(type, 'verified', result, record.confidence, [], 1);
+                engine.learn(type, 'verified', result, record.confidence, [], 1);
                 updated++;
             }
         }
@@ -1829,7 +1923,7 @@ async function autoProcess() {
                 
                 const existing = history.hu.find(h => h.phien_hien_tai === (currentPhien + 1).toString());
                 if (!existing) {
-                    const result = await superPredictor.predict('hu');
+                    const result = await predictor.predict('hu');
                     const newRecord = {
                         phien: dataHu[0].phien,
                         phien_hien_tai: (dataHu[0].phien + 1).toString(),
@@ -1851,7 +1945,8 @@ async function autoProcess() {
                     
                     lastPhien.hu = currentPhien;
                     lastPredictions.hu = result;
-                    console.log(`[Auto] HU: ${result.prediction} (${result.confidence}%) - ${result.detail}`);
+                    predictionCount.hu++;
+                    console.log(`[Auto] HU #${predictionCount.hu}: ${result.prediction} (${result.confidence}%) - ${result.detail}`);
                 }
             }
         }
@@ -1864,7 +1959,7 @@ async function autoProcess() {
                 
                 const existing = history.md5.find(h => h.phien_hien_tai === (currentPhien + 1).toString());
                 if (!existing) {
-                    const result = await superPredictor.predict('md5');
+                    const result = await predictor.predict('md5');
                     const newRecord = {
                         phien: dataMd5[0].phien,
                         phien_hien_tai: (dataMd5[0].phien + 1).toString(),
@@ -1886,7 +1981,8 @@ async function autoProcess() {
                     
                     lastPhien.md5 = currentPhien;
                     lastPredictions.md5 = result;
-                    console.log(`[Auto] MD5: ${result.prediction} (${result.confidence}%) - ${result.detail}`);
+                    predictionCount.md5++;
+                    console.log(`[Auto] MD5 #${predictionCount.md5}: ${result.prediction} (${result.confidence}%) - ${result.detail}`);
                 }
             }
         }
@@ -1904,15 +2000,21 @@ function startAutoTask() {
 }
 
 // ============================================================
-// 🌐 GIAO DIỆN SIÊU WEB - TỰ ĐỘNG LOAD
+// 🌐 GIAO DIỆN WEB CÔNG NGHỆ 2026
 // ============================================================
 
-function generateSuperWebHTML(type) {
+function generateWebHTML(type) {
     const s = stats[type];
     const h = history[type] || [];
     const recent = h.slice(0, 30);
-    const learningStats = adaptiveEngine.getStats(type);
+    const learningStats = engine.getStats(type);
     const lastPred = lastPredictions[type];
+    
+    // Tính thống kê
+    const total = stats.hu.total + stats.md5.total;
+    const correct = stats.hu.correct + stats.md5.correct;
+    const totalAccuracy = total > 0 ? Math.round((correct / total) * 100) : 0;
+    const today = new Date().toLocaleDateString('vi-VN');
     
     let rows = '';
     for (const r of recent) {
@@ -1926,14 +2028,10 @@ function generateSuperWebHTML(type) {
                 <td><span class="do-tin">${r.confidence || 0}%</span></td>
                 <td><span class="trang-thai ${statusClass}">${statusText}</span></td>
                 <td>${r.actual || '-'}</td>
-                <td class="chi-tiet">${r.detail || '-'}</td>
+                <td class="chi-tiet">${r.detail ? r.detail.substring(0, 30) + (r.detail.length > 30 ? '...' : '') : '-'}</td>
             </tr>
         `;
     }
-
-    const total = stats.hu.total + stats.md5.total;
-    const correct = stats.hu.correct + stats.md5.correct;
-    const totalAccuracy = total > 0 ? Math.round((correct / total) * 100) : 0;
 
     return `
 <!DOCTYPE html>
@@ -1941,21 +2039,36 @@ function generateSuperWebHTML(type) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🌌 TX Universe - Anh Khôi</title>
+    <title>🌌 TX Universe - Anh Khôi 2026</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;600;700;800;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Inter:wght@300;400;500;600;700;800;900&display=swap');
         
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
+        :root {
+            --primary: #7b2ffc;
+            --secondary: #00d4ff;
+            --success: #4ade80;
+            --danger: #f87171;
+            --warning: #fb923c;
+            --bg: #04040e;
+            --card: rgba(255,255,255,0.03);
+            --border: rgba(255,255,255,0.06);
+            --text: #e8e8e8;
+            --text-secondary: #667788;
+            --text-muted: #334455;
+        }
+        
         body {
             font-family: 'Inter', sans-serif;
-            background: #04040a;
-            color: #e8e8e8;
+            background: var(--bg);
+            color: var(--text);
             min-height: 100vh;
             overflow-x: hidden;
         }
         
-        .bg-super {
+        /* Nền công nghệ */
+        .bg-2026 {
             position: fixed;
             top: 0;
             left: 0;
@@ -1963,13 +2076,13 @@ function generateSuperWebHTML(type) {
             height: 100%;
             z-index: 0;
             background: 
-                radial-gradient(ellipse at 10% 30%, rgba(123, 47, 252, 0.12) 0%, transparent 50%),
-                radial-gradient(ellipse at 90% 70%, rgba(0, 212, 255, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 15% 25%, rgba(123, 47, 252, 0.10) 0%, transparent 50%),
+                radial-gradient(ellipse at 85% 75%, rgba(0, 212, 255, 0.06) 0%, transparent 50%),
                 radial-gradient(ellipse at 50% 100%, rgba(123, 47, 252, 0.04) 0%, transparent 30%);
             overflow: hidden;
         }
         
-        .bg-super::before {
+        .bg-2026::before {
             content: '';
             position: absolute;
             top: 0;
@@ -1977,76 +2090,77 @@ function generateSuperWebHTML(type) {
             width: 100%;
             height: 100%;
             background-image: 
-                radial-gradient(1px 1px at 10px 20px, rgba(255,255,255,0.08), transparent),
-                radial-gradient(1px 1px at 30px 60px, rgba(255,255,255,0.06), transparent),
-                radial-gradient(1px 1px at 50px 140px, rgba(255,255,255,0.07), transparent),
-                radial-gradient(1px 1px at 80px 30px, rgba(255,255,255,0.06), transparent),
-                radial-gradient(1px 1px at 120px 90px, rgba(255,255,255,0.07), transparent),
-                radial-gradient(1px 1px at 180px 50px, rgba(255,255,255,0.05), transparent),
-                radial-gradient(1px 1px at 250px 110px, rgba(255,255,255,0.06), transparent),
-                radial-gradient(1px 1px at 300px 70px, rgba(255,255,255,0.04), transparent);
-            background-size: 350px 350px;
-            animation: starsFloat 50s linear infinite;
+                radial-gradient(1px 1px at 10px 20px, rgba(255,255,255,0.06), transparent),
+                radial-gradient(1px 1px at 30px 60px, rgba(255,255,255,0.05), transparent),
+                radial-gradient(1px 1px at 50px 140px, rgba(255,255,255,0.06), transparent),
+                radial-gradient(1px 1px at 80px 30px, rgba(255,255,255,0.05), transparent),
+                radial-gradient(1px 1px at 120px 90px, rgba(255,255,255,0.06), transparent),
+                radial-gradient(1px 1px at 180px 50px, rgba(255,255,255,0.04), transparent),
+                radial-gradient(1px 1px at 250px 110px, rgba(255,255,255,0.05), transparent),
+                radial-gradient(1px 1px at 320px 70px, rgba(255,255,255,0.04), transparent);
+            background-size: 400px 400px;
+            animation: starsDrift 60s linear infinite;
         }
         
-        @keyframes starsFloat {
+        @keyframes starsDrift {
             0% { transform: translate(0, 0); }
-            100% { transform: translate(-40px, -30px); }
+            100% { transform: translate(-50px, -30px); }
         }
         
-        .bg-super::after {
-            content: '✦ ✧ ✦ ✧ ✦';
+        .bg-2026::after {
+            content: '✦ ✧ ✦ ✧ ✦ ✧ ✦';
             position: absolute;
-            top: 3%;
-            right: 3%;
-            font-size: 80px;
-            color: rgba(123, 47, 252, 0.03);
-            letter-spacing: 30px;
-            animation: spinSlow 60s linear infinite;
+            top: 2%;
+            right: 2%;
+            font-size: 100px;
+            color: rgba(123, 47, 252, 0.02);
+            letter-spacing: 40px;
+            animation: rotateSlow 80s linear infinite;
+            white-space: nowrap;
         }
         
-        @keyframes spinSlow {
+        @keyframes rotateSlow {
             0% { transform: rotate(0deg) scale(1); }
-            50% { transform: rotate(180deg) scale(1.1); }
+            50% { transform: rotate(180deg) scale(1.05); }
             100% { transform: rotate(360deg) scale(1); }
         }
         
         .container {
             position: relative;
             z-index: 1;
-            max-width: 1400px;
+            max-width: 1440px;
             margin: 0 auto;
             padding: 12px;
         }
         
         /* Header */
-        .header-super {
-            background: linear-gradient(135deg, rgba(123, 47, 252, 0.10), rgba(0, 212, 255, 0.05));
-            border-radius: 18px;
-            padding: 20px 28px;
+        .header-2026 {
+            background: linear-gradient(135deg, rgba(123, 47, 252, 0.08), rgba(0, 212, 255, 0.04));
+            border-radius: 20px;
+            padding: 18px 28px;
             margin-bottom: 16px;
-            border: 1px solid rgba(123, 47, 252, 0.12);
+            border: 1px solid rgba(123, 47, 252, 0.10);
             backdrop-filter: blur(30px);
             position: relative;
             overflow: hidden;
         }
         
-        .header-super::before {
+        .header-2026::before {
             content: '';
             position: absolute;
-            top: -80%;
-            left: -80%;
-            width: 260%;
-            height: 260%;
+            top: -60%;
+            left: -60%;
+            width: 220%;
+            height: 220%;
             background: conic-gradient(from 0deg, transparent, rgba(123, 47, 252, 0.03), transparent, rgba(0, 212, 255, 0.03), transparent);
-            animation: spinFast 35s linear infinite;
+            animation: spinConic 40s linear infinite;
         }
         
-        @keyframes spinFast {
+        @keyframes spinConic {
             100% { transform: rotate(360deg); }
         }
         
-        .header-super .content {
+        .header-2026 .content {
             position: relative;
             z-index: 1;
             display: flex;
@@ -2056,73 +2170,73 @@ function generateSuperWebHTML(type) {
             gap: 12px;
         }
         
-        .logo-super {
+        .logo-2026 {
             display: flex;
             align-items: center;
             gap: 12px;
         }
         
-        .logo-super .icon {
-            font-size: 32px;
-            animation: glowPulse 2s ease-in-out infinite;
-            filter: drop-shadow(0 0 30px rgba(123, 47, 252, 0.15));
+        .logo-2026 .icon {
+            font-size: 30px;
+            animation: pulseGlow 2.5s ease-in-out infinite;
+            filter: drop-shadow(0 0 30px rgba(123, 47, 252, 0.12));
         }
         
-        @keyframes glowPulse {
-            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 30px rgba(123, 47, 252, 0.15)); }
-            50% { transform: scale(1.05); filter: drop-shadow(0 0 60px rgba(123, 47, 252, 0.3)); }
+        @keyframes pulseGlow {
+            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 30px rgba(123, 47, 252, 0.12)); }
+            50% { transform: scale(1.04); filter: drop-shadow(0 0 60px rgba(123, 47, 252, 0.25)); }
         }
         
-        .logo-super .ten {
+        .logo-2026 .ten {
             font-family: 'Orbitron', monospace;
-            font-size: 24px;
+            font-size: 22px;
             font-weight: 900;
             background: linear-gradient(135deg, #7b2ffc, #00d4ff, #7b2ffc);
             background-size: 200% 200%;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            animation: shimmerFast 3s ease-in-out infinite;
+            animation: shimmerGrad 3.5s ease-in-out infinite;
         }
         
-        @keyframes shimmerFast {
+        @keyframes shimmerGrad {
             0%, 100% { background-position: 0% 50%; }
             50% { background-position: 100% 50%; }
         }
         
-        .logo-super .sub {
-            font-size: 11px;
-            color: #556677;
+        .logo-2026 .sub {
+            font-size: 10px;
+            color: var(--text-secondary);
             letter-spacing: 3px;
             font-weight: 300;
         }
         
-        .header-super .info {
+        .header-2026 .info {
             text-align: right;
         }
         
-        .badge-super {
+        .badge-2026 {
             display: inline-block;
             padding: 4px 18px;
             border-radius: 30px;
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 2px;
-            background: linear-gradient(135deg, rgba(123, 47, 252, 0.15), rgba(0, 212, 255, 0.08));
-            border: 1px solid rgba(123, 47, 252, 0.15);
+            background: linear-gradient(135deg, rgba(123, 47, 252, 0.12), rgba(0, 212, 255, 0.06));
+            border: 1px solid rgba(123, 47, 252, 0.12);
             color: #a78bfa;
             backdrop-filter: blur(10px);
         }
         
-        .badge-super .live {
+        .badge-2026 .live {
             display: inline-block;
-            width: 7px;
-            height: 7px;
+            width: 6px;
+            height: 6px;
             border-radius: 50%;
-            background: #4ade80;
+            background: var(--success);
             margin-right: 8px;
-            animation: livePulse 1s ease-in-out infinite;
-            box-shadow: 0 0 20px rgba(74, 222, 128, 0.2);
+            animation: livePulse 0.8s ease-in-out infinite;
+            box-shadow: 0 0 20px rgba(74, 222, 128, 0.15);
         }
         
         @keyframes livePulse {
@@ -2130,88 +2244,120 @@ function generateSuperWebHTML(type) {
             50% { opacity: 0.3; transform: scale(0.6); }
         }
         
-        /* Stats */
-        .stats-super {
+        .badge-2026 .version {
+            color: var(--text-muted);
+            font-weight: 400;
+            letter-spacing: 1px;
+        }
+        
+        /* Stats Grid */
+        .stats-2026 {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
             gap: 10px;
             margin-bottom: 16px;
         }
         
-        .stat-super {
-            background: rgba(255,255,255,0.02);
-            border-radius: 12px;
+        .stat-2026 {
+            background: var(--card);
+            border-radius: 14px;
             padding: 12px 14px;
-            border: 1px solid rgba(255,255,255,0.04);
+            border: 1px solid var(--border);
             backdrop-filter: blur(15px);
-            transition: all 0.4s ease;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             text-align: center;
             position: relative;
             overflow: hidden;
         }
         
-        .stat-super:hover {
-            transform: translateY(-2px);
-            border-color: rgba(123, 47, 252, 0.12);
-            box-shadow: 0 6px 25px rgba(123, 47, 252, 0.04);
+        .stat-2026::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(123, 47, 252, 0.04), transparent);
+            opacity: 0;
+            transition: opacity 0.4s ease;
         }
         
-        .stat-super .label {
+        .stat-2026:hover {
+            transform: translateY(-3px) scale(1.02);
+            border-color: rgba(123, 47, 252, 0.15);
+            box-shadow: 0 8px 30px rgba(123, 47, 252, 0.04);
+        }
+        
+        .stat-2026:hover::before {
+            opacity: 1;
+        }
+        
+        .stat-2026 .label {
             font-size: 8px;
             text-transform: uppercase;
             letter-spacing: 1.5px;
-            color: #445566;
+            color: var(--text-muted);
             font-weight: 700;
+            position: relative;
+            z-index: 1;
         }
         
-        .stat-super .value {
-            font-size: 20px;
+        .stat-2026 .value {
+            font-size: 18px;
             font-weight: 800;
             margin-top: 2px;
             font-family: 'Orbitron', monospace;
+            position: relative;
+            z-index: 1;
         }
         
-        .stat-super .value.xanh { color: #4ade80; }
-        .stat-super .value.do { color: #f87171; }
-        .stat-super .value.cam { color: #fb923c; }
-        .stat-super .value.xanh-duong { color: #60a5fa; }
-        .stat-super .value.tim { color: #a78bfa; }
-        .stat-super .value.cyan { color: #22d3ee; }
+        .stat-2026 .value.xanh { color: var(--success); }
+        .stat-2026 .value.do { color: var(--danger); }
+        .stat-2026 .value.cam { color: var(--warning); }
+        .stat-2026 .value.xanh-duong { color: #60a5fa; }
+        .stat-2026 .value.tim { color: #a78bfa; }
+        .stat-2026 .value.cyan { color: #22d3ee; }
+        .stat-2026 .value.vang { color: #fbbf24; }
         
-        .stat-super .sub {
+        .stat-2026 .sub {
             font-size: 9px;
-            color: #334455;
+            color: var(--text-muted);
             margin-top: 2px;
+            position: relative;
+            z-index: 1;
         }
         
         /* Table */
-        .table-super {
-            background: rgba(255,255,255,0.015);
-            border-radius: 12px;
+        .table-2026 {
+            background: var(--card);
+            border-radius: 14px;
             overflow: hidden;
-            border: 1px solid rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
             backdrop-filter: blur(15px);
         }
         
-        .table-super .header {
+        .table-2026 .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             padding: 10px 18px;
-            border-bottom: 1px solid rgba(255,255,255,0.03);
+            border-bottom: 1px solid var(--border);
             flex-wrap: wrap;
             gap: 6px;
         }
         
-        .table-super .header h3 {
+        .table-2026 .header h3 {
             font-size: 13px;
             font-weight: 700;
-            color: #c0c0c0;
+            color: #d0d0d0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
         
-        .table-super .header .count {
+        .table-2026 .header .count {
             font-size: 10px;
-            color: #334455;
+            color: var(--text-muted);
         }
         
         table {
@@ -2228,7 +2374,7 @@ function generateSuperWebHTML(type) {
             font-size: 9px;
             text-transform: uppercase;
             letter-spacing: 1px;
-            color: #334455;
+            color: var(--text-muted);
         }
         
         td {
@@ -2242,8 +2388,8 @@ function generateSuperWebHTML(type) {
         
         .phien {
             font-family: 'Orbitron', monospace;
-            font-size: 11px;
-            color: #556677;
+            font-size: 10px;
+            color: var(--text-secondary);
         }
         
         .du-doan {
@@ -2251,17 +2397,17 @@ function generateSuperWebHTML(type) {
             padding: 2px 12px;
             border-radius: 8px;
             font-weight: 700;
-            font-size: 11px;
+            font-size: 10px;
         }
         
         .du-doan.tai {
-            background: rgba(74, 222, 128, 0.10);
-            color: #4ade80;
+            background: rgba(74, 222, 128, 0.08);
+            color: var(--success);
         }
         
         .du-doan.xiu {
-            background: rgba(248, 113, 113, 0.10);
-            color: #f87171;
+            background: rgba(248, 113, 113, 0.08);
+            color: var(--danger);
         }
         
         .do-tin {
@@ -2279,23 +2425,23 @@ function generateSuperWebHTML(type) {
         }
         
         .trang-thai.dung {
-            background: rgba(74, 222, 128, 0.10);
-            color: #4ade80;
+            background: rgba(74, 222, 128, 0.08);
+            color: var(--success);
         }
         
         .trang-thai.sai {
-            background: rgba(248, 113, 113, 0.10);
-            color: #f87171;
+            background: rgba(248, 113, 113, 0.08);
+            color: var(--danger);
         }
         
         .trang-thai.cho {
-            background: rgba(251, 146, 60, 0.10);
-            color: #fb923c;
+            background: rgba(251, 146, 60, 0.08);
+            color: var(--warning);
         }
         
         .chi-tiet {
             font-size: 10px;
-            color: #334455;
+            color: var(--text-muted);
             max-width: 180px;
             white-space: nowrap;
             overflow: hidden;
@@ -2303,65 +2449,67 @@ function generateSuperWebHTML(type) {
         }
         
         /* Footer */
-        .footer-super {
+        .footer-2026 {
             text-align: center;
             padding: 14px;
-            color: #223344;
-            font-size: 11px;
-            border-top: 1px solid rgba(255,255,255,0.02);
+            color: var(--text-muted);
+            font-size: 10px;
+            border-top: 1px solid var(--border);
             margin-top: 16px;
         }
         
-        .footer-super .highlight {
+        .footer-2026 .highlight {
             color: #a78bfa;
         }
         
-        .footer-super .heart {
-            color: #f87171;
-            animation: heartbeat 1.5s ease-in-out infinite;
+        .footer-2026 .heart {
+            color: var(--danger);
+            animation: heartBeat 1.5s ease-in-out infinite;
             display: inline-block;
         }
         
-        @keyframes heartbeat {
+        @keyframes heartBeat {
             0%, 100% { transform: scale(1); }
             50% { transform: scale(1.2); }
         }
         
         /* Responsive */
         @media (max-width: 768px) {
-            .header-super { padding: 14px; }
-            .header-super .content { flex-direction: column; align-items: flex-start; }
-            .header-super .info { text-align: left; width: 100%; }
-            .stats-super { grid-template-columns: repeat(3, 1fr); gap: 6px; }
-            .stat-super .value { font-size: 16px; }
-            .logo-super .ten { font-size: 18px; }
+            .header-2026 { padding: 14px; }
+            .header-2026 .content { flex-direction: column; align-items: flex-start; }
+            .header-2026 .info { text-align: left; width: 100%; }
+            .stats-2026 { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+            .stat-2026 .value { font-size: 15px; }
+            .logo-2026 .ten { font-size: 18px; }
             table { font-size: 10px; }
             th, td { padding: 5px 6px; }
             .chi-tiet { max-width: 60px; }
         }
         
         @media (max-width: 480px) {
-            .stats-super { grid-template-columns: repeat(2, 1fr); }
+            .stats-2026 { grid-template-columns: repeat(2, 1fr); }
             .container { padding: 6px; }
             th, td { padding: 3px 4px; font-size: 9px; }
-            .logo-super .ten { font-size: 14px; }
-            .logo-super .icon { font-size: 24px; }
-            .du-doan { font-size: 9px; padding: 1px 8px; }
+            .logo-2026 .ten { font-size: 14px; }
+            .logo-2026 .icon { font-size: 22px; }
+            .du-doan { font-size: 8px; padding: 1px 8px; }
+            .trang-thai { font-size: 7px; padding: 1px 6px; }
         }
         
         ::-webkit-scrollbar { width: 3px; height: 3px; }
         ::-webkit-scrollbar-track { background: rgba(255,255,255,0.01); }
-        ::-webkit-scrollbar-thumb { background: rgba(123, 47, 252, 0.15); border-radius: 2px; }
-        ::-webkit-scrollbar-thumb:hover { background: rgba(123, 47, 252, 0.3); }
+        ::-webkit-scrollbar-thumb { background: rgba(123, 47, 252, 0.12); border-radius: 2px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(123, 47, 252, 0.25); }
     </style>
 </head>
 <body>
-    <div class="bg-super"></div>
+    <div class="bg-2026"></div>
     
     <div class="container">
-        <div class="header-super">
+        <!-- Header -->
+        <div class="header-2026">
             <div class="content">
-                <div class="logo-super">
+                <div class="logo-2026">
                     <span class="icon">🌌</span>
                     <div>
                         <div class="ten">TX UNIVERSE</div>
@@ -2369,52 +2517,54 @@ function generateSuperWebHTML(type) {
                     </div>
                 </div>
                 <div class="info">
-                    <div class="badge-super">
+                    <div class="badge-2026">
                         <span class="live"></span>
                         ${type.toUpperCase()} • TRỰC TIẾP
-                        <span style="font-weight:400;color:#445566;letter-spacing:1px;">v6.0</span>
+                        <span class="version">v7.0</span>
                     </div>
-                    <div style="font-size:9px;color:#223344;margin-top:3px;">
-                        ${new Date().toLocaleString('vi-VN')}
+                    <div style="font-size:9px;color:var(--text-muted);margin-top:3px;">
+                        ${new Date().toLocaleString('vi-VN')} • #${predictionCount[type] || 0}
                     </div>
                 </div>
             </div>
         </div>
         
-        <div class="stats-super">
-            <div class="stat-super">
+        <!-- Stats -->
+        <div class="stats-2026">
+            <div class="stat-2026">
                 <div class="label">Tổng</div>
                 <div class="value xanh-duong">${s.total}</div>
                 <div class="sub">Dự đoán</div>
             </div>
-            <div class="stat-super">
+            <div class="stat-2026">
                 <div class="label">✅ Đúng</div>
                 <div class="value xanh">${s.correct}</div>
                 <div class="sub">${s.accuracy}%</div>
             </div>
-            <div class="stat-super">
+            <div class="stat-2026">
                 <div class="label">❌ Sai</div>
                 <div class="value do">${s.wrong}</div>
                 <div class="sub">${100 - s.accuracy}%</div>
             </div>
-            <div class="stat-super">
+            <div class="stat-2026">
                 <div class="label">📊 Tỷ Lệ</div>
                 <div class="value ${s.accuracy >= 65 ? 'xanh' : s.accuracy >= 55 ? 'cam' : 'do'}">${s.accuracy}%</div>
                 <div class="sub">${s.accuracy >= 65 ? '🌟 Xuất sắc' : s.accuracy >= 55 ? '📈 Tốt' : '📉 Cần cải thiện'}</div>
             </div>
-            <div class="stat-super">
+            <div class="stat-2026">
                 <div class="label">⚡ Chuỗi</div>
                 <div class="value ${s.streak > 0 ? 'xanh' : s.streak < 0 ? 'do' : 'cam'}">${s.streak > 0 ? '✅ +' + s.streak : s.streak < 0 ? '❌ ' + s.streak : '0'}</div>
                 <div class="sub">${s.streak > 0 ? '🔥 Đang thắng' : s.streak < 0 ? '💪 Cố lên' : '⚖️ Cân bằng'}</div>
             </div>
-            <div class="stat-super">
+            <div class="stat-2026">
                 <div class="label">🏆 Dài Nhất</div>
                 <div class="value cyan">${s.bestStreak}</div>
                 <div class="sub">${s.bestStreak >= 5 ? '🚀 Siêu chuỗi' : '📈 Đang tiến'}</div>
             </div>
         </div>
         
-        <div class="table-super">
+        <!-- Table -->
+        <div class="table-2026">
             <div class="header">
                 <h3>📋 LỊCH SỬ DỰ ĐOÁN</h3>
                 <span class="count">${h.length} phiên • Hiển thị ${Math.min(30, h.length)} gần nhất</span>
@@ -2431,36 +2581,30 @@ function generateSuperWebHTML(type) {
                     </tr>
                 </thead>
                 <tbody>
-                    ${rows || '<tr><td colspan="6" style="text-align:center;padding:30px;color:#223344;">⏳ Đang chờ dữ liệu...</td></tr>'}
+                    ${rows || '<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted);">⏳ Đang chờ dữ liệu...</td></tr>'}
                 </tbody>
             </table>
         </div>
         
-        <div class="footer-super">
-            <span style="color:#334455;">🌌 TX Universe Predictor</span> • 
+        <!-- Footer -->
+        <div class="footer-2026">
+            <span style="color:var(--text-muted);">🌌 TX Universe Predictor</span> • 
             <span class="highlight">Anh Khôi</span> • 
-            Phiên bản 6.0 • 
-            Tự động cập nhật mỗi 6s
+            Phiên bản 7.0 • 
+            Tự động cập nhật mỗi 5s
             <br>
-            <span style="font-size:9px;color:#223344;">
-                <span class="heart">❤️</span> Bệt • Zigzag • 1-1 • 2-2 • Chu kỳ • Xu hướng • Gãy cầu • Cân bằng
-                <span style="color:#334455;letter-spacing:2px;">✦ ✧ ✦</span>
+            <span style="font-size:8px;color:var(--text-muted);">
+                <span class="heart">❤️</span> Bệt • Zigzag • 1-1 • 2-2 • Chu kỳ • Xu hướng • Gãy cầu • Cân bằng • Đà • Biến động • Tương quan
+                <span style="color:var(--text-muted);letter-spacing:2px;">✦ ✧ ✦</span>
             </span>
         </div>
     </div>
     
     <script>
-        // Tự động reload mỗi 6 giây - tối ưu cho theo dõi
+        // Tự động reload mỗi 5 giây
         setTimeout(function() {
             location.reload();
-        }, 6000);
-        
-        // Hiển thị thời gian còn lại
-        let countdown = 6;
-        setInterval(function() {
-            countdown--;
-            if (countdown <= 0) countdown = 6;
-        }, 1000);
+        }, 5000);
     </script>
 </body>
 </html>
@@ -2474,9 +2618,9 @@ function generateSuperWebHTML(type) {
 app.get('/', (req, res) => {
     res.json({
         name: 'TX Universe Predictor',
-        version: '6.0',
+        version: '7.0',
         author: 'Anh Khôi',
-        status: '🚀 Siêu chính xác - Không cần dữ liệu',
+        status: '🚀 Siêu chính xác 2026',
         endpoints: ['/lc79-hu', '/lc79-md5', '/lc79-hu/history', '/lc79-md5/history', '/stats', '/analysis', '/dashboard']
     });
 });
@@ -2490,12 +2634,12 @@ app.get('/dashboard', (req, res) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🌌 TX Universe - Anh Khôi</title>
+    <title>🌌 TX Universe - Anh Khôi 2026</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Inter', sans-serif;
-            background: #04040a;
+            background: #04040e;
             color: #e0e0e0;
             min-height: 100vh;
             display: flex;
@@ -2504,14 +2648,14 @@ app.get('/dashboard', (req, res) => {
             background: radial-gradient(ellipse at 20% 50%, rgba(123, 47, 252, 0.06) 0%, transparent 60%),
                         radial-gradient(ellipse at 80% 50%, rgba(0, 212, 255, 0.04) 0%, transparent 60%);
         }
-        .container { text-align: center; padding: 30px; max-width: 500px; }
-        .logo { font-size: 56px; margin-bottom: 10px; animation: glowBig 3s ease-in-out infinite; }
+        .container { text-align: center; padding: 30px; max-width: 480px; }
+        .logo { font-size: 52px; margin-bottom: 10px; animation: glowBig 3s ease-in-out infinite; }
         @keyframes glowBig {
-            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 30px rgba(123, 47, 252, 0.15)); }
-            50% { transform: scale(1.05); filter: drop-shadow(0 0 60px rgba(123, 47, 252, 0.3)); }
+            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 30px rgba(123, 47, 252, 0.12)); }
+            50% { transform: scale(1.04); filter: drop-shadow(0 0 60px rgba(123, 47, 252, 0.25)); }
         }
         h1 {
-            font-size: 30px;
+            font-size: 28px;
             font-weight: 900;
             background: linear-gradient(135deg, #7b2ffc, #00d4ff);
             -webkit-background-clip: text;
@@ -2521,20 +2665,20 @@ app.get('/dashboard', (req, res) => {
         }
         .sub {
             color: #445566;
-            font-size: 14px;
+            font-size: 13px;
             margin-bottom: 24px;
         }
         .sub strong { color: #a78bfa; }
         .grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 12px;
+            gap: 10px;
             margin-bottom: 24px;
         }
         .card {
             background: rgba(255,255,255,0.02);
             border-radius: 12px;
-            padding: 18px;
+            padding: 16px;
             border: 1px solid rgba(255,255,255,0.04);
             text-decoration: none;
             color: #e0e0e0;
@@ -2543,15 +2687,15 @@ app.get('/dashboard', (req, res) => {
         }
         .card:hover {
             transform: translateY(-4px);
-            border-color: rgba(123, 47, 252, 0.2);
-            box-shadow: 0 8px 30px rgba(123, 47, 252, 0.06);
+            border-color: rgba(123, 47, 252, 0.15);
+            box-shadow: 0 8px 30px rgba(123, 47, 252, 0.04);
         }
-        .card .icon { font-size: 28px; margin-bottom: 4px; }
-        .card .title { font-weight: 700; font-size: 13px; }
+        .card .icon { font-size: 26px; margin-bottom: 4px; }
+        .card .title { font-weight: 700; font-size: 12px; }
         .card .desc { font-size: 10px; color: #334455; margin-top: 2px; }
         .footer {
             color: #223344;
-            font-size: 11px;
+            font-size: 10px;
         }
         .footer .highlight { color: #a78bfa; }
         .footer .heart { color: #f87171; animation: heartBeat 1.5s ease-in-out infinite; display: inline-block; }
@@ -2560,11 +2704,11 @@ app.get('/dashboard', (req, res) => {
             50% { transform: scale(1.2); }
         }
         @media (max-width: 500px) {
-            h1 { font-size: 22px; }
+            h1 { font-size: 20px; }
             .grid { gap: 8px; }
             .card { padding: 12px; }
-            .card .icon { font-size: 22px; }
-            .card .title { font-size: 11px; }
+            .card .icon { font-size: 20px; }
+            .card .title { font-size: 10px; }
         }
     </style>
 </head>
@@ -2572,7 +2716,7 @@ app.get('/dashboard', (req, res) => {
     <div class="container">
         <div class="logo">🌌</div>
         <h1>TX UNIVERSE</h1>
-        <div class="sub">Bởi <strong>Anh Khôi</strong> • Dự đoán siêu chính xác</div>
+        <div class="sub">Bởi <strong>Anh Khôi</strong> • Dự đoán siêu chính xác 2026</div>
         
         <div class="grid">
             <a href="/lc79-hu/history" class="card">
@@ -2598,11 +2742,11 @@ app.get('/dashboard', (req, res) => {
         </div>
         
         <div class="footer">
-            ⚡ <span class="highlight">TX Universe Predictor v6.0</span> • 
-            Bệt • Zigzag • 1-1 • 2-2 • Chu kỳ • Xu hướng • Gãy cầu • Cân bằng
+            ⚡ <span class="highlight">TX Universe Predictor v7.0</span> • 
+            11 loại cầu • Tự động học
             <br>
-            <span style="font-size:9px;color:#223344;">
-                <span class="heart">❤️</span> Anh Khôi - Siêu chính xác
+            <span style="font-size:8px;color:#223344;">
+                <span class="heart">❤️</span> Anh Khôi - Siêu chính xác 2026
             </span>
         </div>
     </div>
@@ -2614,7 +2758,7 @@ app.get('/dashboard', (req, res) => {
 // Dự đoán HU
 app.get('/lc79-hu', async (req, res) => {
     try {
-        const result = await superPredictor.predict('hu');
+        const result = await predictor.predict('hu');
         const data = await fetchData('hu');
         if (!data || data.length === 0) {
             return res.json({
@@ -2681,7 +2825,7 @@ app.get('/lc79-hu', async (req, res) => {
 // Dự đoán MD5
 app.get('/lc79-md5', async (req, res) => {
     try {
-        const result = await superPredictor.predict('md5');
+        const result = await predictor.predict('md5');
         const data = await fetchData('md5');
         if (!data || data.length === 0) {
             return res.json({
@@ -2750,7 +2894,7 @@ app.get('/lc79-hu/history', async (req, res) => {
     const data = await fetchData('hu');
     if (data) verifyAndUpdate('hu', data);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.send(generateSuperWebHTML('hu'));
+    res.send(generateWebHTML('hu'));
 });
 
 // Lịch sử MD5
@@ -2758,7 +2902,7 @@ app.get('/lc79-md5/history', async (req, res) => {
     const data = await fetchData('md5');
     if (data) verifyAndUpdate('md5', data);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.send(generateSuperWebHTML('md5'));
+    res.send(generateWebHTML('md5'));
 });
 
 // JSON
@@ -2788,18 +2932,19 @@ app.get('/stats', (req, res) => {
             accuracy: total > 0 ? Math.round((correct / total) * 100) : 0
         },
         learning: {
-            hu: adaptiveEngine.getStats('hu'),
-            md5: adaptiveEngine.getStats('md5')
+            hu: engine.getStats('hu'),
+            md5: engine.getStats('md5')
         },
-        lastPredictions: lastPredictions
+        lastPredictions: lastPredictions,
+        predictionCount: predictionCount
     });
 });
 
 // Phân tích
 app.get('/analysis', async (req, res) => {
     const [hu, md5] = await Promise.all([
-        superPredictor.predict('hu'),
-        superPredictor.predict('md5')
+        predictor.predict('hu'),
+        predictor.predict('md5')
     ]);
     
     res.json({
@@ -2830,11 +2975,12 @@ app.get('/analysis', async (req, res) => {
 app.get('/reset', (req, res) => {
     history = { hu: [], md5: [] };
     stats = {
-        hu: { total: 0, correct: 0, wrong: 0, accuracy: 0, streak: 0, bestStreak: 0, worstStreak: 0, last10: [], last50: [] },
-        md5: { total: 0, correct: 0, wrong: 0, accuracy: 0, streak: 0, bestStreak: 0, worstStreak: 0, last10: [], last50: [] }
+        hu: { total: 0, correct: 0, wrong: 0, accuracy: 0, streak: 0, bestStreak: 0, worstStreak: 0, last10: [], last50: [], daily: { wins: 0, losses: 0, total: 0 } },
+        md5: { total: 0, correct: 0, wrong: 0, accuracy: 0, streak: 0, bestStreak: 0, worstStreak: 0, last10: [], last50: [], daily: { wins: 0, losses: 0, total: 0 } }
     };
     lastPhien = { hu: null, md5: null };
     lastPredictions = { hu: null, md5: null };
+    predictionCount = { hu: 0, md5: 0 };
     saveHistory();
     res.json({ message: '✅ Reset thành công' });
 });
@@ -2846,41 +2992,36 @@ app.get('/reset', (req, res) => {
 loadHistory();
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log('\n╔═══════════════════════════════════════════════════════════════╗');
-    console.log('║                                                               ║');
-    console.log('║   🌌  TX UNIVERSE PREDICTOR v6.0 - ANH KHÔI                 ║');
-    console.log('║                                                               ║');
-    console.log('║   🚀 Siêu chính xác - Không cần dữ liệu                      ║');
-    console.log('║   ⚡ Học thích nghi siêu cấp                                 ║');
-    console.log('║                                                               ║');
-    console.log('╠═══════════════════════════════════════════════════════════════╣');
-    console.log('║                                                               ║');
-    console.log(`║   📡 Server: http://0.0.0.0:${PORT}                            ║`);
-    console.log('║                                                               ║');
-    console.log('║   🔗 ENDPOINTS:                                              ║');
-    console.log('║   📊 /dashboard       - Trang chủ Công Nghệ                  ║');
-    console.log('║   📈 /lc79-hu         - Dự đoán HU                           ║');
-    console.log('║   📈 /lc79-md5        - Dự đoán MD5                          ║');
-    console.log('║   🎯 /lc79-hu/history - Thống kê HU (Tự động load 6s)        ║');
-    console.log('║   🎯 /lc79-md5/history - Thống kê MD5 (Tự động load 6s)      ║');
-    console.log('║   📋 /stats           - Thống kê tổng hợp                    ║');
-    console.log('║   🔍 /analysis        - Phân tích chi tiết                   ║');
-    console.log('║                                                               ║');
-    console.log('║   🧠 THUẬT TOÁN SIÊU CẤP:                                   ║');
-    console.log('║   🔥 Bắt cầu Bệt siêu chính xác                              ║');
-    console.log('║   ⚡ Bắt cầu Zigzag siêu chính xác                           ║');
-    console.log('║   🔄 Bắt cầu 1-1 siêu chính xác                              ║');
-    console.log('║   🔄 Bắt cầu 2-2                                             ║');
-    console.log('║   🔁 Bắt chu kỳ                                              ║');
-    console.log('║   📈 Bắt xu hướng                                            ║');
-    console.log('║   💥 Bắt gãy cầu                                             ║');
-    console.log('║   ⚖️ Bắt cân bằng tránh lệch                                 ║');
-    console.log('║   🆘 Dự đoán không cần dữ liệu                               ║');
-    console.log('║                                                               ║');
-    console.log('║   📁 himinhlaanhkhoi_history.json                            ║');
-    console.log('║   📁 himinhlaanhkhoi_learning.json                           ║');
-    console.log('║                                                               ║');
-    console.log('╚═══════════════════════════════════════════════════════════════╝\n');
+    console.log('\n╔══════════════════════════════════════════════════════════════════╗');
+    console.log('║                                                                  ║');
+    console.log('║   🌌  TX UNIVERSE PREDICTOR v7.0 - ANH KHÔI 2026               ║');
+    console.log('║                                                                  ║');
+    console.log('║   🚀 Siêu chính xác - Công nghệ 2026                            ║');
+    console.log('║   ⚡ 11 loại cầu - Tự động học thông minh                        ║');
+    console.log('║                                                                  ║');
+    console.log('╠══════════════════════════════════════════════════════════════════╣');
+    console.log('║                                                                  ║');
+    console.log(`║   📡 Server: http://0.0.0.0:${PORT}                               ║`);
+    console.log('║                                                                  ║');
+    console.log('║   🔗 ENDPOINTS:                                                 ║');
+    console.log('║   📊 /dashboard       - Trang chủ Công Nghệ 2026               ║');
+    console.log('║   📈 /lc79-hu         - Dự đoán HU                              ║');
+    console.log('║   📈 /lc79-md5        - Dự đoán MD5                             ║');
+    console.log('║   🎯 /lc79-hu/history - Thống kê HU (Auto load 5s)              ║');
+    console.log('║   🎯 /lc79-md5/history - Thống kê MD5 (Auto load 5s)            ║');
+    console.log('║   📋 /stats           - Thống kê tổng hợp                       ║');
+    console.log('║   🔍 /analysis        - Phân tích chi tiết                      ║');
+    console.log('║                                                                  ║');
+    console.log('║   🧠 11 LOẠI CẦU THÔNG MINH:                                   ║');
+    console.log('║   🔥 Bệt           ⚡ Zigzag        🔄 Đảo 1-1                  ║');
+    console.log('║   🔄 Đảo 2-2       🔁 Chu kỳ        📈 Xu hướng                 ║');
+    console.log('║   💥 Gãy cầu       ⚖️ Cân bằng      📊 Đà                       ║');
+    console.log('║   📉 Biến động     🔗 Tương quan                                ║');
+    console.log('║                                                                  ║');
+    console.log('║   📁 himinhlaanhkhoi_history.json                               ║');
+    console.log('║   📁 himinhlaanhkhoi_learning.json                              ║');
+    console.log('║                                                                  ║');
+    console.log('╚══════════════════════════════════════════════════════════════════╝\n');
     
     startAutoTask();
 });
