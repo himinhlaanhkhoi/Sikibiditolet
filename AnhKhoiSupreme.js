@@ -22,11 +22,11 @@ let lastPhien = { hu: null, md5: null };
 let lastPred = { hu: null, md5: null };
 
 // ============================================================
-// 🧠 THUẬT TOÁN THÔNG MINH - BỘ NHỚ SIÊU DÀI HẠN
+// 🧠 THUẬT TOÁN THÔNG MINH SIÊU CẤP
 // ============================================================
 class SuperSmartPredictor {
     constructor() {
-        // Bộ nhớ dài hạn - KHÔNG BAO GIỜ QUÊN
+        // Bộ nhớ dài hạn
         this.longTermMemory = new Map();
         this.patternMemory = new Map();
         this.weightMemory = new Map();
@@ -46,40 +46,45 @@ class SuperSmartPredictor {
         this.momentumMemory = new Map();
         this.volatilityMemory = new Map();
         this.correlationMemory = new Map();
+        this.fibonacciMemory = new Map();
+        this.movingAvgMemory = new Map();
+        this.rsiMemory = new Map();
+        this.macdMemory = new Map();
+        this.kalmanMemory = new Map();
+        this.ensembleMemory = new Map();
         
-        // Bộ nhớ phiên
-        this.sessionMemory = new Map();
-        this.historyCache = new Map();
-        this.predictionLog = [];
-        
-        // Hệ số thông minh
-        this.smartFactor = 1.0;
-        this.learningSpeed = 0.35;
+        // Hệ số
+        this.learningRate = 0.35;
         this.memoryDepth = 500;
-        this.confidenceBoost = 1.0;
         
         // Khởi tạo
         this.loadData();
         this.initSmartPatterns();
     }
 
-    // Khởi tạo pattern thông minh - DỰ ĐOÁN TỪ GIÂY ĐẦU TIÊN
+    // Khởi tạo pattern thông minh
     initSmartPatterns() {
-        // Pattern dự phòng siêu thông minh
         const basePatterns = [
             { name: 'Bệt ngắn', weight: 1.0, conf: 55 },
             { name: 'Bệt vừa', weight: 1.2, conf: 62 },
             { name: 'Bệt dài', weight: 1.5, conf: 72 },
+            { name: 'Bệt siêu dài', weight: 1.8, conf: 82 },
             { name: 'Đảo 1-1', weight: 1.3, conf: 68 },
             { name: 'Đảo 2-2', weight: 1.2, conf: 62 },
-            { name: 'Zigzag', weight: 1.3, conf: 66 },
+            { name: 'Zigzag ngắn', weight: 1.1, conf: 58 },
+            { name: 'Zigzag dài', weight: 1.4, conf: 70 },
+            { name: 'Zigzag siêu dài', weight: 1.6, conf: 78 },
             { name: 'Chu kỳ 2', weight: 1.1, conf: 58 },
-            { name: 'Chu kỳ 3', weight: 1.2, conf: 60 },
+            { name: 'Chu kỳ 3', weight: 1.2, conf: 62 },
             { name: 'Xu hướng Tài', weight: 1.1, conf: 56 },
             { name: 'Xu hướng Xỉu', weight: 1.1, conf: 56 },
             { name: 'Gãy cầu', weight: 1.2, conf: 64 },
             { name: 'Cân bằng', weight: 1.1, conf: 60 },
-            { name: 'Momentum', weight: 1.1, conf: 58 }
+            { name: 'Momentum', weight: 1.1, conf: 58 },
+            { name: 'Fibonacci', weight: 1.2, conf: 60 },
+            { name: 'RSI', weight: 1.1, conf: 56 },
+            { name: 'MACD', weight: 1.15, conf: 58 },
+            { name: 'Kalman', weight: 1.1, conf: 55 }
         ];
 
         for (const p of basePatterns) {
@@ -90,12 +95,11 @@ class SuperSmartPredictor {
     }
 
     // ============================================================
-    // HỌC SIÊU THÔNG MINH - KHÔNG BAO GIỜ QUÊN
+    // HỌC SIÊU THÔNG MINH
     // ============================================================
     learn(game, pattern, result, conf, sequence) {
         const key = `${game}_${pattern}`;
         
-        // Bộ nhớ dài hạn
         if (!this.longTermMemory.has(key)) {
             this.longTermMemory.set(key, {
                 T: 0, X: 0, total: 0, correct: 0,
@@ -112,11 +116,10 @@ class SuperSmartPredictor {
         mem.lastSeen = Date.now();
         mem.evolution += conf / 100;
         
-        // Giữ bộ nhớ siêu dài hạn
         if (mem.history.length > this.memoryDepth) mem.history.shift();
         if (mem.confidences.length > this.memoryDepth) mem.confidences.shift();
 
-        // Tính độ chính xác siêu thông minh
+        // Tính độ chính xác
         const recent = mem.history.slice(-30);
         const recentConf = mem.confidences.slice(-30);
         let weightedCorrect = 0, weightedTotal = 0;
@@ -127,7 +130,7 @@ class SuperSmartPredictor {
         }
         mem.correct = weightedTotal > 0 ? Math.min(1, weightedCorrect / weightedTotal) : 0.5;
 
-        // Cập nhật weight siêu thông minh
+        // Cập nhật weight
         let weight = 15 + (mem.correct - 0.2) * 220;
         const avgConf = mem.confidences.slice(-20).reduce((a,b) => a+b, 0) / Math.min(mem.confidences.length, 20);
         if (avgConf > 70) weight *= 1.25;
@@ -152,20 +155,13 @@ class SuperSmartPredictor {
             seq.total++;
         }
 
-        // Học tất cả các cầu
+        // Học tất cả cầu
         this.learnAllCau(game, sequence, result);
-
-        // Cập nhật streak
         this.updateStreak(game, result);
-
-        // Lưu prediction log
-        this.predictionLog.push({ game, pattern, result, conf, time: Date.now() });
-        if (this.predictionLog.length > 1000) this.predictionLog.shift();
-
         this.saveData();
     }
 
-    // Học tất cả các loại cầu
+    // Học tất cả cầu
     learnAllCau(game, sequence, result) {
         if (!sequence || sequence.length < 2) return;
 
@@ -180,6 +176,12 @@ class SuperSmartPredictor {
         this.learnMomentum(game, sequence, result);
         this.learnVolatility(game, sequence, result);
         this.learnCorrelation(game, sequence, result);
+        this.learnFibonacci(game, sequence, result);
+        this.learnMovingAvg(game, sequence, result);
+        this.learnRSI(game, sequence, result);
+        this.learnMACD(game, sequence, result);
+        this.learnKalman(game, sequence, result);
+        this.learnEnsemble(game, sequence, result);
     }
 
     // Học Bệt
@@ -545,6 +547,206 @@ class SuperSmartPredictor {
         mem.accuracy = recent2.length > 0 ? correct / recent2.length : 0.5;
     }
 
+    // Học Fibonacci
+    learnFibonacci(game, sequence, result) {
+        if (sequence.length < 8) return;
+        const key = `${game}_fibonacci`;
+        if (!this.fibonacciMemory.has(key)) {
+            this.fibonacciMemory.set(key, {
+                values: [], results: [], accuracy: 0.5, total: 0,
+                patternMap: new Map()
+            });
+        }
+        const mem = this.fibonacciMemory.get(key);
+        
+        const fibs = [1, 1, 2, 3, 5, 8];
+        let fibSum = 0;
+        for (const f of fibs) {
+            if (sequence.length > f && sequence[sequence.length - f] === 'T') fibSum++;
+        }
+        const ratio = fibSum / fibs.length;
+        
+        mem.values.push(ratio);
+        mem.results.push(result);
+        mem.total++;
+        
+        const key2 = ratio > 0.5 ? 'high' : 'low';
+        if (!mem.patternMap.has(key2)) {
+            mem.patternMap.set(key2, { T: 0, X: 0 });
+        }
+        mem.patternMap.get(key2)[result]++;
+        
+        const recent2 = mem.results.slice(-30);
+        const correct = recent2.filter(r => r === result).length;
+        mem.accuracy = recent2.length > 0 ? correct / recent2.length : 0.5;
+    }
+
+    // Học Moving Average
+    learnMovingAvg(game, sequence, result) {
+        if (sequence.length < 10) return;
+        const key = `${game}_ma`;
+        if (!this.movingAvgMemory.has(key)) {
+            this.movingAvgMemory.set(key, {
+                values: [], results: [], accuracy: 0.5, total: 0,
+                patternMap: new Map()
+            });
+        }
+        const mem = this.movingAvgMemory.get(key);
+        
+        const ma5 = sequence.slice(0, 5).filter(r => r === 'T').length / 5;
+        const ma10 = sequence.slice(0, 10).filter(r => r === 'T').length / 10;
+        const diff = ma5 - ma10;
+        
+        mem.values.push(diff);
+        mem.results.push(result);
+        mem.total++;
+        
+        const key2 = diff > 0 ? 'up' : 'down';
+        if (!mem.patternMap.has(key2)) {
+            mem.patternMap.set(key2, { T: 0, X: 0 });
+        }
+        mem.patternMap.get(key2)[result]++;
+        
+        const recent2 = mem.results.slice(-30);
+        const correct = recent2.filter(r => r === result).length;
+        mem.accuracy = recent2.length > 0 ? correct / recent2.length : 0.5;
+    }
+
+    // Học RSI
+    learnRSI(game, sequence, result) {
+        if (sequence.length < 8) return;
+        const key = `${game}_rsi`;
+        if (!this.rsiMemory.has(key)) {
+            this.rsiMemory.set(key, {
+                values: [], results: [], accuracy: 0.5, total: 0,
+                patternMap: new Map()
+            });
+        }
+        const mem = this.rsiMemory.get(key);
+        
+        const recent = sequence.slice(0, 7);
+        let gains = 0, losses = 0;
+        for (let i = 1; i < recent.length; i++) {
+            if (recent[i-1] === 'T' && recent[i] === 'T') gains++;
+            else if (recent[i-1] === 'X' && recent[i] === 'X') losses++;
+        }
+        const rsi = gains + losses > 0 ? gains / (gains + losses) : 0.5;
+        
+        mem.values.push(rsi);
+        mem.results.push(result);
+        mem.total++;
+        
+        const key2 = rsi > 0.6 ? 'high' : 'low';
+        if (!mem.patternMap.has(key2)) {
+            mem.patternMap.set(key2, { T: 0, X: 0 });
+        }
+        mem.patternMap.get(key2)[result]++;
+        
+        const recent2 = mem.results.slice(-30);
+        const correct = recent2.filter(r => r === result).length;
+        mem.accuracy = recent2.length > 0 ? correct / recent2.length : 0.5;
+    }
+
+    // Học MACD
+    learnMACD(game, sequence, result) {
+        if (sequence.length < 12) return;
+        const key = `${game}_macd`;
+        if (!this.macdMemory.has(key)) {
+            this.macdMemory.set(key, {
+                values: [], results: [], accuracy: 0.5, total: 0,
+                patternMap: new Map()
+            });
+        }
+        const mem = this.macdMemory.get(key);
+        
+        const ma6 = sequence.slice(0, 6).filter(r => r === 'T').length / 6;
+        const ma12 = sequence.slice(0, 12).filter(r => r === 'T').length / 12;
+        const macd = ma6 - ma12;
+        
+        mem.values.push(macd);
+        mem.results.push(result);
+        mem.total++;
+        
+        const key2 = macd > 0 ? 'positive' : 'negative';
+        if (!mem.patternMap.has(key2)) {
+            mem.patternMap.set(key2, { T: 0, X: 0 });
+        }
+        mem.patternMap.get(key2)[result]++;
+        
+        const recent2 = mem.results.slice(-30);
+        const correct = recent2.filter(r => r === result).length;
+        mem.accuracy = recent2.length > 0 ? correct / recent2.length : 0.5;
+    }
+
+    // Học Kalman Filter
+    learnKalman(game, sequence, result) {
+        if (sequence.length < 5) return;
+        const key = `${game}_kalman`;
+        if (!this.kalmanMemory.has(key)) {
+            this.kalmanMemory.set(key, {
+                values: [], results: [], accuracy: 0.5, total: 0,
+                patternMap: new Map()
+            });
+        }
+        const mem = this.kalmanMemory.get(key);
+        
+        const recent = sequence.slice(0, 5);
+        let estimate = 0.5;
+        for (let i = 0; i < recent.length; i++) {
+            const z = recent[i] === 'T' ? 1 : 0;
+            estimate = estimate + 0.3 * (z - estimate);
+        }
+        
+        mem.values.push(estimate);
+        mem.results.push(result);
+        mem.total++;
+        
+        const key2 = estimate > 0.5 ? 'up' : 'down';
+        if (!mem.patternMap.has(key2)) {
+            mem.patternMap.set(key2, { T: 0, X: 0 });
+        }
+        mem.patternMap.get(key2)[result]++;
+        
+        const recent2 = mem.results.slice(-30);
+        const correct = recent2.filter(r => r === result).length;
+        mem.accuracy = recent2.length > 0 ? correct / recent2.length : 0.5;
+    }
+
+    // Học Ensemble
+    learnEnsemble(game, sequence, result) {
+        if (sequence.length < 5) return;
+        const key = `${game}_ensemble`;
+        if (!this.ensembleMemory.has(key)) {
+            this.ensembleMemory.set(key, {
+                values: [], results: [], accuracy: 0.5, total: 0,
+                patternMap: new Map()
+            });
+        }
+        const mem = this.ensembleMemory.get(key);
+        
+        // Tổng hợp nhiều chỉ báo
+        const ma3 = sequence.slice(0, 3).filter(r => r === 'T').length / 3;
+        const ma5 = sequence.slice(0, 5).filter(r => r === 'T').length / 5;
+        const trend = ma3 - ma5;
+        const volatility = sequence.slice(0, 5).filter((r, i) => i > 0 && r !== sequence[i-1]).length / 4;
+        
+        const score = (trend * 2 + volatility) / 3;
+        
+        mem.values.push(score);
+        mem.results.push(result);
+        mem.total++;
+        
+        const key2 = score > 0 ? 'up' : 'down';
+        if (!mem.patternMap.has(key2)) {
+            mem.patternMap.set(key2, { T: 0, X: 0 });
+        }
+        mem.patternMap.get(key2)[result]++;
+        
+        const recent2 = mem.results.slice(-30);
+        const correct = recent2.filter(r => r === result).length;
+        mem.accuracy = recent2.length > 0 ? correct / recent2.length : 0.5;
+    }
+
     // Cập nhật streak
     updateStreak(game, result) {
         if (!this.streakMemory.has(game)) {
@@ -573,183 +775,179 @@ class SuperSmartPredictor {
     }
 
     // ============================================================
-    // DỰ ĐOÁN SIÊU THÔNG MINH - BẮT CẦU CHÍNH XÁC
+    // DỰ ĐOÁN SIÊU THÔNG MINH - KHÔNG LỖI
     // ============================================================
     predict(game, data) {
-        // Nếu không có dữ liệu, dùng bộ nhớ dự phòng
+        // Nếu không có dữ liệu
         if (!data || data.length < 2) {
             return this.smartPredictNoData(game);
         }
 
         let T = 0, X = 0;
         const patterns = [];
-        let totalWeight = 0;
 
-        // 1. BỆT - ƯU TIÊN CAO
+        // 1. BỆT
         const bet = this.predictBet(game, data);
         if (bet) {
-            const weight = 1.5;
             patterns.push(bet);
-            if (bet.pred === 'T') T += bet.diem * weight;
-            else X += bet.diem * weight;
-            totalWeight += weight;
+            if (bet.pred === 'T') T += bet.diem;
+            else X += bet.diem;
         }
 
         // 2. ZIGZAG
         const zigzag = this.predictZigzag(game, data);
         if (zigzag) {
-            const weight = 1.4;
             patterns.push(zigzag);
-            if (zigzag.pred === 'T') T += zigzag.diem * weight;
-            else X += zigzag.diem * weight;
-            totalWeight += weight;
+            if (zigzag.pred === 'T') T += zigzag.diem;
+            else X += zigzag.diem;
         }
 
         // 3. ĐẢO 1-1
         const dao = this.predictDao(game, data);
         if (dao) {
-            const weight = 1.3;
             patterns.push(dao);
-            if (dao.pred === 'T') T += dao.diem * weight;
-            else X += dao.diem * weight;
-            totalWeight += weight;
+            if (dao.pred === 'T') T += dao.diem;
+            else X += dao.diem;
         }
 
         // 4. CẦU 2-2
         const cau22 = this.predictCau22(game, data);
         if (cau22) {
-            const weight = 1.25;
             patterns.push(cau22);
-            if (cau22.pred === 'T') T += cau22.diem * weight;
-            else X += cau22.diem * weight;
-            totalWeight += weight;
+            if (cau22.pred === 'T') T += cau22.diem;
+            else X += cau22.diem;
         }
 
         // 5. CẦU 3-3
         const cau33 = this.predictCau33(game, data);
         if (cau33) {
-            const weight = 1.25;
             patterns.push(cau33);
-            if (cau33.pred === 'T') T += cau33.diem * weight;
-            else X += cau33.diem * weight;
-            totalWeight += weight;
+            if (cau33.pred === 'T') T += cau33.diem;
+            else X += cau33.diem;
         }
 
         // 6. CHU KỲ
         const cycle = this.predictCycle(game, data);
         if (cycle) {
-            const weight = 1.2;
             patterns.push(cycle);
-            if (cycle.pred === 'T') T += cycle.diem * weight;
-            else X += cycle.diem * weight;
-            totalWeight += weight;
+            if (cycle.pred === 'T') T += cycle.diem;
+            else X += cycle.diem;
         }
 
         // 7. XU HƯỚNG
         const trend = this.predictTrend(game, data);
         if (trend) {
-            const weight = 1.2;
             patterns.push(trend);
-            if (trend.pred === 'T') T += trend.diem * weight;
-            else X += trend.diem * weight;
-            totalWeight += weight;
+            if (trend.pred === 'T') T += trend.diem;
+            else X += trend.diem;
         }
 
         // 8. CÂN BẰNG
         const balance = this.predictBalance(game, data);
         if (balance) {
-            const weight = 1.15;
             patterns.push(balance);
-            if (balance.pred === 'T') T += balance.diem * weight;
-            else X += balance.diem * weight;
-            totalWeight += weight;
+            if (balance.pred === 'T') T += balance.diem;
+            else X += balance.diem;
         }
 
         // 9. MOMENTUM
         const momentum = this.predictMomentum(game, data);
         if (momentum) {
-            const weight = 1.1;
             patterns.push(momentum);
-            if (momentum.pred === 'T') T += momentum.diem * weight;
-            else X += momentum.diem * weight;
-            totalWeight += weight;
+            if (momentum.pred === 'T') T += momentum.diem;
+            else X += momentum.diem;
         }
 
         // 10. BIẾN ĐỘNG
         const volatility = this.predictVolatility(game, data);
         if (volatility) {
-            const weight = 1.1;
             patterns.push(volatility);
-            if (volatility.pred === 'T') T += volatility.diem * weight;
-            else X += volatility.diem * weight;
-            totalWeight += weight;
+            if (volatility.pred === 'T') T += volatility.diem;
+            else X += volatility.diem;
         }
 
         // 11. TƯƠNG QUAN
         const correlation = this.predictCorrelation(game, data);
         if (correlation) {
-            const weight = 1.05;
             patterns.push(correlation);
-            if (correlation.pred === 'T') T += correlation.diem * weight;
-            else X += correlation.diem * weight;
-            totalWeight += weight;
+            if (correlation.pred === 'T') T += correlation.diem;
+            else X += correlation.diem;
         }
 
-        // ====== ĐIỀU CHỈNH THEO STREAK ======
+        // 12. FIBONACCI
+        const fib = this.predictFibonacci(game, data);
+        if (fib) {
+            patterns.push(fib);
+            if (fib.pred === 'T') T += fib.diem;
+            else X += fib.diem;
+        }
+
+        // 13. MOVING AVERAGE
+        const ma = this.predictMovingAvg(game, data);
+        if (ma) {
+            patterns.push(ma);
+            if (ma.pred === 'T') T += ma.diem;
+            else X += ma.diem;
+        }
+
+        // 14. RSI
+        const rsi = this.predictRSI(game, data);
+        if (rsi) {
+            patterns.push(rsi);
+            if (rsi.pred === 'T') T += rsi.diem;
+            else X += rsi.diem;
+        }
+
+        // 15. MACD
+        const macd = this.predictMACD(game, data);
+        if (macd) {
+            patterns.push(macd);
+            if (macd.pred === 'T') T += macd.diem;
+            else X += macd.diem;
+        }
+
+        // 16. KALMAN
+        const kalman = this.predictKalman(game, data);
+        if (kalman) {
+            patterns.push(kalman);
+            if (kalman.pred === 'T') T += kalman.diem;
+            else X += kalman.diem;
+        }
+
+        // 17. ENSEMBLE
+        const ensemble = this.predictEnsemble(game, data);
+        if (ensemble) {
+            patterns.push(ensemble);
+            if (ensemble.pred === 'T') T += ensemble.diem;
+            else X += ensemble.diem;
+        }
+
+        // ĐIỀU CHỈNH THEO STREAK
         const s = this.streakMemory.get(game);
         if (s) {
-            // Last5
             if (s.last5.length >= 5) {
                 const tCount = s.last5.filter(r => r === 'T').length;
-                if (tCount >= 4) {
-                    X *= 1.35;
-                    patterns.push({ name: '📊 Last5 Tài→Xỉu', pred: 'X', diem: 12 });
-                } else if (tCount <= 1) {
-                    T *= 1.35;
-                    patterns.push({ name: '📊 Last5 Xỉu→Tài', pred: 'T', diem: 12 });
-                }
+                if (tCount >= 4) { X *= 1.35; patterns.push({ name: '📊 Last5 Tài→Xỉu', pred: 'X', diem: 12 }); }
+                else if (tCount <= 1) { T *= 1.35; patterns.push({ name: '📊 Last5 Xỉu→Tài', pred: 'T', diem: 12 }); }
             }
-            // Last10
             if (s.last10.length >= 10) {
                 const tCount = s.last10.filter(r => r === 'T').length;
-                if (tCount >= 7) {
-                    X *= 1.25;
-                    patterns.push({ name: '📊 Last10 Tài→Xỉu', pred: 'X', diem: 10 });
-                } else if (tCount <= 3) {
-                    T *= 1.25;
-                    patterns.push({ name: '📊 Last10 Xỉu→Tài', pred: 'T', diem: 10 });
-                }
+                if (tCount >= 7) { X *= 1.25; patterns.push({ name: '📊 Last10 Tài→Xỉu', pred: 'X', diem: 10 }); }
+                else if (tCount <= 3) { T *= 1.25; patterns.push({ name: '📊 Last10 Xỉu→Tài', pred: 'T', diem: 10 }); }
             }
-            // Last20
-            if (s.last20.length >= 20) {
-                const tCount = s.last20.filter(r => r === 'T').length;
-                if (tCount >= 14) {
-                    X *= 1.15;
-                    patterns.push({ name: '📊 Last20 Tài→Xỉu', pred: 'X', diem: 8 });
-                } else if (tCount <= 6) {
-                    T *= 1.15;
-                    patterns.push({ name: '📊 Last20 Xỉu→Tài', pred: 'T', diem: 8 });
-                }
-            }
-            // Streak
             if (s.chuoi <= -3) {
                 const temp = T;
                 T = X * 1.5;
                 X = temp * 1.5;
-                patterns.push({ name: '🔄 Đảo chiều mạnh', pred: T > X ? 'T' : 'X', diem: 18 });
+                patterns.push({ name: '🔄 Đảo chiều mạnh', pred: 'T', diem: 18 });
             } else if (s.chuoi <= -2) {
                 const temp = T;
                 T = X * 1.3;
                 X = temp * 1.3;
-                patterns.push({ name: '🔄 Đảo chiều', pred: T > X ? 'T' : 'X', diem: 12 });
-            } else if (s.chuoi >= 5) {
-                T *= 1.15;
-                X *= 1.15;
-                patterns.push({ name: '🔥 Đang thắng lớn', pred: 'T', diem: 10 });
+                patterns.push({ name: '🔄 Đảo chiều', pred: 'T', diem: 12 });
             }
         }
 
-        // QUYẾT ĐỊNH
         const total = T + X;
         if (total === 0) {
             return this.smartPredictNoData(game);
@@ -759,7 +957,6 @@ class SuperSmartPredictor {
         let conf = Math.round(Math.max(T, X) / total * 100);
         conf = Math.min(97, Math.max(48, conf));
 
-        // Học
         const result = pred === 'TÀI' ? 'T' : 'X';
         const detail = patterns.map(p => p.name).slice(0, 4).join(' • ');
         this.learn(game, 'main', result, conf, data.slice(0, 6).join(''));
@@ -772,7 +969,7 @@ class SuperSmartPredictor {
     }
 
     // ============================================================
-    // DỰ ĐOÁN CÁC LOẠI CẦU
+    // DỰ ĐOÁN CÁC LOẠI CẦU - KHÔNG LỖI
     // ============================================================
 
     // 1. BỆT
@@ -785,22 +982,17 @@ class SuperSmartPredictor {
             else break;
         }
 
-        const key = `${game}_bet`;
-        const mem = this.betMemory.get(key);
-        let acc = mem ? mem.accuracy : 0.5;
-
         if (count >= 8) {
-            return { name: `🔥 Bệt siêu dài ${count}`, pred: last === 'T' ? 'X' : 'T', diem: 40 };
+            return { name: `🔥 Bệt siêu dài ${count}`, pred: last === 'T' ? 'X' : 'T', diem: 45 };
         }
         if (count >= 6) {
-            if (acc > 0.5) return { name: `⚡ Bệt dài ${count}`, pred: last === 'T' ? 'X' : 'T', diem: 32 };
-            return { name: `⚡ Bệt dài ${count}`, pred: last === 'T' ? 'X' : 'T', diem: 28 };
+            return { name: `⚡ Bệt dài ${count}`, pred: last === 'T' ? 'X' : 'T', diem: 35 };
         }
         if (count >= 4) {
-            return { name: `📈 Bệt ${count}`, pred: last === 'T' ? 'X' : 'T', diem: 22 };
+            return { name: `📈 Bệt ${count}`, pred: last === 'T' ? 'X' : 'T', diem: 25 };
         }
         if (count >= 3) {
-            if (acc > 0.55) return { name: `📊 Bệt ngắn ${count}`, pred: last === 'T' ? 'X' : 'T', diem: 16 };
+            return { name: `📊 Bệt ngắn ${count}`, pred: last === 'T' ? 'X' : 'T', diem: 18 };
         }
         return null;
     }
@@ -813,19 +1005,14 @@ class SuperSmartPredictor {
             if (data[i-1] !== data[i]) changes++;
         }
 
-        const key = `${game}_zigzag`;
-        const mem = this.zigzagMemory.get(key);
-        let acc = mem ? mem.accuracy : 0.5;
-
         if (changes >= 7) {
-            return { name: `⚡ Zigzag ${changes}`, pred: data[0] === 'T' ? 'X' : 'T', diem: 32 };
+            return { name: `⚡ Zigzag siêu dài ${changes}`, pred: data[0] === 'T' ? 'X' : 'T', diem: 35 };
         }
         if (changes >= 5) {
-            if (acc > 0.5) return { name: `🌀 Zigzag ${changes}`, pred: data[0] === 'T' ? 'X' : 'T', diem: 24 };
-            return { name: `🌀 Zigzag ${changes}`, pred: data[0] === 'T' ? 'X' : 'T', diem: 20 };
+            return { name: `🌀 Zigzag ${changes}`, pred: data[0] === 'T' ? 'X' : 'T', diem: 25 };
         }
         if (changes >= 4) {
-            return { name: `🎯 Zigzag ngắn ${changes}`, pred: data[0] === 'T' ? 'X' : 'T', diem: 16 };
+            return { name: `🎯 Zigzag ngắn ${changes}`, pred: data[0] === 'T' ? 'X' : 'T', diem: 18 };
         }
         return null;
     }
@@ -838,17 +1025,12 @@ class SuperSmartPredictor {
             if (data[i] === data[i+1]) { alt = false; break; }
         }
 
-        const key = `${game}_dao`;
-        const mem = this.daoMemory.get(key);
-        let acc = mem ? mem.accuracy : 0.5;
-
         if (alt) {
             const len = data.length;
             let diem = 22;
-            if (len >= 6) diem = 26;
-            if (len >= 8) diem = 30;
-            if (acc > 0.55) diem += 4;
-            return { name: `🔄 Đảo 1-1`, pred: data[0] === 'T' ? 'X' : 'T', diem };
+            if (len >= 6) diem = 28;
+            if (len >= 8) diem = 32;
+            return { name: `🔄 Đảo 1-1 ${len >= 6 ? 'dài' : ''}`, pred: data[0] === 'T' ? 'X' : 'T', diem };
         }
         return null;
     }
@@ -860,7 +1042,7 @@ class SuperSmartPredictor {
         const p2 = data[2] === data[3];
         const p3 = data[4] === data[5];
         if (p1 && p2 && p3 && data[0] !== data[2] && data[2] !== data[4]) {
-            return { name: `🔄 Cầu 2-2`, pred: data[0] === 'T' ? 'X' : 'T', diem: 24 };
+            return { name: `🔄 Cầu 2-2`, pred: data[0] === 'T' ? 'X' : 'T', diem: 26 };
         }
         return null;
     }
@@ -871,7 +1053,7 @@ class SuperSmartPredictor {
         const l3 = data.slice(0, 3);
         const p3 = data.slice(3, 6);
         if (l3.every(v => v === l3[0]) && p3.every(v => v === p3[0]) && l3[0] !== p3[0]) {
-            return { name: `🏗️ Cầu 3-3`, pred: l3[0] === 'T' ? 'X' : 'T', diem: 26 };
+            return { name: `🏗️ Cầu 3-3`, pred: l3[0] === 'T' ? 'X' : 'T', diem: 28 };
         }
         return null;
     }
@@ -885,7 +1067,7 @@ class SuperSmartPredictor {
             const p2 = data.slice(c, c*2);
             const p3 = data.slice(c*2, c*3);
             if (p1.join('') === p2.join('') && p2.join('') === p3.join('')) {
-                return { name: `🔁 Chu kỳ ${c}`, pred: p1[0] === 'T' ? 'X' : 'T', diem: 20 };
+                return { name: `🔁 Chu kỳ ${c}`, pred: p1[0] === 'T' ? 'X' : 'T', diem: 22 };
             }
         }
         return null;
@@ -898,16 +1080,16 @@ class SuperSmartPredictor {
         const tCount = recent.filter(r => r === 'T').length;
 
         if (tCount >= 8) {
-            return { name: `📈 Tài ${tCount}/10 → Xỉu`, pred: 'X', diem: 18 };
+            return { name: `📈 Tài ${tCount}/10 → Xỉu`, pred: 'X', diem: 20 };
         }
         if (tCount <= 2) {
-            return { name: `📉 Xỉu ${10-tCount}/10 → Tài`, pred: 'T', diem: 18 };
+            return { name: `📉 Xỉu ${10-tCount}/10 → Tài`, pred: 'T', diem: 20 };
         }
         if (tCount >= 6) {
-            return { name: `📈 Tài ${tCount}/10 → Xỉu`, pred: 'X', diem: 14 };
+            return { name: `📈 Tài ${tCount}/10 → Xỉu`, pred: 'X', diem: 16 };
         }
         if (tCount <= 4) {
-            return { name: `📉 Xỉu ${10-tCount}/10 → Tài`, pred: 'T', diem: 14 };
+            return { name: `📉 Xỉu ${10-tCount}/10 → Tài`, pred: 'T', diem: 16 };
         }
         return null;
     }
@@ -919,16 +1101,16 @@ class SuperSmartPredictor {
         const tCount = recent.filter(r => r === 'T').length;
 
         if (tCount >= 15) {
-            return { name: `⚖️ Tài ${tCount}/20 → Xỉu`, pred: 'X', diem: 16 };
+            return { name: `⚖️ Tài ${tCount}/20 → Xỉu`, pred: 'X', diem: 18 };
         }
         if (tCount <= 5) {
-            return { name: `⚖️ Xỉu ${20-tCount}/20 → Tài`, pred: 'T', diem: 16 };
+            return { name: `⚖️ Xỉu ${20-tCount}/20 → Tài`, pred: 'T', diem: 18 };
         }
         if (tCount >= 13) {
-            return { name: `⚖️ Tài ${tCount}/20 → Xỉu`, pred: 'X', diem: 12 };
+            return { name: `⚖️ Tài ${tCount}/20 → Xỉu`, pred: 'X', diem: 14 };
         }
         if (tCount <= 7) {
-            return { name: `⚖️ Xỉu ${20-tCount}/20 → Tài`, pred: 'T', diem: 12 };
+            return { name: `⚖️ Xỉu ${20-tCount}/20 → Tài`, pred: 'T', diem: 14 };
         }
         return null;
     }
@@ -940,10 +1122,10 @@ class SuperSmartPredictor {
         const tCount = recent.filter(r => r === 'T').length;
 
         if (tCount >= 4) {
-            return { name: `📊 Đà Tài ${tCount}/5 → Xỉu`, pred: 'X', diem: 12 };
+            return { name: `📊 Đà Tài ${tCount}/5 → Xỉu`, pred: 'X', diem: 14 };
         }
         if (tCount <= 1) {
-            return { name: `📊 Đà Xỉu ${5-tCount}/5 → Tài`, pred: 'T', diem: 12 };
+            return { name: `📊 Đà Xỉu ${5-tCount}/5 → Tài`, pred: 'T', diem: 14 };
         }
         return null;
     }
@@ -957,7 +1139,7 @@ class SuperSmartPredictor {
         }
 
         if (changes >= 4) {
-            return { name: `📉 Biến động ${changes}/4 → Đảo`, pred: data[0] === 'T' ? 'X' : 'T', diem: 10 };
+            return { name: `📉 Biến động ${changes}/4 → Đảo`, pred: data[0] === 'T' ? 'X' : 'T', diem: 12 };
         }
         return null;
     }
@@ -972,22 +1154,128 @@ class SuperSmartPredictor {
         }
 
         if (corr >= 3) {
-            return { name: `🔗 Tương quan dương → Theo`, pred: data[0] === 'T' ? 'T' : 'X', diem: 8 };
+            return { name: `🔗 Tương quan dương → Theo`, pred: data[0] === 'T' ? 'T' : 'X', diem: 10 };
         }
         if (corr <= -3) {
-            return { name: `🔗 Tương quan âm → Đảo`, pred: data[0] === 'T' ? 'X' : 'T', diem: 8 };
+            return { name: `🔗 Tương quan âm → Đảo`, pred: data[0] === 'T' ? 'X' : 'T', diem: 10 };
+        }
+        return null;
+    }
+
+    // 12. FIBONACCI
+    predictFibonacci(game, data) {
+        if (data.length < 8) return null;
+        const fibs = [1, 1, 2, 3, 5, 8];
+        let fibSum = 0;
+        for (const f of fibs) {
+            if (data.length > f && data[data.length - f] === 'T') fibSum++;
+        }
+        const ratio = fibSum / fibs.length;
+
+        if (ratio >= 0.7) {
+            return { name: `🔢 Fibonacci ${Math.round(ratio*100)}% Tài → Xỉu`, pred: 'X', diem: 12 };
+        }
+        if (ratio <= 0.3) {
+            return { name: `🔢 Fibonacci ${Math.round(ratio*100)}% Xỉu → Tài`, pred: 'T', diem: 12 };
+        }
+        return null;
+    }
+
+    // 13. MOVING AVERAGE
+    predictMovingAvg(game, data) {
+        if (data.length < 10) return null;
+        const ma5 = data.slice(0, 5).filter(r => r === 'T').length / 5;
+        const ma10 = data.slice(0, 10).filter(r => r === 'T').length / 10;
+        const diff = ma5 - ma10;
+
+        if (diff > 0.3) {
+            return { name: `📊 MA5>MA10 → Xỉu`, pred: 'X', diem: 12 };
+        }
+        if (diff < -0.3) {
+            return { name: `📊 MA5<MA10 → Tài`, pred: 'T', diem: 12 };
+        }
+        return null;
+    }
+
+    // 14. RSI
+    predictRSI(game, data) {
+        if (data.length < 8) return null;
+        const recent = data.slice(0, 7);
+        let gains = 0, losses = 0;
+        for (let i = 1; i < recent.length; i++) {
+            if (recent[i-1] === 'T' && recent[i] === 'T') gains++;
+            else if (recent[i-1] === 'X' && recent[i] === 'X') losses++;
+        }
+        const rsi = gains + losses > 0 ? gains / (gains + losses) : 0.5;
+
+        if (rsi >= 0.7) {
+            return { name: `📈 RSI ${Math.round(rsi*100)}% → Xỉu`, pred: 'X', diem: 10 };
+        }
+        if (rsi <= 0.3) {
+            return { name: `📉 RSI ${Math.round(rsi*100)}% → Tài`, pred: 'T', diem: 10 };
+        }
+        return null;
+    }
+
+    // 15. MACD
+    predictMACD(game, data) {
+        if (data.length < 12) return null;
+        const ma6 = data.slice(0, 6).filter(r => r === 'T').length / 6;
+        const ma12 = data.slice(0, 12).filter(r => r === 'T').length / 12;
+        const macd = ma6 - ma12;
+
+        if (macd > 0.2) {
+            return { name: `📊 MACD dương → Xỉu`, pred: 'X', diem: 10 };
+        }
+        if (macd < -0.2) {
+            return { name: `📊 MACD âm → Tài`, pred: 'T', diem: 10 };
+        }
+        return null;
+    }
+
+    // 16. KALMAN
+    predictKalman(game, data) {
+        if (data.length < 5) return null;
+        const recent = data.slice(0, 5);
+        let estimate = 0.5;
+        for (let i = 0; i < recent.length; i++) {
+            const z = recent[i] === 'T' ? 1 : 0;
+            estimate = estimate + 0.3 * (z - estimate);
+        }
+
+        if (estimate > 0.6) {
+            return { name: `🎯 Kalman ${Math.round(estimate*100)}% → Xỉu`, pred: 'X', diem: 10 };
+        }
+        if (estimate < 0.4) {
+            return { name: `🎯 Kalman ${Math.round(estimate*100)}% → Tài`, pred: 'T', diem: 10 };
+        }
+        return null;
+    }
+
+    // 17. ENSEMBLE
+    predictEnsemble(game, data) {
+        if (data.length < 5) return null;
+        const ma3 = data.slice(0, 3).filter(r => r === 'T').length / 3;
+        const ma5 = data.slice(0, 5).filter(r => r === 'T').length / 5;
+        const trend = ma3 - ma5;
+        const volatility = data.slice(0, 5).filter((r, i) => i > 0 && r !== data[i-1]).length / 4;
+        const score = (trend * 2 + volatility) / 3;
+
+        if (score > 0.3) {
+            return { name: `🧠 Ensemble → Xỉu`, pred: 'X', diem: 12 };
+        }
+        if (score < -0.3) {
+            return { name: `🧠 Ensemble → Tài`, pred: 'T', diem: 12 };
         }
         return null;
     }
 
     // ============================================================
-    // DỰ ĐOÁN KHI CHƯA CÓ DỮ LIỆU - SIÊU THÔNG MINH
+    // DỰ ĐOÁN KHI CHƯA CÓ DỮ LIỆU
     // ============================================================
     smartPredictNoData(game) {
-        // Sử dụng bộ nhớ đã học
         const s = this.streakMemory.get(game);
         
-        // Nếu có streak, dùng để dự đoán
         if (s) {
             if (s.chuoi <= -2) {
                 return { prediction: 'TÀI', confidence: 56, detail: '🔄 Đảo chiều từ bộ nhớ' };
@@ -995,7 +1283,6 @@ class SuperSmartPredictor {
             if (s.chuoi >= 3) {
                 return { prediction: 'XỈU', confidence: 56, detail: '📊 Đảo chuỗi từ bộ nhớ' };
             }
-            // Phân tích last5
             if (s.last5.length >= 5) {
                 const tCount = s.last5.filter(r => r === 'T').length;
                 if (tCount >= 4) {
@@ -1007,7 +1294,6 @@ class SuperSmartPredictor {
             }
         }
 
-        // Dùng pattern dự phòng thông minh
         const seed = Date.now() % 3;
         const preds = ['TÀI', 'XỈU', 'TÀI'];
         return {
@@ -1028,7 +1314,6 @@ class SuperSmartPredictor {
                 accuracy: Object.fromEntries(this.accuracyMemory),
                 streak: Object.fromEntries(this.streakMemory),
                 sequence: Object.fromEntries(this.sequenceMemory),
-                predictionLog: this.predictionLog.slice(-500),
                 updated: new Date().toISOString()
             };
             fs.writeFileSync(LEARNING_FILE, JSON.stringify(data, null, 2));
@@ -1064,10 +1349,7 @@ class SuperSmartPredictor {
                         this.sequenceMemory.set(k, v);
                     }
                 }
-                if (data.predictionLog) {
-                    this.predictionLog = data.predictionLog;
-                }
-                console.log('🧠 Đã tải bộ nhớ siêu dài hạn');
+                console.log('🧠 Đã tải bộ nhớ siêu thông minh');
             }
         } catch (e) {}
     }
@@ -1077,8 +1359,7 @@ class SuperSmartPredictor {
         return {
             chuoi: s ? s.chuoi : 0,
             chuoi_dai: s ? s.best : 0,
-            totalPatterns: this.longTermMemory.size,
-            totalLearned: this.predictionLog.length
+            totalPatterns: this.longTermMemory.size
         };
     }
 }
@@ -1163,7 +1444,6 @@ function verifyAndUpdate(type, data) {
 
 async function autoProcess() {
     try {
-        // HU
         const dHu = await fetchData('hu');
         if (dHu && dHu.length > 0) {
             const cur = dHu[0].phien;
@@ -1194,7 +1474,6 @@ async function autoProcess() {
             }
         }
 
-        // MD5
         const dMd5 = await fetchData('md5');
         if (dMd5 && dMd5.length > 0) {
             const cur = dMd5[0].phien;
@@ -1394,7 +1673,7 @@ function generateHTML(type) {
         </table>
     </div>
     
-    <div class="footer">🌌 <span class="hl">TX Universe</span> • Bộ nhớ siêu dài hạn • Tự động cập nhật 5s</div>
+    <div class="footer">🌌 <span class="hl">TX Universe</span> • 17 thuật toán thông minh • Tự động cập nhật 5s</div>
 </div>
 <script>setTimeout(()=>location.reload(),5000);</script>
 </body>
@@ -1520,9 +1799,13 @@ loadHistory();
 app.listen(PORT, '0.0.0.0', () => {
     console.log('\n╔═══════════════════════════════════════════╗');
     console.log('║  🌌 TX UNIVERSE v7.0 - ANH KHÔI       ║');
-    console.log('║  🧠 BỘ NHỚ SIÊU DÀI HẠN               ║');
+    console.log('║  🧠 17 THUẬT TOÁN THÔNG MINH          ║');
     console.log(`║  📡 http://0.0.0.0:${PORT}             ║`);
-    console.log('║  🎯 11 loại cầu thông minh            ║');
+    console.log('║  🎯 Bệt • Zigzag • Đảo • Cầu 2-2     ║');
+    console.log('║  🎯 Cầu 3-3 • Chu kỳ • Xu hướng       ║');
+    console.log('║  🎯 Cân bằng • Momentum • Biến động    ║');
+    console.log('║  🎯 Tương quan • Fibonacci • MA        ║');
+    console.log('║  🎯 RSI • MACD • Kalman • Ensemble    ║');
     console.log('║  📁 himinhlaanhkhoi_history.json      ║');
     console.log('║  📁 himinhlaanhkhoi_learning.json     ║');
     console.log('╚═══════════════════════════════════════════╝\n');
