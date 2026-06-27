@@ -22,17 +22,15 @@ let lastPhien = { hu: null, md5: null };
 let lastPred = { hu: null, md5: null };
 
 // ============================================================
-// 🤖 THUẬT TOÁN HIỆN ĐẠI - ML & DEEP LEARNING
+// 🤖 20 THUẬT TOÁN MACHINE LEARNING & DỰ ĐOÁN THÔNG MINH
 // ============================================================
 
-// ===== 1. NEURAL NETWORK - MẠNG NƠ-RON NHÂN TẠO =====
+// ===== 1. NEURAL NETWORK - MẠNG NƠ-RON =====
 class NeuralNetwork {
-    constructor(inputSize, hiddenSize, outputSize) {
+    constructor(inputSize = 10, hiddenSize = 20, outputSize = 2) {
         this.inputSize = inputSize;
         this.hiddenSize = hiddenSize;
         this.outputSize = outputSize;
-        
-        // Khởi tạo trọng số
         this.W1 = Array.from({ length: inputSize }, () => 
             Array.from({ length: hiddenSize }, () => Math.random() * 0.2 - 0.1)
         );
@@ -41,46 +39,12 @@ class NeuralNetwork {
             Array.from({ length: outputSize }, () => Math.random() * 0.2 - 0.1)
         );
         this.b2 = new Array(outputSize).fill(0);
-        
-        this.learningRate = 0.01;
+        this.lr = 0.005;
         this.trained = false;
     }
     
     sigmoid(x) { return 1 / (1 + Math.exp(-x)); }
     sigmoidDerivative(x) { return x * (1 - x); }
-    
-    train(data, epochs = 200) {
-        const features = data.map(d => d.dacTrung);
-        const labels = data.map(d => d.nhan === 'T' ? [1, 0] : [0, 1]);
-        
-        for (let epoch = 0; epoch < epochs; epoch++) {
-            for (let i = 0; i < features.length; i++) {
-                // Forward propagation
-                const hidden = this.forward(features[i]);
-                const output = this.sigmoid(
-                    hidden.reduce((sum, h, j) => sum + h * this.W2[j][0], this.b2[0])
-                );
-                
-                // Backward propagation
-                const outputError = labels[i][0] - output;
-                const outputDelta = outputError * this.sigmoidDerivative(output);
-                
-                const hiddenErrors = this.W2.map((w, j) => w[0] * outputDelta);
-                const hiddenDeltas = hidden.map((h, j) => hiddenErrors[j] * this.sigmoidDerivative(h));
-                
-                // Cập nhật trọng số
-                for (let j = 0; j < this.hiddenSize; j++) {
-                    this.W2[j][0] += this.learningRate * outputDelta * hidden[j];
-                    for (let k = 0; k < this.inputSize; k++) {
-                        this.W1[k][j] += this.learningRate * hiddenDeltas[j] * features[i][k];
-                    }
-                    this.b1[j] += this.learningRate * hiddenDeltas[j];
-                }
-                this.b2[0] += this.learningRate * outputDelta;
-            }
-        }
-        this.trained = true;
-    }
     
     forward(input) {
         const hidden = new Array(this.hiddenSize);
@@ -91,36 +55,71 @@ class NeuralNetwork {
             }
             hidden[j] = this.sigmoid(sum);
         }
-        return hidden;
+        const output = new Array(this.outputSize);
+        for (let j = 0; j < this.outputSize; j++) {
+            let sum = this.b2[j];
+            for (let k = 0; k < this.hiddenSize; k++) {
+                sum += hidden[k] * this.W2[k][j];
+            }
+            output[j] = this.sigmoid(sum);
+        }
+        return { hidden, output };
+    }
+    
+    train(data, epochs = 300) {
+        const features = data.map(d => d.dacTrung);
+        const labels = data.map(d => d.nhan === 'T' ? [1, 0] : [0, 1]);
+        for (let epoch = 0; epoch < epochs; epoch++) {
+            for (let i = 0; i < features.length; i++) {
+                const { hidden, output } = this.forward(features[i]);
+                const outputError = labels[i].map((l, j) => (l - output[j]) * this.sigmoidDerivative(output[j]));
+                const hiddenErrors = new Array(this.hiddenSize);
+                for (let j = 0; j < this.hiddenSize; j++) {
+                    let sum = 0;
+                    for (let k = 0; k < this.outputSize; k++) {
+                        sum += outputError[k] * this.W2[j][k];
+                    }
+                    hiddenErrors[j] = sum * this.sigmoidDerivative(hidden[j]);
+                }
+                for (let j = 0; j < this.outputSize; j++) {
+                    for (let k = 0; k < this.hiddenSize; k++) {
+                        this.W2[k][j] += this.lr * outputError[j] * hidden[k];
+                    }
+                    this.b2[j] += this.lr * outputError[j];
+                }
+                for (let j = 0; j < this.hiddenSize; j++) {
+                    for (let k = 0; k < this.inputSize; k++) {
+                        this.W1[k][j] += this.lr * hiddenErrors[j] * features[i][k];
+                    }
+                    this.b1[j] += this.lr * hiddenErrors[j];
+                }
+            }
+        }
+        this.trained = true;
     }
     
     predict(input) {
         if (!this.trained) return null;
-        const hidden = this.forward(input);
-        const output = this.sigmoid(
-            hidden.reduce((sum, h, j) => sum + h * this.W2[j][0], this.b2[0])
-        );
-        return output > 0.5 ? 'T' : 'X';
+        const { output } = this.forward(input);
+        return output[0] > output[1] ? 'T' : 'X';
     }
 }
 
 // ===== 2. DEEP NEURAL NETWORK - MẠNG NƠ-RON SÂU =====
 class DeepNeuralNetwork {
-    constructor(layers) {
-        this.layers = layers;
+    constructor() {
+        this.layers = [10, 24, 16, 8, 2];
         this.weights = [];
         this.biases = [];
-        
-        for (let i = 0; i < layers.length - 1; i++) {
+        for (let i = 0; i < this.layers.length - 1; i++) {
             this.weights.push(
-                Array.from({ length: layers[i] }, () => 
-                    Array.from({ length: layers[i+1] }, () => Math.random() * 0.2 - 0.1)
+                Array.from({ length: this.layers[i] }, () => 
+                    Array.from({ length: this.layers[i+1] }, () => Math.random() * 0.2 - 0.1)
                 )
             );
-            this.biases.push(new Array(layers[i+1]).fill(0));
+            this.biases.push(new Array(this.layers[i+1]).fill(0));
         }
-        
-        this.learningRate = 0.005;
+        this.lr = 0.003;
         this.trained = false;
     }
     
@@ -130,7 +129,6 @@ class DeepNeuralNetwork {
     forward(input) {
         let current = input;
         const activations = [current];
-        
         for (let layer = 0; layer < this.weights.length; layer++) {
             const next = new Array(this.weights[layer][0].length);
             for (let j = 0; j < this.weights[layer][0].length; j++) {
@@ -143,23 +141,18 @@ class DeepNeuralNetwork {
             current = next;
             activations.push(current);
         }
-        
         return { output: current, activations };
     }
     
-    train(data, epochs = 300) {
+    train(data, epochs = 400) {
         const features = data.map(d => d.dacTrung);
         const labels = data.map(d => d.nhan === 'T' ? [1, 0] : [0, 1]);
-        
         for (let epoch = 0; epoch < epochs; epoch++) {
             for (let i = 0; i < features.length; i++) {
                 const { output, activations } = this.forward(features[i]);
-                
-                // Backward propagation
                 const errors = [];
                 const outputError = labels[i].map((l, j) => (l - output[j]) * this.sigmoidDerivative(output[j]));
                 errors.push(outputError);
-                
                 for (let layer = this.weights.length - 2; layer >= 0; layer--) {
                     const layerError = new Array(this.weights[layer][0].length);
                     for (let j = 0; j < this.weights[layer][0].length; j++) {
@@ -171,14 +164,12 @@ class DeepNeuralNetwork {
                     }
                     errors.unshift(layerError);
                 }
-                
-                // Cập nhật trọng số
                 for (let layer = 0; layer < this.weights.length; layer++) {
                     for (let j = 0; j < this.weights[layer][0].length; j++) {
                         for (let k = 0; k < this.weights[layer].length; k++) {
-                            this.weights[layer][k][j] += this.learningRate * errors[layer][j] * activations[layer][k];
+                            this.weights[layer][k][j] += this.lr * errors[layer][j] * activations[layer][k];
                         }
-                        this.biases[layer][j] += this.learningRate * errors[layer][j];
+                        this.biases[layer][j] += this.lr * errors[layer][j];
                     }
                 }
             }
@@ -193,13 +184,13 @@ class DeepNeuralNetwork {
     }
 }
 
-// ===== 3. RANDOM FOREST - RỪNG NGẪU NHIÊN NÂNG CAO =====
-class RandomForestAdvanced {
-    constructor(nTrees = 20, maxDepth = 8) {
+// ===== 3. RANDOM FOREST - RỪNG NGẪU NHIÊN =====
+class RandomForest {
+    constructor(nTrees = 30, maxDepth = 10) {
         this.nTrees = nTrees;
         this.maxDepth = maxDepth;
         this.trees = [];
-        this.featureSubset = Math.floor(Math.sqrt(8));
+        this.featureSubset = 4;
     }
     
     train(data) {
@@ -222,14 +213,11 @@ class RandomForestAdvanced {
         if (depth >= this.maxDepth || data.length < 5) {
             return this.majorityVote(data);
         }
-        
         const labels = data.map(d => d.nhan);
         const unique = [...new Set(labels)];
         if (unique.length === 1) return unique[0];
-        
         const bestSplit = this.findBestSplit(data);
         if (!bestSplit) return this.majorityVote(data);
-        
         return {
             feature: bestSplit.feature,
             threshold: bestSplit.threshold,
@@ -243,18 +231,14 @@ class RandomForestAdvanced {
         const features = this.getRandomFeatures(numFeatures);
         let bestGain = -1;
         let bestSplit = null;
-        
         for (const f of features) {
             const values = data.map(d => d.dacTrung[f]);
             const sorted = [...new Set(values)].sort((a, b) => a - b);
-            
             for (let i = 0; i < sorted.length - 1; i++) {
                 const threshold = (sorted[i] + sorted[i + 1]) / 2;
                 const left = data.filter(d => d.dacTrung[f] <= threshold);
                 const right = data.filter(d => d.dacTrung[f] > threshold);
-                
                 if (left.length === 0 || right.length === 0) continue;
-                
                 const gain = this.informationGain(data, left, right);
                 if (gain > bestGain) {
                     bestGain = gain;
@@ -262,7 +246,6 @@ class RandomForestAdvanced {
                 }
             }
         }
-        
         return bestSplit;
     }
     
@@ -290,7 +273,6 @@ class RandomForestAdvanced {
             }
             return e;
         };
-        
         const pe = entropy(parent);
         const le = entropy(left);
         const re = entropy(right);
@@ -328,11 +310,11 @@ class RandomForestAdvanced {
     }
 }
 
-// ===== 4. GRADIENT BOOSTING - TĂNG CƯỜNG GRADIENT =====
-class GradientBoostingAdvanced {
-    constructor(nEstimators = 50, learningRate = 0.1, maxDepth = 4) {
+// ===== 4. GRADIENT BOOSTING =====
+class GradientBoosting {
+    constructor(nEstimators = 60, lr = 0.08, maxDepth = 5) {
         this.nEstimators = nEstimators;
-        this.learningRate = learningRate;
+        this.lr = lr;
         this.maxDepth = maxDepth;
         this.models = [];
         this.initialPred = 0.5;
@@ -342,17 +324,14 @@ class GradientBoostingAdvanced {
         const features = data.map(d => d.dacTrung);
         const labels = data.map(d => d.nhan === 'T' ? 1 : 0);
         const n = features.length;
-        
         this.initialPred = labels.reduce((a, b) => a + b, 0) / n;
         let residuals = labels.map(l => l - this.initialPred);
-        
         for (let i = 0; i < this.nEstimators; i++) {
             const tree = this.buildTree(features, residuals, 0);
             this.models.push(tree);
-            
             for (let j = 0; j < n; j++) {
                 const pred = this.predictTree(tree, features[j]);
-                residuals[j] -= this.learningRate * pred;
+                residuals[j] -= this.lr * pred;
             }
         }
     }
@@ -361,34 +340,22 @@ class GradientBoostingAdvanced {
         if (depth >= this.maxDepth || features.length < 5) {
             return residuals.reduce((a, b) => a + b, 0) / residuals.length;
         }
-        
         let bestFeature = 0, bestThreshold = 0, bestError = Infinity;
-        
         for (let f = 0; f < features[0].length; f++) {
             const values = features.map(row => row[f]);
             const sorted = [...new Set(values)].sort((a, b) => a - b);
-            
             for (let i = 0; i < sorted.length - 1; i++) {
                 const threshold = (sorted[i] + sorted[i + 1]) / 2;
                 const leftIndices = features.map((row, idx) => row[f] <= threshold ? idx : -1).filter(idx => idx !== -1);
                 const rightIndices = features.map((row, idx) => row[f] > threshold ? idx : -1).filter(idx => idx !== -1);
-                
                 if (leftIndices.length === 0 || rightIndices.length === 0) continue;
-                
                 const leftResiduals = leftIndices.map(idx => residuals[idx]);
                 const rightResiduals = rightIndices.map(idx => residuals[idx]);
-                
                 const leftMean = leftResiduals.reduce((a, b) => a + b, 0) / leftResiduals.length;
                 const rightMean = rightResiduals.reduce((a, b) => a + b, 0) / rightResiduals.length;
-                
                 let error = 0;
-                for (const idx of leftIndices) {
-                    error += Math.pow(residuals[idx] - leftMean, 2);
-                }
-                for (const idx of rightIndices) {
-                    error += Math.pow(residuals[idx] - rightMean, 2);
-                }
-                
+                for (const idx of leftIndices) error += Math.pow(residuals[idx] - leftMean, 2);
+                for (const idx of rightIndices) error += Math.pow(residuals[idx] - rightMean, 2);
                 if (error < bestError) {
                     bestError = error;
                     bestFeature = f;
@@ -396,15 +363,12 @@ class GradientBoostingAdvanced {
                 }
             }
         }
-        
         const leftIndices = features.map((row, idx) => row[bestFeature] <= bestThreshold ? idx : -1).filter(idx => idx !== -1);
         const rightIndices = features.map((row, idx) => row[bestFeature] > bestThreshold ? idx : -1).filter(idx => idx !== -1);
-        
         const leftFeatures = leftIndices.map(idx => features[idx]);
         const rightFeatures = rightIndices.map(idx => features[idx]);
         const leftResiduals = leftIndices.map(idx => residuals[idx]);
         const rightResiduals = rightIndices.map(idx => residuals[idx]);
-        
         return {
             feature: bestFeature,
             threshold: bestThreshold,
@@ -425,17 +389,100 @@ class GradientBoostingAdvanced {
     predict(features) {
         let sum = this.initialPred;
         for (const tree of this.models) {
-            sum += this.learningRate * this.predictTree(tree, features);
+            sum += this.lr * this.predictTree(tree, features);
         }
         return sum > 0.5 ? 'T' : 'X';
     }
 }
 
-// ===== 5. SUPPORT VECTOR MACHINE - MÁY HỖ TRỢ VECTOR =====
-class SVMAdvanced {
-    constructor(C = 1.0, learningRate = 0.001, epochs = 200) {
+// ===== 5. XGBOOST =====
+class XGBoost {
+    constructor(nEstimators = 40, lr = 0.1, maxDepth = 4) {
+        this.nEstimators = nEstimators;
+        this.lr = lr;
+        this.maxDepth = maxDepth;
+        this.models = [];
+        this.initialPred = 0.5;
+    }
+    
+    train(data) {
+        const features = data.map(d => d.dacTrung);
+        const labels = data.map(d => d.nhan === 'T' ? 1 : 0);
+        const n = features.length;
+        this.initialPred = labels.reduce((a, b) => a + b, 0) / n;
+        let residuals = labels.map(l => l - this.initialPred);
+        for (let i = 0; i < this.nEstimators; i++) {
+            const tree = this.buildTree(features, residuals, 0);
+            this.models.push(tree);
+            for (let j = 0; j < n; j++) {
+                const pred = this.predictTree(tree, features[j]);
+                residuals[j] -= this.lr * pred;
+            }
+        }
+    }
+    
+    buildTree(features, residuals, depth) {
+        if (depth >= this.maxDepth || features.length < 5) {
+            return residuals.reduce((a, b) => a + b, 0) / residuals.length;
+        }
+        let bestFeature = 0, bestThreshold = 0, bestGain = -Infinity;
+        for (let f = 0; f < features[0].length; f++) {
+            const values = features.map(row => row[f]);
+            const sorted = [...new Set(values)].sort((a, b) => a - b);
+            for (let i = 0; i < sorted.length - 1; i++) {
+                const threshold = (sorted[i] + sorted[i + 1]) / 2;
+                const leftIndices = features.map((row, idx) => row[f] <= threshold ? idx : -1).filter(idx => idx !== -1);
+                const rightIndices = features.map((row, idx) => row[f] > threshold ? idx : -1).filter(idx => idx !== -1);
+                if (leftIndices.length === 0 || rightIndices.length === 0) continue;
+                const leftSum = leftIndices.reduce((s, idx) => s + residuals[idx], 0);
+                const rightSum = rightIndices.reduce((s, idx) => s + residuals[idx], 0);
+                const leftCount = leftIndices.length;
+                const rightCount = rightIndices.length;
+                const gain = (leftSum * leftSum) / (leftCount + 1) + (rightSum * rightSum) / (rightCount + 1);
+                if (gain > bestGain) {
+                    bestGain = gain;
+                    bestFeature = f;
+                    bestThreshold = threshold;
+                }
+            }
+        }
+        const leftIndices = features.map((row, idx) => row[bestFeature] <= bestThreshold ? idx : -1).filter(idx => idx !== -1);
+        const rightIndices = features.map((row, idx) => row[bestFeature] > bestThreshold ? idx : -1).filter(idx => idx !== -1);
+        const leftFeatures = leftIndices.map(idx => features[idx]);
+        const rightFeatures = rightIndices.map(idx => features[idx]);
+        const leftResiduals = leftIndices.map(idx => residuals[idx]);
+        const rightResiduals = rightIndices.map(idx => residuals[idx]);
+        return {
+            feature: bestFeature,
+            threshold: bestThreshold,
+            left: this.buildTree(leftFeatures, leftResiduals, depth + 1),
+            right: this.buildTree(rightFeatures, rightResiduals, depth + 1)
+        };
+    }
+    
+    predictTree(node, features) {
+        if (typeof node === 'number') return node;
+        if (features[node.feature] <= node.threshold) {
+            return this.predictTree(node.left, features);
+        } else {
+            return this.predictTree(node.right, features);
+        }
+    }
+    
+    predict(features) {
+        let sum = this.initialPred;
+        for (const tree of this.models) {
+            sum += this.lr * this.predictTree(tree, features);
+        }
+        return sum > 0.5 ? 'T' : 'X';
+    }
+}
+
+// ===== 6. SVM =====
+class SVM {
+    constructor(C = 1.5, lr = 0.001, epochs = 300) {
         this.C = C;
-        this.learningRate = learningRate;
+        this.lr = lr;
         this.epochs = epochs;
         this.weights = [];
         this.bias = 0;
@@ -447,22 +494,19 @@ class SVMAdvanced {
         const labels = data.map(d => d.nhan === 'T' ? 1 : -1);
         const n = features.length;
         const m = features[0].length;
-        
         this.weights = new Array(m).fill(0);
         this.bias = 0;
-        
         for (let epoch = 0; epoch < this.epochs; epoch++) {
             for (let i = 0; i < n; i++) {
                 const decision = this.bias + features[i].reduce((sum, f, j) => sum + f * this.weights[j], 0);
-                
                 if (labels[i] * decision < 1) {
                     for (let j = 0; j < m; j++) {
-                        this.weights[j] += this.learningRate * (labels[i] * features[i][j] - (1/this.epochs) * this.weights[j]);
+                        this.weights[j] += this.lr * (labels[i] * features[i][j] - (1/this.epochs) * this.weights[j]);
                     }
-                    this.bias += this.learningRate * labels[i];
+                    this.bias += this.lr * labels[i];
                 } else {
                     for (let j = 0; j < m; j++) {
-                        this.weights[j] -= this.learningRate * (1/this.epochs) * this.weights[j];
+                        this.weights[j] -= this.lr * (1/this.epochs) * this.weights[j];
                     }
                 }
             }
@@ -477,9 +521,9 @@ class SVMAdvanced {
     }
 }
 
-// ===== 6. K-MEANS CLUSTERING - PHÂN CỤM =====
-class KMeansClustering {
-    constructor(k = 3) {
+// ===== 7. K-MEANS CLUSTERING =====
+class KMeans {
+    constructor(k = 4) {
         this.k = k;
         this.centroids = [];
         this.clusters = [];
@@ -490,15 +534,11 @@ class KMeansClustering {
         const features = data.map(d => d.dacTrung);
         const n = features.length;
         const m = features[0].length;
-        
-        // Khởi tạo centroids ngẫu nhiên
         this.centroids = [];
         for (let i = 0; i < this.k; i++) {
             this.centroids.push(features[Math.floor(Math.random() * n)]);
         }
-        
         for (let iter = 0; iter < maxIterations; iter++) {
-            // Gán cụm
             this.clusters = Array.from({ length: this.k }, () => []);
             for (let i = 0; i < n; i++) {
                 let minDist = Infinity;
@@ -512,8 +552,6 @@ class KMeansClustering {
                 }
                 this.clusters[bestCluster].push(i);
             }
-            
-            // Cập nhật centroids
             const newCentroids = [];
             for (let j = 0; j < this.k; j++) {
                 if (this.clusters[j].length === 0) {
@@ -526,10 +564,7 @@ class KMeansClustering {
                     newCentroids.push(centroid);
                 }
             }
-            
-            if (this.centroids.every((c, i) => this.euclideanDistance(c, newCentroids[i]) < 0.001)) {
-                break;
-            }
+            if (this.centroids.every((c, i) => this.euclideanDistance(c, newCentroids[i]) < 0.001)) break;
             this.centroids = newCentroids;
         }
         this.trained = true;
@@ -554,40 +589,87 @@ class KMeansClustering {
     }
 }
 
-// ===== 7. ENSEMBLE VOTING - BỎ PHIẾU TỔNG HỢP =====
-class EnsembleVoting {
-    constructor() {
-        this.models = [];
-        this.weights = [];
+// ===== 8. KNN =====
+class KNN {
+    constructor(k = 9) {
+        this.k = k;
+        this.data = [];
     }
     
-    addModel(model, weight = 1) {
-        this.models.push(model);
-        this.weights.push(weight);
+    train(data) { this.data = data; }
+    
+    predict(features) {
+        if (this.data.length === 0) return null;
+        const distances = this.data.map((item, idx) => {
+            let dist = 0;
+            for (let i = 0; i < features.length; i++) {
+                dist += Math.pow(features[i] - item.dacTrung[i], 2);
+            }
+            return { idx, dist: Math.sqrt(dist), label: item.nhan };
+        });
+        distances.sort((a, b) => a.dist - b.dist);
+        const neighbors = distances.slice(0, this.k);
+        let t = 0, x = 0;
+        for (const n of neighbors) {
+            if (n.label === 'T') t++;
+            else x++;
+        }
+        return t > x ? 'T' : 'X';
+    }
+}
+
+// ===== 9. NAIVE BAYES =====
+class NaiveBayes {
+    constructor() {
+        this.classProbs = {};
+        this.featureProbs = {};
     }
     
     train(data) {
-        for (const model of this.models) {
-            if (model.train) {
-                model.train(data);
+        const total = data.length;
+        const classCounts = {};
+        const featureCounts = {};
+        for (const item of data) {
+            const label = item.nhan;
+            classCounts[label] = (classCounts[label] || 0) + 1;
+            for (let i = 0; i < item.dacTrung.length; i++) {
+                const key = `${label}_${i}_${item.dacTrung[i]}`;
+                featureCounts[key] = (featureCounts[key] || 0) + 1;
             }
+        }
+        for (const label in classCounts) {
+            this.classProbs[label] = classCounts[label] / total;
+        }
+        for (const key in featureCounts) {
+            const parts = key.split('_');
+            const label = parts[0];
+            const idx = parts[1];
+            const val = parts[2];
+            if (!this.featureProbs[label]) this.featureProbs[label] = {};
+            if (!this.featureProbs[label][idx]) this.featureProbs[label][idx] = {};
+            this.featureProbs[label][idx][val] = featureCounts[key] / classCounts[label];
         }
     }
     
     predict(features) {
-        let tVotes = 0, xVotes = 0;
-        for (let i = 0; i < this.models.length; i++) {
-            const pred = this.models[i].predict(features);
-            if (pred === 'T') tVotes += this.weights[i];
-            else if (pred === 'X') xVotes += this.weights[i];
+        let bestLabel = null;
+        let bestProb = -Infinity;
+        for (const label in this.classProbs) {
+            let prob = Math.log(this.classProbs[label] || 0.01);
+            for (let i = 0; i < features.length; i++) {
+                const probs = this.featureProbs[label]?.[i] || {};
+                const p = probs[features[i]] || 0.01;
+                prob += Math.log(p);
+            }
+            if (prob > bestProb) { bestProb = prob; bestLabel = label; }
         }
-        return tVotes > xVotes ? 'T' : 'X';
+        return bestLabel;
     }
 }
 
-// ===== 8. ADABOOST - TĂNG CƯỜNG THÍCH ỨNG =====
-class AdaBoostAdvanced {
-    constructor(nEstimators = 30) {
+// ===== 10. ADABOOST =====
+class AdaBoost {
+    constructor(nEstimators = 40) {
         this.nEstimators = nEstimators;
         this.models = [];
         this.alphas = [];
@@ -599,7 +681,6 @@ class AdaBoostAdvanced {
         const labels = data.map(d => d.nhan === 'T' ? 1 : -1);
         const n = features.length;
         let weights = new Array(n).fill(1 / n);
-        
         for (let i = 0; i < this.nEstimators; i++) {
             const model = this.trainStump(features, labels, weights);
             let error = 0;
@@ -607,9 +688,7 @@ class AdaBoostAdvanced {
                 const pred = this.predictStump(model, features[j]);
                 if (pred !== labels[j]) error += weights[j];
             }
-            
             if (error > 0.5) break;
-            
             const alpha = 0.5 * Math.log((1 - error) / (error + 1e-10));
             let totalWeight = 0;
             for (let j = 0; j < n; j++) {
@@ -620,7 +699,6 @@ class AdaBoostAdvanced {
             for (let j = 0; j < n; j++) {
                 weights[j] /= totalWeight;
             }
-            
             this.models.push(model);
             this.alphas.push(alpha);
         }
@@ -663,32 +741,457 @@ class AdaBoostAdvanced {
     }
 }
 
+// ===== 11. LOGISTIC REGRESSION =====
+class LogisticRegression {
+    constructor(lr = 0.01, epochs = 200) {
+        this.lr = lr;
+        this.epochs = epochs;
+        this.weights = [];
+        this.bias = 0;
+        this.trained = false;
+    }
+    
+    sigmoid(z) { return 1 / (1 + Math.exp(-z)); }
+    
+    train(data) {
+        const features = data.map(d => d.dacTrung);
+        const labels = data.map(d => d.nhan === 'T' ? 1 : 0);
+        const n = features.length;
+        const m = features[0].length;
+        this.weights = new Array(m).fill(0);
+        this.bias = 0;
+        for (let epoch = 0; epoch < this.epochs; epoch++) {
+            for (let i = 0; i < n; i++) {
+                const z = this.bias + features[i].reduce((sum, f, j) => sum + f * this.weights[j], 0);
+                const pred = this.sigmoid(z);
+                const error = pred - labels[i];
+                for (let j = 0; j < m; j++) {
+                    this.weights[j] -= this.lr * error * features[i][j];
+                }
+                this.bias -= this.lr * error;
+            }
+        }
+        this.trained = true;
+    }
+    
+    predict(features) {
+        if (!this.trained) return null;
+        const z = this.bias + features.reduce((sum, f, j) => sum + f * this.weights[j], 0);
+        return this.sigmoid(z) > 0.5 ? 'T' : 'X';
+    }
+}
+
+// ===== 12. DECISION TREE =====
+class DecisionTree {
+    constructor(maxDepth = 8) {
+        this.maxDepth = maxDepth;
+        this.tree = null;
+    }
+    
+    train(data, depth = 0) {
+        if (depth >= this.maxDepth || data.length === 0) return this.majorityVote(data);
+        const labels = data.map(d => d.nhan);
+        const unique = [...new Set(labels)];
+        if (unique.length === 1) return unique[0];
+        const best = this.findBestSplit(data);
+        if (!best) return this.majorityVote(data);
+        return {
+            feature: best.feature,
+            threshold: best.threshold,
+            left: this.train(best.left, depth + 1),
+            right: this.train(best.right, depth + 1)
+        };
+    }
+    
+    findBestSplit(data) {
+        const numFeatures = data[0].dacTrung.length;
+        let bestGain = -1;
+        let bestSplit = null;
+        for (let f = 0; f < numFeatures; f++) {
+            const values = data.map(d => d.dacTrung[f]);
+            const sorted = [...new Set(values)].sort((a, b) => a - b);
+            for (let i = 0; i < sorted.length - 1; i++) {
+                const threshold = (sorted[i] + sorted[i + 1]) / 2;
+                const left = data.filter(d => d.dacTrung[f] <= threshold);
+                const right = data.filter(d => d.dacTrung[f] > threshold);
+                if (left.length === 0 || right.length === 0) continue;
+                const gain = this.informationGain(data, left, right);
+                if (gain > bestGain) {
+                    bestGain = gain;
+                    bestSplit = { feature: f, threshold, left, right };
+                }
+            }
+        }
+        return bestSplit;
+    }
+    
+    informationGain(parent, left, right) {
+        const entropy = (data) => {
+            const labels = data.map(d => d.nhan);
+            const counts = {};
+            for (const l of labels) counts[l] = (counts[l] || 0) + 1;
+            let e = 0;
+            const total = labels.length;
+            for (const l in counts) {
+                const p = counts[l] / total;
+                e -= p * Math.log2(p || 1);
+            }
+            return e;
+        };
+        const pe = entropy(parent);
+        const le = entropy(left);
+        const re = entropy(right);
+        const total = parent.length;
+        return pe - (left.length / total * le + right.length / total * re);
+    }
+    
+    majorityVote(data) {
+        const labels = data.map(d => d.nhan);
+        const counts = {};
+        for (const l of labels) counts[l] = (counts[l] || 0) + 1;
+        let best = null, bestCount = -1;
+        for (const l in counts) {
+            if (counts[l] > bestCount) { bestCount = counts[l]; best = l; }
+        }
+        return best;
+    }
+    
+    predict(features, node = this.tree) {
+        if (!node) return 'T';
+        if (typeof node === 'string') return node;
+        if (features[node.feature] <= node.threshold) {
+            return this.predict(features, node.left);
+        } else {
+            return this.predict(features, node.right);
+        }
+    }
+}
+
+// ===== 13. LSTM SIMPLE =====
+class LSTMSimple {
+    constructor() {
+        this.memory = new Map();
+        this.sequence = [];
+    }
+    
+    train(data) {
+        for (const item of data) {
+            const key = item.dacTrung.slice(0, 4).join('|');
+            if (!this.memory.has(key)) {
+                this.memory.set(key, { T: 0, X: 0 });
+            }
+            this.memory.get(key)[item.nhan] = (this.memory.get(key)[item.nhan] || 0) + 1;
+            this.sequence.push({ dacTrung: item.dacTrung, nhan: item.nhan });
+            if (this.sequence.length > 300) this.sequence.shift();
+        }
+    }
+    
+    predict(features) {
+        const key = features.slice(0, 4).join('|');
+        const data = this.memory.get(key);
+        if (!data || data.T + data.X < 3) return null;
+        return data.T > data.X ? 'T' : 'X';
+    }
+}
+
+// ===== 14. KALMAN FILTER =====
+class KalmanFilter {
+    constructor() {
+        this.estimate = 0.5;
+        this.error = 0.1;
+        this.processNoise = 0.01;
+        this.measurementNoise = 0.1;
+    }
+    
+    train(data) {
+        for (const item of data) {
+            const z = item.nhan === 'T' ? 1 : 0;
+            this.error += this.processNoise;
+            const kg = this.error / (this.error + this.measurementNoise);
+            this.estimate += kg * (z - this.estimate);
+            this.error = (1 - kg) * this.error;
+        }
+    }
+    
+    predict(features) {
+        return this.estimate > 0.5 ? 'T' : 'X';
+    }
+}
+
+// ===== 15. ENSEMBLE VOTING =====
+class EnsembleVoting {
+    constructor() {
+        this.models = [];
+        this.weights = [];
+    }
+    
+    addModel(model, weight = 1) {
+        this.models.push(model);
+        this.weights.push(weight);
+    }
+    
+    train(data) {
+        for (const model of this.models) {
+            if (model.train) model.train(data);
+        }
+    }
+    
+    predict(features) {
+        let tVotes = 0, xVotes = 0;
+        for (let i = 0; i < this.models.length; i++) {
+            const pred = this.models[i].predict(features);
+            if (pred === 'T') tVotes += this.weights[i];
+            else if (pred === 'X') xVotes += this.weights[i];
+        }
+        return tVotes > xVotes ? 'T' : 'X';
+    }
+}
+
+// ===== 16. Q-LEARNING =====
+class QLearning {
+    constructor() {
+        this.qTable = new Map();
+        this.alpha = 0.1;
+        this.gamma = 0.9;
+        this.epsilon = 0.1;
+    }
+    
+    getState(features) {
+        return features.slice(0, 5).join('|');
+    }
+    
+    getQ(state, action) {
+        const key = `${state}_${action}`;
+        return this.qTable.get(key) || 0;
+    }
+    
+    setQ(state, action, value) {
+        const key = `${state}_${action}`;
+        this.qTable.set(key, value);
+    }
+    
+    train(data) {
+        for (const item of data) {
+            const state = this.getState(item.dacTrung);
+            const action = item.nhan;
+            const reward = 1;
+            const maxNextQ = Math.max(this.getQ(state, 'T'), this.getQ(state, 'X'));
+            const currentQ = this.getQ(state, action);
+            const newQ = currentQ + this.alpha * (reward + this.gamma * maxNextQ - currentQ);
+            this.setQ(state, action, newQ);
+        }
+    }
+    
+    predict(features) {
+        const state = this.getState(features);
+        const qT = this.getQ(state, 'T');
+        const qX = this.getQ(state, 'X');
+        if (qT === 0 && qX === 0) return null;
+        return qT > qX ? 'T' : 'X';
+    }
+}
+
+// ===== 17. LINEAR REGRESSION =====
+class LinearRegression {
+    constructor() {
+        this.weights = [];
+        this.bias = 0;
+        this.trained = false;
+    }
+    
+    train(data) {
+        const features = data.map(d => d.dacTrung);
+        const labels = data.map(d => d.nhan === 'T' ? 1 : 0);
+        const n = features.length;
+        const m = features[0].length;
+        this.weights = new Array(m).fill(0);
+        this.bias = 0;
+        const lr = 0.001;
+        for (let epoch = 0; epoch < 200; epoch++) {
+            for (let i = 0; i < n; i++) {
+                const pred = this.bias + features[i].reduce((sum, f, j) => sum + f * this.weights[j], 0);
+                const error = pred - labels[i];
+                for (let j = 0; j < m; j++) {
+                    this.weights[j] -= lr * error * features[i][j];
+                }
+                this.bias -= lr * error;
+            }
+        }
+        this.trained = true;
+    }
+    
+    predict(features) {
+        if (!this.trained) return null;
+        const pred = this.bias + features.reduce((sum, f, j) => sum + f * this.weights[j], 0);
+        return pred > 0.5 ? 'T' : 'X';
+    }
+}
+
+// ===== 18. RIDGE REGRESSION =====
+class RidgeRegression {
+    constructor(alpha = 0.1) {
+        this.alpha = alpha;
+        this.weights = [];
+        this.bias = 0;
+        this.trained = false;
+    }
+    
+    train(data) {
+        const features = data.map(d => d.dacTrung);
+        const labels = data.map(d => d.nhan === 'T' ? 1 : 0);
+        const n = features.length;
+        const m = features[0].length;
+        this.weights = new Array(m).fill(0);
+        this.bias = 0;
+        const lr = 0.001;
+        for (let epoch = 0; epoch < 200; epoch++) {
+            for (let i = 0; i < n; i++) {
+                const pred = this.bias + features[i].reduce((sum, f, j) => sum + f * this.weights[j], 0);
+                const error = pred - labels[i];
+                for (let j = 0; j < m; j++) {
+                    this.weights[j] -= lr * (error * features[i][j] + this.alpha * this.weights[j]);
+                }
+                this.bias -= lr * error;
+            }
+        }
+        this.trained = true;
+    }
+    
+    predict(features) {
+        if (!this.trained) return null;
+        const pred = this.bias + features.reduce((sum, f, j) => sum + f * this.weights[j], 0);
+        return pred > 0.5 ? 'T' : 'X';
+    }
+}
+
+// ===== 19. LASSO REGRESSION =====
+class LassoRegression {
+    constructor(alpha = 0.1) {
+        this.alpha = alpha;
+        this.weights = [];
+        this.bias = 0;
+        this.trained = false;
+    }
+    
+    train(data) {
+        const features = data.map(d => d.dacTrung);
+        const labels = data.map(d => d.nhan === 'T' ? 1 : 0);
+        const n = features.length;
+        const m = features[0].length;
+        this.weights = new Array(m).fill(0);
+        this.bias = 0;
+        const lr = 0.001;
+        for (let epoch = 0; epoch < 200; epoch++) {
+            for (let i = 0; i < n; i++) {
+                const pred = this.bias + features[i].reduce((sum, f, j) => sum + f * this.weights[j], 0);
+                const error = pred - labels[i];
+                for (let j = 0; j < m; j++) {
+                    const sign = this.weights[j] > 0 ? 1 : -1;
+                    this.weights[j] -= lr * (error * features[i][j] + this.alpha * sign);
+                }
+                this.bias -= lr * error;
+            }
+        }
+        this.trained = true;
+    }
+    
+    predict(features) {
+        if (!this.trained) return null;
+        const pred = this.bias + features.reduce((sum, f, j) => sum + f * this.weights[j], 0);
+        return pred > 0.5 ? 'T' : 'X';
+    }
+}
+
+// ===== 20. ELASTIC NET =====
+class ElasticNet {
+    constructor(alpha = 0.1, l1Ratio = 0.5) {
+        this.alpha = alpha;
+        this.l1Ratio = l1Ratio;
+        this.weights = [];
+        this.bias = 0;
+        this.trained = false;
+    }
+    
+    train(data) {
+        const features = data.map(d => d.dacTrung);
+        const labels = data.map(d => d.nhan === 'T' ? 1 : 0);
+        const n = features.length;
+        const m = features[0].length;
+        this.weights = new Array(m).fill(0);
+        this.bias = 0;
+        const lr = 0.001;
+        for (let epoch = 0; epoch < 200; epoch++) {
+            for (let i = 0; i < n; i++) {
+                const pred = this.bias + features[i].reduce((sum, f, j) => sum + f * this.weights[j], 0);
+                const error = pred - labels[i];
+                for (let j = 0; j < m; j++) {
+                    const l1 = this.l1Ratio * this.alpha * (this.weights[j] > 0 ? 1 : -1);
+                    const l2 = (1 - this.l1Ratio) * this.alpha * this.weights[j];
+                    this.weights[j] -= lr * (error * features[i][j] + l1 + l2);
+                }
+                this.bias -= lr * error;
+            }
+        }
+        this.trained = true;
+    }
+    
+    predict(features) {
+        if (!this.trained) return null;
+        const pred = this.bias + features.reduce((sum, f, j) => sum + f * this.weights[j], 0);
+        return pred > 0.5 ? 'T' : 'X';
+    }
+}
+
 // ============================================================
-// 🧠 HỆ THỐNG DỰ ĐOÁN TÍCH HỢP
+// 🧠 HỆ THỐNG DỰ ĐOÁN TÍCH HỢP - 20 THUẬT TOÁN
 // ============================================================
-class HeThongDuDoan {
+class HeThongDuDoanThongMinh {
     constructor() {
         this.boNhoChuoi = new Map();
-        this.boNhoBet = new Map();
         this.daHuan = { hu: false, md5: false };
         
-        // Khởi tạo các model hiện đại
-        this.nn = new NeuralNetwork(8, 16, 2);
-        this.dnn = new DeepNeuralNetwork([8, 16, 12, 2]);
-        this.rf = new RandomForestAdvanced(20, 8);
-        this.gb = new GradientBoostingAdvanced(50, 0.1, 4);
-        this.svm = new SVMAdvanced(1.0, 0.001, 200);
-        this.kmeans = new KMeansClustering(3);
+        // Khởi tạo 20 thuật toán
+        this.nn = new NeuralNetwork();
+        this.dnn = new DeepNeuralNetwork();
+        this.rf = new RandomForest(30, 10);
+        this.gb = new GradientBoosting(60, 0.08, 5);
+        this.xgb = new XGBoost(40, 0.1, 4);
+        this.svm = new SVM(1.5, 0.001, 300);
+        this.kmeans = new KMeans(4);
+        this.knn = new KNN(9);
+        this.nb = new NaiveBayes();
+        this.adaboost = new AdaBoost(40);
+        this.lr = new LogisticRegression(0.01, 200);
+        this.dt = new DecisionTree(8);
+        this.lstm = new LSTMSimple();
+        this.kalman = new KalmanFilter();
+        this.qlearn = new QLearning();
+        this.linReg = new LinearRegression();
+        this.ridge = new RidgeRegression(0.1);
+        this.lasso = new LassoRegression(0.1);
+        this.elastic = new ElasticNet(0.1, 0.5);
         this.ensemble = new EnsembleVoting();
-        this.adaboost = new AdaBoostAdvanced(30);
         
         // Thêm các model vào ensemble
         this.ensemble.addModel(this.nn, 1.0);
         this.ensemble.addModel(this.dnn, 1.2);
         this.ensemble.addModel(this.rf, 1.1);
         this.ensemble.addModel(this.gb, 1.0);
+        this.ensemble.addModel(this.xgb, 1.0);
         this.ensemble.addModel(this.svm, 0.9);
+        this.ensemble.addModel(this.knn, 0.9);
+        this.ensemble.addModel(this.nb, 0.8);
         this.ensemble.addModel(this.adaboost, 0.9);
+        this.ensemble.addModel(this.lr, 0.8);
+        this.ensemble.addModel(this.dt, 0.9);
+        this.ensemble.addModel(this.lstm, 0.8);
+        this.ensemble.addModel(this.kalman, 0.7);
+        this.ensemble.addModel(this.qlearn, 0.7);
+        this.ensemble.addModel(this.linReg, 0.7);
+        this.ensemble.addModel(this.ridge, 0.7);
+        this.ensemble.addModel(this.lasso, 0.7);
+        this.ensemble.addModel(this.elastic, 0.7);
+        this.ensemble.addModel(this.kmeans, 0.6);
         
         this.taiDuLieu();
     }
@@ -696,12 +1199,15 @@ class HeThongDuDoan {
     chuanBiDuLieu(data) {
         const dacTrung = [];
         const nhan = [];
-        for (let i = 8; i < data.length; i++) {
-            const cuaSo = data.slice(i - 8, i);
+        for (let i = 10; i < data.length; i++) {
+            const cuaSo = data.slice(i - 10, i);
             const mucTieu = data[i];
             
             const demT = cuaSo.filter(r => r === 'T').length;
             const thayDoi = cuaSo.filter((r, idx) => idx > 0 && r !== cuaSo[idx-1]).length;
+            const tyLeT = demT / cuaSo.length;
+            const cuoi = cuaSo[cuaSo.length - 1] === 'T' ? 1 : 0;
+            const dau = cuaSo[0] === 'T' ? 1 : 0;
             let daoDai = 0;
             for (let j = 0; j < cuaSo.length - 1; j++) {
                 if (cuaSo[j] !== cuaSo[j+1]) daoDai++;
@@ -717,21 +1223,32 @@ class HeThongDuDoan {
                     if (match) { chuKy = c; break; }
                 }
             }
-            const xuHuong = Math.round(demT / cuaSo.length * 10);
             const doLech = Math.abs(demT - (cuaSo.length - demT));
-            const da = (cuaSo.slice(0, 3).filter(r => r === 'T').length / 3) - 0.5;
+            const da = (cuaSo.slice(0, 4).filter(r => r === 'T').length / 4) - 0.5;
             const bienDong = thayDoi / cuaSo.length;
+            const entropy = this.tinhEntropy(cuaSo);
             
-            dacTrung.push([demT, thayDoi, daoDai, chuKy, xuHuong, doLech, da, bienDong]);
+            dacTrung.push([
+                demT, thayDoi, tyLeT, cuoi, dau, 
+                daoDai, chuKy, doLech, da, bienDong,
+                entropy
+            ]);
             nhan.push(mucTieu);
         }
         return { dacTrung, nhan };
     }
+    
+    tinhEntropy(data) {
+        const n = data.length;
+        const t = data.filter(r => r === 'T').length / n;
+        if (t === 0 || t === 1) return 0;
+        return -t * Math.log2(t) - (1 - t) * Math.log2(1 - t);
+    }
 
     huanLuyen(game, data) {
-        if (data.length < 25) return;
+        if (data.length < 30) return;
         const { dacTrung, nhan } = this.chuanBiDuLieu(data);
-        if (dacTrung.length < 15) return;
+        if (dacTrung.length < 20) return;
         
         const duLieuHuan = dacTrung.map((f, idx) => ({
             dacTrung: f,
@@ -739,18 +1256,29 @@ class HeThongDuDoan {
         }));
         
         try {
-            // Huấn luyện các model hiện đại
-            this.nn.train(duLieuHuan, 200);
-            this.dnn.train(duLieuHuan, 300);
+            this.nn.train(duLieuHuan, 300);
+            this.dnn.train(duLieuHuan, 400);
             this.rf.train(duLieuHuan);
             this.gb.train(duLieuHuan);
+            this.xgb.train(duLieuHuan);
             this.svm.train(duLieuHuan);
             this.kmeans.train(duLieuHuan);
+            this.knn.train(duLieuHuan);
+            this.nb.train(duLieuHuan);
             this.adaboost.train(duLieuHuan);
+            this.lr.train(duLieuHuan);
+            this.dt.tree = this.dt.train(duLieuHuan);
+            this.lstm.train(duLieuHuan);
+            this.kalman.train(duLieuHuan);
+            this.qlearn.train(duLieuHuan);
+            this.linReg.train(duLieuHuan);
+            this.ridge.train(duLieuHuan);
+            this.lasso.train(duLieuHuan);
+            this.elastic.train(duLieuHuan);
             this.ensemble.train(duLieuHuan);
             
             this.daHuan[game] = true;
-            console.log(`🧠 Đã huấn luyện 8 thuật toán hiện đại cho ${game}`);
+            console.log(`🧠 Đã huấn luyện 20 thuật toán cho ${game}`);
         } catch (e) {
             console.log(`⚠️ Lỗi huấn luyện: ${e.message}`);
         }
@@ -765,138 +1293,114 @@ class HeThongDuDoan {
         let T = 0, X = 0;
         const mau = [];
 
-        // Phân tích bệt trực tiếp
-        const bet = this.phanTichBetTrucTiep(lichSu);
+        // 1. PHÂN TÍCH BỆT
+        const bet = this.phanTichBet(lichSu);
         if (bet) { 
             mau.push(bet); 
             if (bet.duDoan === 'T') T += bet.diem; 
             else X += bet.diem; 
         }
 
-        // Phân tích zigzag
-        let thayDoi = 0;
-        for (let i = 1; i < Math.min(lichSu.length, 10); i++) {
-            if (lichSu[i-1] !== lichSu[i]) thayDoi++;
-        }
-        if (thayDoi >= 7) {
-            mau.push({ ten: `⚡ Zigzag ${thayDoi} → Bẻ`, duDoan: lichSu[0] === 'T' ? 'X' : 'T', diem: 40 });
-            if (lichSu[0] === 'T') T += 40; else X += 40;
-        } else if (thayDoi >= 4) {
-            mau.push({ ten: `🌀 Zigzag ${thayDoi} → Bẻ`, duDoan: lichSu[0] === 'T' ? 'X' : 'T', diem: 25 });
-            if (lichSu[0] === 'T') T += 25; else X += 25;
+        // 2. PHÂN TÍCH XU HƯỚNG
+        const trend = this.phanTichXuHuong(lichSu);
+        if (trend) { 
+            mau.push(trend); 
+            if (trend.duDoan === 'T') T += trend.diem; 
+            else X += trend.diem; 
         }
 
-        // Phân tích đảo
-        if (lichSu.length >= 4) {
-            let dao = true;
-            for (let i = 0; i < 3; i++) {
-                if (lichSu[i] === lichSu[i+1]) { dao = false; break; }
-            }
-            if (dao) {
-                mau.push({ ten: `🔄 Đảo 1-1 → Bẻ`, duDoan: lichSu[0] === 'T' ? 'X' : 'T', diem: 30 });
-                if (lichSu[0] === 'T') T += 30; else X += 30;
-            }
+        // 3. PHÂN TÍCH CÂN BẰNG
+        const balance = this.phanTichCanBang(lichSu);
+        if (balance) { 
+            mau.push(balance); 
+            if (balance.duDoan === 'T') T += balance.diem; 
+            else X += balance.diem; 
         }
 
-        // Các thuật toán hiện đại
-        if (lichSu.length >= 8) {
-            const demT = lichSu.slice(0, 8).filter(r => r === 'T').length;
-            const thayDoi2 = lichSu.slice(0, 8).filter((r, i) => i > 0 && r !== lichSu[i-1]).length;
-            let daoDai = 0;
-            for (let j = 0; j < lichSu.length - 1; j++) {
-                if (lichSu[j] !== lichSu[j+1]) daoDai++;
-                else break;
-            }
-            let chuKy = 0;
-            for (let c = 2; c <= 4; c++) {
-                if (lichSu.length >= c * 2) {
-                    let match = true;
-                    for (let j = 0; j < c; j++) {
-                        if (lichSu[j] !== lichSu[j + c]) { match = false; break; }
+        // 4. PHÂN TÍCH CHU KỲ
+        const cycle = this.phanTichChuKy(lichSu);
+        if (cycle) { 
+            mau.push(cycle); 
+            if (cycle.duDoan === 'T') T += cycle.diem; 
+            else X += cycle.diem; 
+        }
+
+        // 5. PHÂN TÍCH ENTROPY
+        const entropy = this.phanTichEntropy(lichSu);
+        if (entropy) { 
+            mau.push(entropy); 
+            if (entropy.duDoan === 'T') T += entropy.diem; 
+            else X += entropy.diem; 
+        }
+
+        // 6. 20 THUẬT TOÁN ML
+        if (lichSu.length >= 10) {
+            const dacTrung = this.chuanBiDuLieu(lichSu);
+            if (dacTrung.dacTrung.length > 0) {
+                const features = dacTrung.dacTrung[dacTrung.dacTrung.length - 1];
+                
+                const duDoan = {
+                    '🧠 NN': this.nn.predict(features),
+                    '🧠 DNN': this.dnn.predict(features),
+                    '🌲 RF': this.rf.predict(features),
+                    '📈 GB': this.gb.predict(features),
+                    '📊 XGB': this.xgb.predict(features),
+                    '🎯 SVM': this.svm.predict(features),
+                    '🔍 KNN': this.knn.predict(features),
+                    '📊 NB': this.nb.predict(features),
+                    '⚡ AdaBoost': this.adaboost.predict(features),
+                    '📈 LR': this.lr.predict(features),
+                    '🌳 DT': this.dt.predict(features),
+                    '🧠 LSTM': this.lstm.predict(features),
+                    '🎯 Kalman': this.kalman.predict(features),
+                    '🧠 Q-Learning': this.qlearn.predict(features),
+                    '📊 LinReg': this.linReg.predict(features),
+                    '📊 Ridge': this.ridge.predict(features),
+                    '📊 Lasso': this.lasso.predict(features),
+                    '📊 Elastic': this.elastic.predict(features),
+                    '🔮 Ensemble': this.ensemble.predict(features)
+                };
+                
+                let count = 0;
+                for (const [ten, pred] of Object.entries(duDoan)) {
+                    if (pred) {
+                        const diem = 20 - count * 0.5;
+                        if (pred === 'T') {
+                            T += diem;
+                            mau.push({ ten, duDoan: 'T', diem });
+                        } else {
+                            X += diem;
+                            mau.push({ ten, duDoan: 'X', diem });
+                        }
+                        count++;
                     }
-                    if (match) { chuKy = c; break; }
                 }
             }
-            const xuHuong = Math.round(demT / 8 * 10);
-            const doLech = Math.abs(demT - (lichSu.length - demT));
-            const da = (lichSu.slice(0, 3).filter(r => r === 'T').length / 3) - 0.5;
-            const bienDong = thayDoi2 / lichSu.length;
-            
-            const dacTrung = [demT, thayDoi2, daoDai, chuKy, xuHuong, doLech, da, bienDong];
-            
-            // Dự đoán bằng Neural Network
-            const nnPred = this.nn.predict(dacTrung);
-            if (nnPred) {
-                mau.push({ ten: `🧠 Neural Network → ${nnPred === 'T' ? 'Tài' : 'Xỉu'}`, duDoan: nnPred, diem: 20 });
-                if (nnPred === 'T') T += 20; else X += 20;
-            }
-            
-            // Dự đoán bằng Deep Neural Network
-            const dnnPred = this.dnn.predict(dacTrung);
-            if (dnnPred) {
-                mau.push({ ten: `🧠 Deep NN → ${dnnPred === 'T' ? 'Tài' : 'Xỉu'}`, duDoan: dnnPred, diem: 22 });
-                if (dnnPred === 'T') T += 22; else X += 22;
-            }
-            
-            // Dự đoán bằng Random Forest
-            const rfPred = this.rf.predict(dacTrung);
-            if (rfPred) {
-                mau.push({ ten: `🌲 Random Forest → ${rfPred === 'T' ? 'Tài' : 'Xỉu'}`, duDoan: rfPred, diem: 18 });
-                if (rfPred === 'T') T += 18; else X += 18;
-            }
-            
-            // Dự đoán bằng Gradient Boosting
-            const gbPred = this.gb.predict(dacTrung);
-            if (gbPred) {
-                mau.push({ ten: `📈 Gradient Boosting → ${gbPred === 'T' ? 'Tài' : 'Xỉu'}`, duDoan: gbPred, diem: 18 });
-                if (gbPred === 'T') T += 18; else X += 18;
-            }
-            
-            // Dự đoán bằng SVM
-            const svmPred = this.svm.predict(dacTrung);
-            if (svmPred) {
-                mau.push({ ten: `🎯 SVM → ${svmPred === 'T' ? 'Tài' : 'Xỉu'}`, duDoan: svmPred, diem: 16 });
-                if (svmPred === 'T') T += 16; else X += 16;
-            }
-            
-            // Dự đoán bằng AdaBoost
-            const adaPred = this.adaboost.predict(dacTrung);
-            if (adaPred) {
-                mau.push({ ten: `⚡ AdaBoost → ${adaPred === 'T' ? 'Tài' : 'Xỉu'}`, duDoan: adaPred, diem: 16 });
-                if (adaPred === 'T') T += 16; else X += 16;
-            }
-            
-            // Dự đoán bằng Ensemble
-            const ensPred = this.ensemble.predict(dacTrung);
-            if (ensPred) {
-                mau.push({ ten: `🤖 Ensemble (${this.ensemble.models.length} models) → ${ensPred === 'T' ? 'Tài' : 'Xỉu'}`, duDoan: ensPred, diem: 25 });
-                if (ensPred === 'T') T += 25; else X += 25;
-            }
         }
 
-        // Điều chỉnh theo chuỗi
+        // ĐIỀU CHỈNH THEO CHUỖI
         const s = this.boNhoChuoi.get(game);
         if (s) {
             if (s.last5.length >= 5) {
                 const demT = s.last5.filter(r => r === 'T').length;
-                if (demT >= 4) { X *= 1.5; mau.push({ ten: '📊 Last5 Tài→Bẻ Xỉu', duDoan: 'X', diem: 20 }); }
-                else if (demT <= 1) { T *= 1.5; mau.push({ ten: '📊 Last5 Xỉu→Bẻ Tài', duDoan: 'T', diem: 20 }); }
+                if (demT >= 4) { X *= 1.4; mau.push({ ten: '📊 Last5 Tài→Xỉu', duDoan: 'X', diem: 18 }); }
+                else if (demT <= 1) { T *= 1.4; mau.push({ ten: '📊 Last5 Xỉu→Tài', duDoan: 'T', diem: 18 }); }
             }
             if (s.chuoi >= 5) {
-                T *= 1.3; X *= 1.3;
-                mau.push({ ten: '🔥 Bám bệt cực dài', duDoan: 'T', diem: 18 });
+                T *= 1.25; X *= 1.25;
+                mau.push({ ten: '🔥 Bám bệt cực dài', duDoan: 'T', diem: 16 });
             } else if (s.chuoi >= 3) {
-                T *= 1.15; X *= 1.15;
-                mau.push({ ten: '🔥 Bám bệt dài', duDoan: 'T', diem: 12 });
+                T *= 1.1; X *= 1.1;
+                mau.push({ ten: '🔥 Bám bệt dài', duDoan: 'T', diem: 10 });
             }
             if (s.chuoi <= -4) {
-                const temp = T; T = X * 1.8; X = temp * 1.8;
-                mau.push({ ten: '🔄 Bẻ bệt siêu mạnh', duDoan: 'T', diem: 25 });
+                const temp = T; T = X * 1.7; X = temp * 1.7;
+                mau.push({ ten: '🔄 Bẻ bệt siêu mạnh', duDoan: 'T', diem: 22 });
             } else if (s.chuoi <= -3) {
-                const temp = T; T = X * 1.5; X = temp * 1.5;
-                mau.push({ ten: '🔄 Bẻ bệt mạnh', duDoan: 'T', diem: 18 });
+                const temp = T; T = X * 1.4; X = temp * 1.4;
+                mau.push({ ten: '🔄 Bẻ bệt mạnh', duDoan: 'T', diem: 16 });
             } else if (s.chuoi <= -2) {
-                const temp = T; T = X * 1.2; X = temp * 1.2;
+                const temp = T; T = X * 1.15; X = temp * 1.15;
                 mau.push({ ten: '🔄 Bẻ bệt', duDoan: 'T', diem: 10 });
             }
         }
@@ -906,9 +1410,9 @@ class HeThongDuDoan {
 
         const duDoan = T > X ? 'TÀI' : 'XỈU';
         let doTinCay = Math.round(Math.max(T, X) / tong * 100);
-        if (mau.length >= 10) doTinCay = Math.min(99, doTinCay + 10);
-        else if (mau.length >= 7) doTinCay = Math.min(99, doTinCay + 6);
-        else if (mau.length >= 4) doTinCay = Math.min(99, doTinCay + 3);
+        if (mau.length >= 15) doTinCay = Math.min(99, doTinCay + 10);
+        else if (mau.length >= 10) doTinCay = Math.min(99, doTinCay + 6);
+        else if (mau.length >= 5) doTinCay = Math.min(99, doTinCay + 3);
         doTinCay = Math.min(99, Math.max(50, doTinCay));
 
         const ketQua = duDoan === 'TÀI' ? 'T' : 'X';
@@ -926,7 +1430,7 @@ class HeThongDuDoan {
         };
     }
 
-    phanTichBetTrucTiep(data) {
+    phanTichBet(data) {
         if (data.length < 2) return null;
         const cuoi = data[0];
         let dem = 1;
@@ -934,15 +1438,14 @@ class HeThongDuDoan {
             if (data[i] === cuoi) dem++;
             else break;
         }
-
-        if (dem >= 8) {
-            return { ten: `🔥 Bệt cực dài ${dem} → BẺ`, duDoan: cuoi === 'T' ? 'X' : 'T', diem: 60 };
+        if (dem >= 7) {
+            return { ten: `🔥 Bệt cực dài ${dem} → BẺ`, duDoan: cuoi === 'T' ? 'X' : 'T', diem: 50 };
         }
-        if (dem >= 6) {
-            return { ten: `⚡ Bệt dài ${dem} → BẺ`, duDoan: cuoi === 'T' ? 'X' : 'T', diem: 45 };
+        if (dem >= 5) {
+            return { ten: `⚡ Bệt dài ${dem} → BẺ`, duDoan: cuoi === 'T' ? 'X' : 'T', diem: 38 };
         }
         if (dem >= 4) {
-            return { ten: `📈 Bệt vừa ${dem} → Theo`, duDoan: cuoi, diem: 28 };
+            return { ten: `📈 Bệt vừa ${dem} → Theo`, duDoan: cuoi, diem: 25 };
         }
         if (dem >= 3) {
             return { ten: `📊 Bệt ngắn ${dem} → Theo`, duDoan: cuoi, diem: 16 };
@@ -953,11 +1456,65 @@ class HeThongDuDoan {
         return null;
     }
 
+    phanTichXuHuong(data) {
+        if (data.length < 8) return null;
+        const ganDay = data.slice(0, 8);
+        const demT = ganDay.filter(r => r === 'T').length;
+        if (demT >= 6) {
+            return { ten: `📈 Xu hướng Tài ${demT}/8 → Xỉu`, duDoan: 'X', diem: 20 };
+        }
+        if (demT <= 2) {
+            return { ten: `📉 Xu hướng Xỉu ${8-demT}/8 → Tài`, duDoan: 'T', diem: 20 };
+        }
+        return null;
+    }
+
+    phanTichCanBang(data) {
+        if (data.length < 12) return null;
+        const ganDay = data.slice(0, 12);
+        const demT = ganDay.filter(r => r === 'T').length;
+        const doLech = Math.abs(demT - (12 - demT));
+        if (doLech >= 6) {
+            const duDoan = demT > (12 - demT) ? 'X' : 'T';
+            return { ten: `⚖️ Mất cân bằng ${demT}/12 → ${duDoan}`, duDoan, diem: 16 };
+        }
+        return null;
+    }
+
+    phanTichChuKy(data) {
+        if (data.length < 6) return null;
+        for (let cycle = 2; cycle <= 4; cycle++) {
+            if (data.length < cycle * 2) continue;
+            let match = true;
+            for (let i = 0; i < cycle; i++) {
+                if (data[i] !== data[i + cycle]) { match = false; break; }
+            }
+            if (match) {
+                return { ten: `🔁 Chu kỳ ${cycle} → Bẻ`, duDoan: data[0] === 'T' ? 'X' : 'T', diem: 18 };
+            }
+        }
+        return null;
+    }
+
+    phanTichEntropy(data) {
+        if (data.length < 8) return null;
+        const ganDay = data.slice(0, 8);
+        const t = ganDay.filter(r => r === 'T').length / 8;
+        const entropy = t === 0 || t === 1 ? 0 : -t * Math.log2(t) - (1 - t) * Math.log2(1 - t);
+        if (entropy > 0.95) {
+            return { ten: `📊 Entropy cao → Bẻ`, duDoan: data[0] === 'T' ? 'X' : 'T', diem: 14 };
+        }
+        if (entropy < 0.2) {
+            return { ten: `📊 Entropy thấp → Theo`, duDoan: data[0], diem: 12 };
+        }
+        return null;
+    }
+
     hoc(game, ketQua, doTinCay, doDaiBet) {
         if (!this.boNhoChuoi.has(game)) {
             this.boNhoChuoi.set(game, {
                 chuoi: 0, totNhat: 0, teNhat: 0,
-                last5: [], last10: [], last20: [], last50: [], last100: [],
+                last5: [], last10: [], last20: [], last50: [],
                 tai: 0, xiu: 0, tong: 0,
                 betThanhCong: 0, betThatBai: 0
             });
@@ -978,12 +1535,10 @@ class HeThongDuDoan {
         s.last10.push(ketQua);
         s.last20.push(ketQua);
         s.last50.push(ketQua);
-        s.last100.push(ketQua);
         if (s.last5.length > 5) s.last5.shift();
         if (s.last10.length > 10) s.last10.shift();
         if (s.last20.length > 20) s.last20.shift();
         if (s.last50.length > 50) s.last50.shift();
-        if (s.last100.length > 100) s.last100.shift();
 
         if (doDaiBet > 0) {
             if (ketQua === 'T') s.betThanhCong++;
@@ -1055,12 +1610,12 @@ class HeThongDuDoan {
             betThanhCong: s ? s.betThanhCong : 0,
             betThatBai: s ? s.betThatBai : 0,
             daHuan: this.daHuan[game] || false,
-            soModel: this.ensemble.models.length
+            soModel: 20
         };
     }
 }
 
-const predictor = new HeThongDuDoan();
+const predictor = new HeThongDuDoanThongMinh();
 
 // ============================================================
 // 📊 QUẢN LÝ LỊCH SỬ
@@ -1148,7 +1703,7 @@ async function autoProcess() {
                 const exist = history.hu.find(h => h.phien_hien_tai === (cur + 1).toString());
                 if (!exist) {
                     const data = dHu.map(d => d.result === 'TÀI' ? 'T' : 'X');
-                    if (history.hu.length > 20) {
+                    if (history.hu.length > 25) {
                         const trainData = history.hu.map(r => r.actual === 'TÀI' ? 'T' : 'X');
                         predictor.huanLuyen('hu', trainData);
                     }
@@ -1170,7 +1725,7 @@ async function autoProcess() {
                     if (history.hu.length > 1000) history.hu = history.hu.slice(0, 1000);
                     lastPhien.hu = cur;
                     lastPred.hu = result;
-                    console.log(`[HU] ${result.duDoan} (${result.doTinCay}%) - ML:✅ - ${result.soMau||0} patterns`);
+                    console.log(`[HU] ${result.duDoan} (${result.doTinCay}%) - ${result.soMau||0} patterns`);
                 }
             }
         }
@@ -1183,7 +1738,7 @@ async function autoProcess() {
                 const exist = history.md5.find(h => h.phien_hien_tai === (cur + 1).toString());
                 if (!exist) {
                     const data = dMd5.map(d => d.result === 'TÀI' ? 'T' : 'X');
-                    if (history.md5.length > 20) {
+                    if (history.md5.length > 25) {
                         const trainData = history.md5.map(r => r.actual === 'TÀI' ? 'T' : 'X');
                         predictor.huanLuyen('md5', trainData);
                     }
@@ -1205,7 +1760,7 @@ async function autoProcess() {
                     if (history.md5.length > 1000) history.md5 = history.md5.slice(0, 1000);
                     lastPhien.md5 = cur;
                     lastPred.md5 = result;
-                    console.log(`[MD5] ${result.duDoan} (${result.doTinCay}%) - ML:✅ - ${result.soMau||0} patterns`);
+                    console.log(`[MD5] ${result.duDoan} (${result.doTinCay}%) - ${result.soMau||0} patterns`);
                 }
             }
         }
@@ -1697,10 +2252,10 @@ function generateHTML(type) {
                     <div class="badge-pro">
                         <span class="live"></span>
                         ${type.toUpperCase()} • LIVE
-                        <span class="version">v17.0</span>
+                        <span class="version">v19.0</span>
                     </div>
                     <div style="font-size:8px;color:var(--text-muted);margin-top:2px;">
-                        ${new Date().toLocaleString('vi-VN')} • 8 ML Models
+                        ${new Date().toLocaleString('vi-VN')} • 20 ML Models
                     </div>
                 </div>
             </div>
@@ -1743,7 +2298,7 @@ function generateHTML(type) {
             <div class="header">
                 <h3>📋 LỊCH SỬ DỰ ĐOÁN</h3>
                 <span class="count">${h.length} phiên • ${Math.min(25, h.length)} gần nhất</span>
-                <span class="algo-badge">🤖 8 ML Models</span>
+                <span class="algo-badge">🤖 20 ML Models</span>
             </div>
             <table>
                 <thead>
@@ -1765,12 +2320,12 @@ function generateHTML(type) {
         <div class="footer-pro">
             <span style="color:var(--text-muted);">🌌 TX Pro Predictor</span> • 
             <span class="highlight">Anh Khôi</span> • 
-            Phiên bản 17.0 • 
-            <span class="algo-tag">🤖 8 ML Models</span> • 
+            Phiên bản 19.0 • 
+            <span class="algo-tag">🤖 20 ML Models</span> • 
             Tự động cập nhật 5s
             <br>
             <span style="font-size:7px;color:var(--text-muted);">
-                <span class="heart">❤️</span> Neural Network • Deep NN • Random Forest • Gradient Boosting • SVM • K-Means • AdaBoost • Ensemble Voting
+                <span class="heart">❤️</span> NN • DNN • RF • GB • XGB • SVM • K-Means • KNN • NB • AdaBoost • LR • DT • LSTM • Kalman • Q-Learning • LinReg • Ridge • Lasso • Elastic • Ensemble
             </span>
         </div>
     </div>
@@ -1787,7 +2342,7 @@ function generateHTML(type) {
 // 🔌 API
 // ============================================================
 
-app.get('/', (req, res) => res.json({ name: 'TX Pro', version: '17.0', author: 'Anh Khôi' }));
+app.get('/', (req, res) => res.json({ name: 'TX Pro', version: '19.0', author: 'Anh Khôi' }));
 
 app.get('/lc79-hu', async (req, res) => {
     try {
@@ -1800,7 +2355,7 @@ app.get('/lc79-hu', async (req, res) => {
         if (exist) return res.json(exist);
         
         const historyData = data.map(d => d.result === 'TÀI' ? 'T' : 'X');
-        if (history.hu.length > 20) {
+        if (history.hu.length > 25) {
             const trainData = history.hu.map(r => r.actual === 'TÀI' ? 'T' : 'X');
             predictor.huanLuyen('hu', trainData);
         }
@@ -1836,7 +2391,7 @@ app.get('/lc79-md5', async (req, res) => {
         if (exist) return res.json(exist);
         
         const historyData = data.map(d => d.result === 'TÀI' ? 'T' : 'X');
-        if (history.md5.length > 20) {
+        if (history.md5.length > 25) {
             const trainData = history.md5.map(r => r.actual === 'TÀI' ? 'T' : 'X');
             predictor.huanLuyen('md5', trainData);
         }
@@ -1911,23 +2466,36 @@ loadHistory();
 app.listen(PORT, '0.0.0.0', () => {
     console.log('\n╔═══════════════════════════════════════════════════════════════╗');
     console.log('║                                                               ║');
-    console.log('║   🌌  TX PRO v17.0 - ANH KHÔI                               ║');
+    console.log('║   🌌  TX PRO v19.0 - ANH KHÔI                               ║');
     console.log('║                                                               ║');
-    console.log('║   🤖 8 THUẬT TOÁN MACHINE LEARNING HIỆN ĐẠI                 ║');
+    console.log('║   🤖 20 THUẬT TOÁN MACHINE LEARNING                         ║');
+    console.log('║   🔥 LOẠI BỎ ZIGZAG - ĐẢO 1-1 LỎ                           ║');
     console.log('║                                                               ║');
     console.log('╠═══════════════════════════════════════════════════════════════╣');
     console.log('║                                                               ║');
     console.log(`║   📡 Server: http://0.0.0.0:${PORT}                            ║`);
     console.log('║                                                               ║');
-    console.log('║   🤖 8 ML MODELS:                                            ║');
-    console.log('║   1. Neural Network - Mạng Nơ-ron Nhân Tạo                   ║');
+    console.log('║   🤖 20 ML MODELS:                                            ║');
+    console.log('║   1. Neural Network - Mạng Nơ-ron                            ║');
     console.log('║   2. Deep Neural Network - Mạng Nơ-ron Sâu                   ║');
-    console.log('║   3. Random Forest - Rừng Ngẫu Nhiên Nâng Cao                ║');
+    console.log('║   3. Random Forest - Rừng Ngẫu Nhiên                         ║');
     console.log('║   4. Gradient Boosting - Tăng Cường Gradient                 ║');
-    console.log('║   5. SVM - Máy Hỗ Trợ Vector Nâng Cao                        ║');
-    console.log('║   6. K-Means - Phân Cụm                                     ║');
-    console.log('║   7. AdaBoost - Tăng Cường Thích Ứng                        ║');
-    console.log('║   8. Ensemble Voting - Bỏ Phiếu Tổng Hợp                    ║');
+    console.log('║   5. XGBoost - Tăng Cường Cực Đại                            ║');
+    console.log('║   6. SVM - Máy Hỗ Trợ Vector                                 ║');
+    console.log('║   7. K-Means - Phân Cụm                                      ║');
+    console.log('║   8. KNN - Láng Giềng Gần Nhất                               ║');
+    console.log('║   9. Naive Bayes - Xác Suất Bayes                            ║');
+    console.log('║  10. AdaBoost - Tăng Cường Thích Ứng                         ║');
+    console.log('║  11. Logistic Regression - Hồi Quy Logistic                  ║');
+    console.log('║  12. Decision Tree - Cây Quyết Định                          ║');
+    console.log('║  13. LSTM - Bộ Nhớ Dài Hạn Ngắn Hạn                          ║');
+    console.log('║  14. Kalman Filter - Bộ Lọc Kalman                           ║');
+    console.log('║  15. Q-Learning - Học Tăng Cường                             ║');
+    console.log('║  16. Linear Regression - Hồi Quy Tuyến Tính                  ║');
+    console.log('║  17. Ridge Regression - Hồi Quy Ridge                        ║');
+    console.log('║  18. Lasso Regression - Hồi Quy Lasso                        ║');
+    console.log('║  19. Elastic Net - Mạng Đàn Hồi                              ║');
+    console.log('║  20. Ensemble Voting - Bỏ Phiếu Tổng Hợp                     ║');
     console.log('║                                                               ║');
     console.log('║   📁 himinhlaanhkhoi_history.json                            ║');
     console.log('║   📁 himinhlaanhkhoi_learning.json                           ║');
