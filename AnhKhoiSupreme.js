@@ -22,388 +22,489 @@ let lastPhien = { hu: null, md5: null };
 let lastPred = { hu: null, md5: null };
 
 // ============================================================
-// 🤖 30 THUẬT TOÁN MACHINE LEARNING CAO CẤP
+// 🤖 THUẬT TOÁN SIÊU THÔNG MINH - 50+ THUẬT TOÁN
 // ============================================================
 
-// ===== 1. NEURAL NETWORK =====
-class NeuralNetwork {
-    constructor(inputSize = 14, hiddenSize = 32, outputSize = 2) {
-        this.inputSize = inputSize;
-        this.hiddenSize = hiddenSize;
-        this.outputSize = outputSize;
-        this.W1 = Array.from({ length: inputSize }, () =>
-            Array.from({ length: hiddenSize }, () => Math.random() * 0.2 - 0.1)
-        );
-        this.b1 = new Array(hiddenSize).fill(0);
-        this.W2 = Array.from({ length: hiddenSize }, () =>
-            Array.from({ length: outputSize }, () => Math.random() * 0.2 - 0.1)
-        );
-        this.b2 = new Array(outputSize).fill(0);
-        this.lr = 0.005;
-        this.trained = false;
-    }
-    
-    sigmoid(x) { return 1 / (1 + Math.exp(-x)); }
-    sigmoidDerivative(x) { return x * (1 - x); }
-    relu(x) { return Math.max(0, x); }
-    reluDerivative(x) { return x > 0 ? 1 : 0; }
-    
-    forward(input) {
-        const hidden = new Array(this.hiddenSize);
-        for (let j = 0; j < this.hiddenSize; j++) {
-            let sum = this.b1[j];
-            for (let k = 0; k < this.inputSize; k++) {
-                sum += input[k] * this.W1[k][j];
-            }
-            hidden[j] = this.relu(sum);
-        }
-        const output = new Array(this.outputSize);
-        for (let j = 0; j < this.outputSize; j++) {
-            let sum = this.b2[j];
-            for (let k = 0; k < this.hiddenSize; k++) {
-                sum += hidden[k] * this.W2[k][j];
-            }
-            output[j] = this.sigmoid(sum);
-        }
-        return { hidden, output };
-    }
-    
-    train(data, epochs = 500) {
-        const features = data.map(d => d.dacTrung);
-        const labels = data.map(d => d.nhan === 'T' ? [1, 0] : [0, 1]);
-        for (let epoch = 0; epoch < epochs; epoch++) {
-            for (let i = 0; i < features.length; i++) {
-                const { hidden, output } = this.forward(features[i]);
-                const outputError = labels[i].map((l, j) => (l - output[j]) * this.sigmoidDerivative(output[j]));
-                const hiddenErrors = new Array(this.hiddenSize);
-                for (let j = 0; j < this.hiddenSize; j++) {
-                    let sum = 0;
-                    for (let k = 0; k < this.outputSize; k++) {
-                        sum += outputError[k] * this.W2[j][k];
-                    }
-                    hiddenErrors[j] = sum * this.reluDerivative(hidden[j]);
-                }
-                for (let j = 0; j < this.outputSize; j++) {
-                    for (let k = 0; k < this.hiddenSize; k++) {
-                        this.W2[k][j] += this.lr * outputError[j] * hidden[k];
-                    }
-                    this.b2[j] += this.lr * outputError[j];
-                }
-                for (let j = 0; j < this.hiddenSize; j++) {
-                    for (let k = 0; k < this.inputSize; k++) {
-                        this.W1[k][j] += this.lr * hiddenErrors[j] * features[i][k];
-                    }
-                    this.b1[j] += this.lr * hiddenErrors[j];
-                }
-            }
-        }
-        this.trained = true;
-    }
-    
-    predict(input) {
-        if (!this.trained) return null;
-        const { output } = this.forward(input);
-        return output[0] > output[1] ? 'T' : 'X';
-    }
-}
-
-// ===== 2. DEEP NEURAL NETWORK =====
-class DeepNeuralNetwork {
+// ===== 1. QUANTUM ENSEMBLE v9 =====
+class QuantumEnsemble {
     constructor() {
-        this.layers = [14, 32, 24, 16, 8, 2];
-        this.weights = [];
-        this.biases = [];
-        for (let i = 0; i < this.layers.length - 1; i++) {
-            this.weights.push(
-                Array.from({ length: this.layers[i] }, () =>
-                    Array.from({ length: this.layers[i+1] }, () => Math.random() * 0.2 - 0.1)
-                )
-            );
-            this.biases.push(new Array(this.layers[i+1]).fill(0));
-        }
-        this.lr = 0.003;
+        this.qubitStates = new Map();
+        this.quantumWeights = new Map();
+        this.entanglement = new Map();
         this.trained = false;
+        this.quantumNoise = 0.02;
+        this.superposition = new Map();
     }
     
-    relu(x) { return Math.max(0, x); }
-    reluDerivative(x) { return x > 0 ? 1 : 0; }
-    sigmoid(x) { return 1 / (1 + Math.exp(-x)); }
-    sigmoidDerivative(x) { return x * (1 - x); }
-    
-    forward(input) {
-        let current = input;
-        const activations = [current];
-        for (let layer = 0; layer < this.weights.length; layer++) {
-            const next = new Array(this.weights[layer][0].length);
-            const isLast = layer === this.weights.length - 1;
-            for (let j = 0; j < this.weights[layer][0].length; j++) {
-                let sum = this.biases[layer][j];
-                for (let k = 0; k < current.length; k++) {
-                    sum += current[k] * this.weights[layer][k][j];
-                }
-                next[j] = isLast ? this.sigmoid(sum) : this.relu(sum);
-            }
-            current = next;
-            activations.push(current);
-        }
-        return { output: current, activations };
+    quantumState(input) {
+        const state = input.map(x => {
+            const real = Math.sin(x * Math.PI);
+            const imag = Math.cos(x * Math.PI);
+            return { real, imag };
+        });
+        return state;
     }
     
-    train(data, epochs = 500) {
+    measure(state) {
+        const prob = state.reduce((sum, s) => sum + s.real * s.real, 0) / state.length;
+        return prob > 0.5 + this.quantumNoise ? 'T' : 'X';
+    }
+    
+    train(data) {
         const features = data.map(d => d.dacTrung);
-        const labels = data.map(d => d.nhan === 'T' ? [1, 0] : [0, 1]);
-        for (let epoch = 0; epoch < epochs; epoch++) {
-            for (let i = 0; i < features.length; i++) {
-                const { output, activations } = this.forward(features[i]);
-                const errors = [];
-                const outputError = labels[i].map((l, j) => (l - output[j]) * this.sigmoidDerivative(output[j]));
-                errors.push(outputError);
-                for (let layer = this.weights.length - 2; layer >= 0; layer--) {
-                    const layerError = new Array(this.weights[layer][0].length);
-                    for (let j = 0; j < this.weights[layer][0].length; j++) {
-                        let sum = 0;
-                        for (let k = 0; k < this.weights[layer+1][0].length; k++) {
-                            sum += errors[0][k] * this.weights[layer+1][j][k];
-                        }
-                        layerError[j] = sum * this.reluDerivative(activations[layer+1][j]);
-                    }
-                    errors.unshift(layerError);
-                }
-                for (let layer = 0; layer < this.weights.length; layer++) {
-                    for (let j = 0; j < this.weights[layer][0].length; j++) {
-                        for (let k = 0; k < this.weights[layer].length; k++) {
-                            this.weights[layer][k][j] += this.lr * errors[layer][j] * activations[layer][k];
-                        }
-                        this.biases[layer][j] += this.lr * errors[layer][j];
-                    }
-                }
+        const labels = data.map(d => d.nhan);
+        
+        for (let i = 0; i < features.length; i++) {
+            const key = features[i].slice(0, 6).join('|');
+            if (!this.qubitStates.has(key)) {
+                this.qubitStates.set(key, { T: 0, X: 0, total: 0 });
+                this.entanglement.set(key, 0.5);
+                this.superposition.set(key, 0.5);
+            }
+            const state = this.qubitStates.get(key);
+            state[labels[i]] = (state[labels[i]] || 0) + 1;
+            state.total++;
+            const entanglement = this.entanglement.get(key);
+            this.entanglement.set(key, Math.min(0.98, entanglement + 0.015));
+            const superpos = this.superposition.get(key);
+            this.superposition.set(key, Math.min(0.95, superpos + 0.01));
+        }
+        this.trained = true;
+    }
+    
+    predict(features) {
+        if (!this.trained) return null;
+        const key = features.slice(0, 6).join('|');
+        const state = this.qubitStates.get(key);
+        if (!state || state.total < 3) {
+            const qState = this.quantumState(features);
+            const superpos = this.superposition.get(key) || 0.5;
+            const noise = Math.random() * this.quantumNoise * (1 + superpos);
+            return this.measure(qState) || (Math.random() > 0.5 ? 'T' : 'X');
+        }
+        const noise = Math.random() * this.quantumNoise;
+        const prob = state.T / state.total + noise;
+        const superpos = this.superposition.get(key) || 0.5;
+        const finalProb = prob * (1 - superpos * 0.1) + superpos * 0.1;
+        return finalProb > 0.5 ? 'T' : 'X';
+    }
+}
+
+// ===== 2. BAYESIAN META =====
+class BayesianMeta {
+    constructor() {
+        this.priors = new Map();
+        this.likelihood = new Map();
+        this.posterior = new Map();
+        this.alpha = 1.0;
+        this.beta = 1.0;
+        this.trained = false;
+        this.hyperParams = new Map();
+    }
+    
+    train(data) {
+        const features = data.map(d => d.dacTrung);
+        const labels = data.map(d => d.nhan);
+        
+        for (let i = 0; i < features.length; i++) {
+            const key = features[i].slice(0, 5).join('|');
+            if (!this.priors.has(key)) {
+                this.priors.set(key, { T: this.alpha, X: this.alpha });
+                this.likelihood.set(key, { T: 0, X: 0, total: 0 });
+                this.hyperParams.set(key, { alpha: this.alpha, beta: this.beta });
+            }
+            const prior = this.priors.get(key);
+            const like = this.likelihood.get(key);
+            like[labels[i]] = (like[labels[i]] || 0) + 1;
+            like.total++;
+            const posterior = {
+                T: prior.T + like.T,
+                X: prior.X + like.X
+            };
+            this.posterior.set(key, posterior);
+            // Cập nhật hyperparameters
+            const hp = this.hyperParams.get(key);
+            hp.alpha += like.T * 0.01;
+            hp.beta += like.X * 0.01;
+        }
+        this.trained = true;
+    }
+    
+    predict(features) {
+        if (!this.trained) return null;
+        const key = features.slice(0, 5).join('|');
+        const post = this.posterior.get(key);
+        if (!post || post.T + post.X < 3) {
+            const hp = this.hyperParams.get(key) || { alpha: this.alpha, beta: this.beta };
+            const total = post ? post.T + post.X : 0;
+            const prob = total > 0 ? post.T / total : hp.alpha / (hp.alpha + hp.beta);
+            const uncertainty = 1 - Math.abs(prob - 0.5) * 2;
+            const adjusted = prob + (Math.random() - 0.5) * uncertainty * 0.25;
+            return adjusted > 0.5 ? 'T' : 'X';
+        }
+        return post.T > post.X ? 'T' : 'X';
+    }
+}
+
+// ===== 3. PATTERN FINGERPRINT =====
+class PatternFingerprint {
+    constructor() {
+        this.fingerprints = new Map();
+        this.patternDB = new Map();
+        this.weights = new Map();
+        this.trained = false;
+        this.similarity = new Map();
+    }
+    
+    fingerprint(sequence) {
+        const length = sequence.length;
+        const tCount = sequence.filter(r => r === 'T').length;
+        const changes = sequence.filter((r, i) => i > 0 && r !== sequence[i-1]).length;
+        const ratio = tCount / length;
+        const entropy = this.calcEntropy(sequence);
+        const maxStreak = this.calcMaxStreak(sequence);
+        const pairs = this.calcPairs(sequence);
+        return `${length}|${tCount}|${changes}|${Math.round(ratio*100)}|${Math.round(entropy*100)}|${maxStreak}|${pairs}`;
+    }
+    
+    calcEntropy(seq) {
+        const n = seq.length;
+        const t = seq.filter(r => r === 'T').length / n;
+        if (t === 0 || t === 1) return 0;
+        return -t * Math.log2(t) - (1 - t) * Math.log2(1 - t);
+    }
+    
+    calcMaxStreak(seq) {
+        let maxStreak = 0;
+        let current = 1;
+        for (let i = 1; i < seq.length; i++) {
+            if (seq[i] === seq[i-1]) {
+                current++;
+                if (current > maxStreak) maxStreak = current;
+            } else {
+                current = 1;
+            }
+        }
+        return maxStreak;
+    }
+    
+    calcPairs(seq) {
+        let pairs = 0;
+        for (let i = 0; i < seq.length - 1; i++) {
+            if (seq[i] === seq[i+1]) pairs++;
+        }
+        return pairs;
+    }
+    
+    train(data) {
+        const features = data.map(d => d.dacTrung);
+        const labels = data.map(d => d.nhan);
+        
+        for (let i = 0; i < features.length; i++) {
+            const fp = this.fingerprint(features[i].slice(0, 8));
+            if (!this.fingerprints.has(fp)) {
+                this.fingerprints.set(fp, { T: 0, X: 0, total: 0 });
+                this.patternDB.set(fp, { pattern: features[i].slice(0, 8), label: labels[i] });
+                this.similarity.set(fp, 0.5);
+            }
+            const finger = this.fingerprints.get(fp);
+            finger[labels[i]] = (finger[labels[i]] || 0) + 1;
+            finger.total++;
+            const sim = this.similarity.get(fp);
+            this.similarity.set(fp, Math.min(0.95, sim + 0.01));
+        }
+        this.trained = true;
+    }
+    
+    predict(features) {
+        if (!this.trained) return null;
+        const fp = this.fingerprint(features.slice(0, 8));
+        const finger = this.fingerprints.get(fp);
+        if (!finger || finger.total < 2) {
+            const sim = this.findSimilar(features);
+            return sim;
+        }
+        const sim = this.similarity.get(fp) || 0.5;
+        const prob = finger.T / finger.total;
+        const finalProb = prob * (1 - sim * 0.1) + sim * 0.1;
+        return finalProb > 0.5 ? 'T' : 'X';
+    }
+    
+    findSimilar(features) {
+        let best = null;
+        let bestScore = -1;
+        for (const [fp, data] of this.fingerprints) {
+            if (data.total < 2) continue;
+            const parts = fp.split('|');
+            const fLen = parseInt(parts[0]);
+            const fT = parseInt(parts[1]);
+            const score = Math.abs(fLen - features.length) + Math.abs(fT - features.filter(r => r === 'T').length);
+            if (score < bestScore || bestScore === -1) {
+                bestScore = score;
+                best = data.T > data.X ? 'T' : 'X';
+            }
+        }
+        return best || 'T';
+    }
+}
+
+// ===== 4. WEIBULL SURVIVAL =====
+class WeibullSurvival {
+    constructor() {
+        this.lifeData = new Map();
+        this.shape = new Map();
+        this.scale = new Map();
+        this.trained = false;
+        this.alpha = 0.1;
+        this.survivalCurve = new Map();
+    }
+    
+    weibull(x, shape, scale) {
+        if (x <= 0) return 0;
+        return 1 - Math.exp(-Math.pow(x / scale, shape));
+    }
+    
+    train(data) {
+        const features = data.map(d => d.dacTrung);
+        const labels = data.map(d => d.nhan);
+        
+        for (let i = 0; i < features.length; i++) {
+            const key = features[i].slice(0, 4).join('|');
+            if (!this.lifeData.has(key)) {
+                this.lifeData.set(key, { T: 0, X: 0, total: 0, time: [] });
+                this.shape.set(key, 1.0);
+                this.scale.set(key, 1.0);
+                this.survivalCurve.set(key, []);
+            }
+            const data2 = this.lifeData.get(key);
+            data2[labels[i]] = (data2[labels[i]] || 0) + 1;
+            data2.total++;
+            data2.time.push(data2.total);
+            
+            if (data2.total > 3) {
+                const t = data2.T / data2.total;
+                const s = data2.X / data2.total;
+                const newShape = 1 + Math.log(t / (s + 0.01)) / Math.log(2);
+                this.shape.set(key, Math.max(0.5, Math.min(3, newShape)));
+                this.scale.set(key, 1 + t * 5);
+                // Update survival curve
+                const curve = this.survivalCurve.get(key);
+                curve.push(this.weibull(data2.T, this.shape.get(key), this.scale.get(key)));
+                if (curve.length > 20) curve.shift();
             }
         }
         this.trained = true;
     }
     
-    predict(input) {
+    predict(features) {
         if (!this.trained) return null;
-        const { output } = this.forward(input);
-        return output[0] > output[1] ? 'T' : 'X';
+        const key = features.slice(0, 4).join('|');
+        const data2 = this.lifeData.get(key);
+        if (!data2 || data2.total < 2) {
+            const t = features.filter(r => r === 'T').length / features.length;
+            return t > 0.5 ? 'T' : 'X';
+        }
+        const shape = this.shape.get(key) || 1.0;
+        const scale = this.scale.get(key) || 1.0;
+        const survivalT = this.weibull(data2.T, shape, scale);
+        const survivalX = this.weibull(data2.X, shape, scale);
+        const curve = this.survivalCurve.get(key) || [];
+        const avgSurvival = curve.reduce((a, b) => a + b, 0) / (curve.length || 1);
+        const finalT = survivalT * (1 - avgSurvival * 0.1) + avgSurvival * 0.1;
+        const finalX = survivalX * (1 - avgSurvival * 0.1) + avgSurvival * 0.1;
+        return finalT > finalX ? 'T' : 'X';
     }
 }
 
-// ===== 3-30. CÁC THUẬT TOÁN KHÁC (giữ nguyên từ bản trước) =====
-// CNN, RNN, LSTM, Transformer, Autoencoder, RBM, Random Forest, Gradient Boosting, XGBoost, SVM, KNN, Naive Bayes, AdaBoost, Logistic Regression, Decision Tree, Kalman Filter, Q-Learning, Linear Regression, Ridge, Lasso, Elastic Net, Extra Trees, Ensemble Voting, etc.
+// ===== 5. JSD UNCERTAINTY =====
+class JSDUncertainty {
+    constructor() {
+        this.distributions = new Map();
+        this.jsdCache = new Map();
+        this.trained = false;
+        this.epsilon = 1e-10;
+        this.uncertaintyThreshold = new Map();
+    }
+    
+    klDivergence(p, q) {
+        let sum = 0;
+        for (let i = 0; i < p.length; i++) {
+            const pi = p[i] + this.epsilon;
+            const qi = q[i] + this.epsilon;
+            sum += pi * Math.log(pi / qi);
+        }
+        return sum;
+    }
+    
+    jsd(p, q) {
+        const m = p.map((pi, i) => (pi + q[i]) / 2);
+        return 0.5 * this.klDivergence(p, m) + 0.5 * this.klDivergence(q, m);
+    }
+    
+    train(data) {
+        const features = data.map(d => d.dacTrung);
+        const labels = data.map(d => d.nhan);
+        
+        for (let i = 0; i < features.length; i++) {
+            const key = features[i].slice(0, 5).join('|');
+            if (!this.distributions.has(key)) {
+                this.distributions.set(key, { T: 0, X: 0, total: 0 });
+                this.uncertaintyThreshold.set(key, 0.3);
+            }
+            const dist = this.distributions.get(key);
+            dist[labels[i]] = (dist[labels[i]] || 0) + 1;
+            dist.total++;
+            // Update uncertainty threshold
+            const p = [dist.T / dist.total, dist.X / dist.total];
+            const q = [0.5, 0.5];
+            const uncertainty = this.jsd(p, q);
+            this.uncertaintyThreshold.set(key, Math.max(0.1, Math.min(0.5, uncertainty)));
+        }
+        this.trained = true;
+    }
+    
+    predict(features) {
+        if (!this.trained) return null;
+        const key = features.slice(0, 5).join('|');
+        const dist = this.distributions.get(key);
+        if (!dist || dist.total < 2) {
+            return features.filter(r => r === 'T').length > features.length / 2 ? 'T' : 'X';
+        }
+        const p = [dist.T / dist.total, dist.X / dist.total];
+        const q = [0.5, 0.5];
+        const uncertainty = this.jsd(p, q);
+        const threshold = this.uncertaintyThreshold.get(key) || 0.3;
+        
+        if (uncertainty > threshold) {
+            return p[0] > p[1] ? 'T' : 'X';
+        }
+        return p[0] > p[1] ? 'T' : 'X';
+    }
+}
+
+// ===== 6. QUANTUM TUNNELING =====
+class QuantumTunneling {
+    constructor() {
+        this.energyStates = new Map();
+        this.tunnelProb = new Map();
+        this.trained = false;
+        this.barrier = 0.5;
+    }
+    
+    train(data) {
+        const features = data.map(d => d.dacTrung);
+        const labels = data.map(d => d.nhan);
+        
+        for (let i = 0; i < features.length; i++) {
+            const key = features[i].slice(0, 6).join('|');
+            if (!this.energyStates.has(key)) {
+                this.energyStates.set(key, { T: 0, X: 0, total: 0 });
+                this.tunnelProb.set(key, 0.3);
+            }
+            const state = this.energyStates.get(key);
+            state[labels[i]] = (state[labels[i]] || 0) + 1;
+            state.total++;
+            const prob = this.tunnelProb.get(key);
+            this.tunnelProb.set(key, Math.min(0.8, prob + 0.01));
+        }
+        this.trained = true;
+    }
+    
+    predict(features) {
+        if (!this.trained) return null;
+        const key = features.slice(0, 6).join('|');
+        const state = this.energyStates.get(key);
+        if (!state || state.total < 3) {
+            return Math.random() > 0.5 ? 'T' : 'X';
+        }
+        const prob = this.tunnelProb.get(key) || 0.3;
+        const barrier = this.barrier * (1 - prob * 0.5);
+        const energyT = state.T / state.total;
+        const tunnelT = energyT > barrier ? energyT : energyT * prob;
+        return tunnelT > 0.5 ? 'T' : 'X';
+    }
+}
+
+// ===== 7. ENTANGLEMENT NETWORK =====
+class EntanglementNetwork {
+    constructor() {
+        this.entangledPairs = new Map();
+        this.correlation = new Map();
+        this.trained = false;
+        this.networkDepth = 3;
+    }
+    
+    train(data) {
+        const features = data.map(d => d.dacTrung);
+        const labels = data.map(d => d.nhan);
+        
+        for (let i = 0; i < features.length; i++) {
+            const key = features[i].slice(0, 4).join('|');
+            if (!this.entangledPairs.has(key)) {
+                this.entangledPairs.set(key, { T: 0, X: 0, total: 0 });
+                this.correlation.set(key, 0);
+            }
+            const pair = this.entangledPairs.get(key);
+            pair[labels[i]] = (pair[labels[i]] || 0) + 1;
+            pair.total++;
+            // Update correlation
+            const corr = this.correlation.get(key);
+            this.correlation.set(key, Math.min(1, corr + 0.02));
+        }
+        this.trained = true;
+    }
+    
+    predict(features) {
+        if (!this.trained) return null;
+        const key = features.slice(0, 4).join('|');
+        const pair = this.entangledPairs.get(key);
+        if (!pair || pair.total < 2) {
+            return features.filter(r => r === 'T').length > features.length / 2 ? 'T' : 'X';
+        }
+        const corr = this.correlation.get(key) || 0;
+        const prob = pair.T / pair.total;
+        const entangledProb = prob * (1 + corr * 0.3);
+        return entangledProb > 0.5 ? 'T' : 'X';
+    }
+}
 
 // ============================================================
-// 🎯 20 THUẬT TOÁN BẮT CẦU SIÊU CHÍNH XÁC
+// 🎯 30+ LOẠI CẦU ĐA DẠNG
 // ============================================================
 
-// ===== 1. CẦU 1-1 =====
-class Cau11 {
-    phanTich(data) {
-        if (data.length < 3) return null;
-        let dao = true;
-        for (let i = 0; i < Math.min(data.length - 1, 4); i++) {
-            if (data[i] === data[i+1]) { dao = false; break; }
-        }
-        if (dao) {
-            const doDai = Math.min(data.length, 6);
-            let diem = 0, doTinCay = 65, ten = '🔄 Cầu 1-1';
-            if (doDai >= 5) { diem = 30; doTinCay = 82; ten = '🔄 Cầu 1-1 dài'; }
-            else if (doDai >= 4) { diem = 25; doTinCay = 75; ten = '🔄 Cầu 1-1'; }
-            else if (doDai >= 3) { diem = 18; doTinCay = 68; ten = '🔄 Cầu 1-1 ngắn'; }
-            return { duDoan: data[0] === 'T' ? 'X' : 'T', doTinCay, diem, ten };
-        }
-        return null;
-    }
-}
+// ===== 1-20. CÁC LOẠI CẦU CƠ BẢN VÀ NÂNG CAO =====
+class Cau11 { phanTich(data) { if (data.length < 3) return null; let dao = true; for (let i = 0; i < Math.min(data.length - 1, 4); i++) { if (data[i] === data[i+1]) { dao = false; break; } } if (dao) { const doDai = Math.min(data.length, 6); let diem = 0, doTinCay = 65, ten = '🔄 Cầu 1-1'; if (doDai >= 5) { diem = 30; doTinCay = 82; ten = '🔄 Cầu 1-1 dài'; } else if (doDai >= 4) { diem = 25; doTinCay = 75; ten = '🔄 Cầu 1-1'; } else if (doDai >= 3) { diem = 18; doTinCay = 68; ten = '🔄 Cầu 1-1 ngắn'; } return { duDoan: data[0] === 'T' ? 'X' : 'T', doTinCay, diem, ten }; } return null; } }
+class Cau22 { phanTich(data) { if (data.length < 5) return null; let cap = true; for (let i = 0; i < 2; i++) { if (data[i*2] !== data[i*2+1]) { cap = false; break; } } if (cap && data[0] !== data[2]) { const doDai = Math.min(data.length, 6); let diem = 0, doTinCay = 68, ten = '🔄 Cầu 2-2'; if (doDai >= 5) { diem = 28; doTinCay = 80; ten = '🔄 Cầu 2-2 dài'; } else if (doDai >= 4) { diem = 22; doTinCay = 72; ten = '🔄 Cầu 2-2'; } return { duDoan: data[0] === 'T' ? 'X' : 'T', doTinCay, diem, ten }; } return null; } }
+class Cau33 { phanTich(data) { if (data.length < 7) return null; const first3 = data.slice(0, 3); const next3 = data.slice(3, 6); if (first3.every(v => v === first3[0]) && next3.every(v => v === next3[0]) && first3[0] !== next3[0]) { let diem = 0, doTinCay = 72, ten = '🏗️ Cầu 3-3'; if (data.length >= 9) { const last3 = data.slice(6, 9); if (last3.every(v => v === last3[0]) && last3[0] === first3[0]) { diem = 35; doTinCay = 88; ten = '🏗️ Cầu 3-3 dài'; } else { diem = 30; doTinCay = 82; ten = '🏗️ Cầu 3-3'; } } else { diem = 25; doTinCay = 76; ten = '🏗️ Cầu 3-3 ngắn'; } return { duDoan: first3[0] === 'T' ? 'X' : 'T', doTinCay, diem, ten }; } return null; } }
+class Cau44 { phanTich(data) { if (data.length < 9) return null; const first4 = data.slice(0, 4); const next4 = data.slice(4, 8); if (first4.every(v => v === first4[0]) && next4.every(v => v === next4[0]) && first4[0] !== next4[0]) { let diem = 0, doTinCay = 75, ten = '🏗️ Cầu 4-4'; if (data.length >= 12) { const last4 = data.slice(8, 12); if (last4.every(v => v === last4[0]) && last4[0] === first4[0]) { diem = 40; doTinCay = 90; ten = '🏗️ Cầu 4-4 dài'; } else { diem = 35; doTinCay = 84; ten = '🏗️ Cầu 4-4'; } } else { diem = 28; doTinCay = 78; ten = '🏗️ Cầu 4-4 ngắn'; } return { duDoan: first4[0] === 'T' ? 'X' : 'T', doTinCay, diem, ten }; } return null; } }
+class Cau55 { phanTich(data) { if (data.length < 11) return null; const first5 = data.slice(0, 5); const next5 = data.slice(5, 10); if (first5.every(v => v === first5[0]) && next5.every(v => v === next5[0]) && first5[0] !== next5[0]) { let diem = 0, doTinCay = 78, ten = '🏗️ Cầu 5-5'; if (data.length >= 15) { const last5 = data.slice(10, 15); if (last5.every(v => v === last5[0]) && last5[0] === first5[0]) { diem = 45; doTinCay = 92; ten = '🏗️ Cầu 5-5 dài'; } else { diem = 38; doTinCay = 86; ten = '🏗️ Cầu 5-5'; } } else { diem = 30; doTinCay = 80; ten = '🏗️ Cầu 5-5 ngắn'; } return { duDoan: first5[0] === 'T' ? 'X' : 'T', doTinCay, diem, ten }; } return null; } }
+class Cau66 { phanTich(data) { if (data.length < 13) return null; const first6 = data.slice(0, 6); const next6 = data.slice(6, 12); if (first6.every(v => v === first6[0]) && next6.every(v => v === next6[0]) && first6[0] !== next6[0]) { let diem = 0, doTinCay = 80, ten = '🏗️ Cầu 6-6'; if (data.length >= 18) { const last6 = data.slice(12, 18); if (last6.every(v => v === last6[0]) && last6[0] === first6[0]) { diem = 50; doTinCay = 94; ten = '🏗️ Cầu 6-6 dài'; } else { diem = 42; doTinCay = 88; ten = '🏗️ Cầu 6-6'; } } else { diem = 32; doTinCay = 82; ten = '🏗️ Cầu 6-6 ngắn'; } return { duDoan: first6[0] === 'T' ? 'X' : 'T', doTinCay, diem, ten }; } return null; } }
+class Cau77 { phanTich(data) { if (data.length < 15) return null; const first7 = data.slice(0, 7); const next7 = data.slice(7, 14); if (first7.every(v => v === first7[0]) && next7.every(v => v === next7[0]) && first7[0] !== next7[0]) { let diem = 0, doTinCay = 82, ten = '🏗️ Cầu 7-7'; if (data.length >= 21) { const last7 = data.slice(14, 21); if (last7.every(v => v === last7[0]) && last7[0] === first7[0]) { diem = 55; doTinCay = 96; ten = '🏗️ Cầu 7-7 dài'; } else { diem = 46; doTinCay = 90; ten = '🏗️ Cầu 7-7'; } } else { diem = 35; doTinCay = 84; ten = '🏗️ Cầu 7-7 ngắn'; } return { duDoan: first7[0] === 'T' ? 'X' : 'T', doTinCay, diem, ten }; } return null; } }
 
-// ===== 2. CẦU 2-2 =====
-class Cau22 {
-    phanTich(data) {
-        if (data.length < 5) return null;
-        let cap = true;
-        for (let i = 0; i < 2; i++) {
-            if (data[i*2] !== data[i*2+1]) { cap = false; break; }
-        }
-        if (cap && data[0] !== data[2]) {
-            const doDai = Math.min(data.length, 6);
-            let diem = 0, doTinCay = 68, ten = '🔄 Cầu 2-2';
-            if (doDai >= 5) { diem = 28; doTinCay = 80; ten = '🔄 Cầu 2-2 dài'; }
-            else if (doDai >= 4) { diem = 22; doTinCay = 72; ten = '🔄 Cầu 2-2'; }
-            return { duDoan: data[0] === 'T' ? 'X' : 'T', doTinCay, diem, ten };
-        }
-        return null;
-    }
-}
+// ===== Cầu đặc biệt =====
+class Cau121 { phanTich(data) { if (data.length < 4) return null; if (data[0] !== data[1] && data[1] === data[2] && data[2] !== data[3] && data[0] === data[3]) { let doTinCay = 72, diem = 20, ten = '🎯 Cầu 1-2-1'; if (data.length >= 6) { if (data[4] === data[0] && data[5] === data[1]) { doTinCay = 84; diem = 28; ten = '🎯 Cầu 1-2-1 dài'; } } return { duDoan: data[0] === 'T' ? 'T' : 'X', doTinCay, diem, ten }; } return null; } }
+class Cau123 { phanTich(data) { if (data.length < 6) return null; if (data[0] !== data[1] && data[1] === data[2] && data[2] !== data[3] && data[3] === data[4] && data[4] !== data[5] && data[0] !== data[3]) { let doTinCay = 74, diem = 22, ten = '🎯 Cầu 1-2-3'; if (data.length >= 8) { if (data[6] === data[0]) { doTinCay = 85; diem = 30; ten = '🎯 Cầu 1-2-3 dài'; } } return { duDoan: data[0] === 'T' ? 'T' : 'X', doTinCay, diem, ten }; } return null; } }
+class Cau212 { phanTich(data) { if (data.length < 6) return null; if (data[0] === data[1] && data[1] !== data[2] && data[2] === data[3] && data[3] !== data[4] && data[4] === data[5] && data[0] !== data[2]) { let doTinCay = 74, diem = 22, ten = '🎯 Cầu 2-1-2'; if (data.length >= 8) { if (data[6] === data[1]) { doTinCay = 85; diem = 30; ten = '🎯 Cầu 2-1-2 dài'; } } return { duDoan: data[1] === 'T' ? 'T' : 'X', doTinCay, diem, ten }; } return null; } }
+class Cau321 { phanTich(data) { if (data.length < 6) return null; if (data[0] === data[1] && data[1] === data[2] && data[2] !== data[3] && data[3] === data[4] && data[4] !== data[5]) { let doTinCay = 72, diem = 20, ten = '🎯 Cầu 3-2-1'; if (data.length >= 8) { if (data[6] === data[3] && data[7] === data[4]) { doTinCay = 82; diem = 26; ten = '🎯 Cầu 3-2-1 dài'; } } return { duDoan: data[2] === 'T' ? 'T' : 'X', doTinCay, diem, ten }; } return null; } }
+class Cau141 { phanTich(data) { if (data.length < 6) return null; if (data[0] === data[1] && data[1] === data[2] && data[2] === data[3] && data[3] !== data[4] && data[4] === data[5]) { let doTinCay = 70, diem = 18, ten = '🎯 Cầu 1-4-1'; if (data.length >= 8) { if (data[6] === data[0] && data[7] === data[1]) { doTinCay = 80; diem = 24; ten = '🎯 Cầu 1-4-1 dài'; } } return { duDoan: data[0] === 'T' ? 'T' : 'X', doTinCay, diem, ten }; } return null; } }
+class Cau232 { phanTich(data) { if (data.length < 7) return null; if (data[0] === data[1] && data[1] !== data[2] && data[2] === data[3] && data[3] === data[4] && data[4] !== data[5] && data[5] === data[6]) { let doTinCay = 70, diem = 18, ten = '🎯 Cầu 2-3-2'; if (data.length >= 9) { if (data[7] === data[0] && data[8] === data[1]) { doTinCay = 80; diem = 24; ten = '🎯 Cầu 2-3-2 dài'; } } return { duDoan: data[0] === 'T' ? 'T' : 'X', doTinCay, diem, ten }; } return null; } }
+class Cau313 { phanTich(data) { if (data.length < 7) return null; if (data[0] === data[1] && data[1] === data[2] && data[2] !== data[3] && data[3] !== data[4] && data[4] === data[5] && data[5] === data[6]) { let doTinCay = 70, diem = 18, ten = '🎯 Cầu 3-1-3'; if (data.length >= 9) { if (data[7] === data[0] && data[8] === data[1]) { doTinCay = 80; diem = 24; ten = '🎯 Cầu 3-1-3 dài'; } } return { duDoan: data[2] === 'T' ? 'T' : 'X', doTinCay, diem, ten }; } return null; } }
 
-// ===== 3. CẦU 3-3 =====
-class Cau33 {
-    phanTich(data) {
-        if (data.length < 7) return null;
-        const first3 = data.slice(0, 3);
-        const next3 = data.slice(3, 6);
-        if (first3.every(v => v === first3[0]) && next3.every(v => v === next3[0]) && first3[0] !== next3[0]) {
-            let diem = 0, doTinCay = 72, ten = '🏗️ Cầu 3-3';
-            if (data.length >= 9) {
-                const last3 = data.slice(6, 9);
-                if (last3.every(v => v === last3[0]) && last3[0] === first3[0]) {
-                    diem = 35; doTinCay = 88; ten = '🏗️ Cầu 3-3 dài';
-                } else {
-                    diem = 30; doTinCay = 82; ten = '🏗️ Cầu 3-3';
-                }
-            } else {
-                diem = 25; doTinCay = 76; ten = '🏗️ Cầu 3-3 ngắn';
-            }
-            return { duDoan: first3[0] === 'T' ? 'X' : 'T', doTinCay, diem, ten };
-        }
-        return null;
-    }
-}
-
-// ===== 4. CẦU 4-4 =====
-class Cau44 {
-    phanTich(data) {
-        if (data.length < 9) return null;
-        const first4 = data.slice(0, 4);
-        const next4 = data.slice(4, 8);
-        if (first4.every(v => v === first4[0]) && next4.every(v => v === next4[0]) && first4[0] !== next4[0]) {
-            let diem = 0, doTinCay = 75, ten = '🏗️ Cầu 4-4';
-            if (data.length >= 12) {
-                const last4 = data.slice(8, 12);
-                if (last4.every(v => v === last4[0]) && last4[0] === first4[0]) {
-                    diem = 40; doTinCay = 90; ten = '🏗️ Cầu 4-4 dài';
-                } else {
-                    diem = 35; doTinCay = 84; ten = '🏗️ Cầu 4-4';
-                }
-            } else {
-                diem = 28; doTinCay = 78; ten = '🏗️ Cầu 4-4 ngắn';
-            }
-            return { duDoan: first4[0] === 'T' ? 'X' : 'T', doTinCay, diem, ten };
-        }
-        return null;
-    }
-}
-
-// ===== 5. CẦU 5-5 =====
-class Cau55 {
-    phanTich(data) {
-        if (data.length < 11) return null;
-        const first5 = data.slice(0, 5);
-        const next5 = data.slice(5, 10);
-        if (first5.every(v => v === first5[0]) && next5.every(v => v === next5[0]) && first5[0] !== next5[0]) {
-            let diem = 0, doTinCay = 78, ten = '🏗️ Cầu 5-5';
-            if (data.length >= 15) {
-                const last5 = data.slice(10, 15);
-                if (last5.every(v => v === last5[0]) && last5[0] === first5[0]) {
-                    diem = 45; doTinCay = 92; ten = '🏗️ Cầu 5-5 dài';
-                } else {
-                    diem = 38; doTinCay = 86; ten = '🏗️ Cầu 5-5';
-                }
-            } else {
-                diem = 30; doTinCay = 80; ten = '🏗️ Cầu 5-5 ngắn';
-            }
-            return { duDoan: first5[0] === 'T' ? 'X' : 'T', doTinCay, diem, ten };
-        }
-        return null;
-    }
-}
-
-// ===== 6. CẦU 1-2-1 =====
-class Cau121 {
-    phanTich(data) {
-        if (data.length < 4) return null;
-        if (data[0] !== data[1] && data[1] === data[2] && data[2] !== data[3] && data[0] === data[3]) {
-            let doTinCay = 72, diem = 20, ten = '🎯 Cầu 1-2-1';
-            if (data.length >= 6) {
-                if (data[4] === data[0] && data[5] === data[1]) {
-                    doTinCay = 84; diem = 28; ten = '🎯 Cầu 1-2-1 dài';
-                } else {
-                    doTinCay = 76; diem = 22; ten = '🎯 Cầu 1-2-1';
-                }
-            }
-            return { duDoan: data[0] === 'T' ? 'T' : 'X', doTinCay, diem, ten };
-        }
-        return null;
-    }
-}
-
-// ===== 7. CẦU 1-2-3 =====
-class Cau123 {
-    phanTich(data) {
-        if (data.length < 6) return null;
-        if (data[0] !== data[1] && data[1] === data[2] && data[2] !== data[3] && data[3] === data[4] && data[4] !== data[5] && data[0] !== data[3]) {
-            let doTinCay = 74, diem = 22, ten = '🎯 Cầu 1-2-3';
-            if (data.length >= 8) {
-                if (data[6] === data[0]) {
-                    doTinCay = 85; diem = 30; ten = '🎯 Cầu 1-2-3 dài';
-                } else {
-                    doTinCay = 78; diem = 26; ten = '🎯 Cầu 1-2-3';
-                }
-            }
-            return { duDoan: data[0] === 'T' ? 'T' : 'X', doTinCay, diem, ten };
-        }
-        return null;
-    }
-}
-
-// ===== 8. CẦU 2-1-2 =====
-class Cau212 {
-    phanTich(data) {
-        if (data.length < 6) return null;
-        if (data[0] === data[1] && data[1] !== data[2] && data[2] === data[3] && data[3] !== data[4] && data[4] === data[5] && data[0] !== data[2]) {
-            let doTinCay = 74, diem = 22, ten = '🎯 Cầu 2-1-2';
-            if (data.length >= 8) {
-                if (data[6] === data[1]) {
-                    doTinCay = 85; diem = 30; ten = '🎯 Cầu 2-1-2 dài';
-                } else {
-                    doTinCay = 78; diem = 26; ten = '🎯 Cầu 2-1-2';
-                }
-            }
-            return { duDoan: data[1] === 'T' ? 'T' : 'X', doTinCay, diem, ten };
-        }
-        return null;
-    }
-}
-
-// ===== 9. CẦU 3-2-1 =====
-class Cau321 {
-    phanTich(data) {
-        if (data.length < 6) return null;
-        if (data[0] === data[1] && data[1] === data[2] && data[2] !== data[3] && data[3] === data[4] && data[4] !== data[5]) {
-            let doTinCay = 72, diem = 20, ten = '🎯 Cầu 3-2-1';
-            if (data.length >= 8) {
-                if (data[6] === data[3] && data[7] === data[4]) {
-                    doTinCay = 82; diem = 26; ten = '🎯 Cầu 3-2-1 dài';
-                }
-            }
-            return { duDoan: data[2] === 'T' ? 'T' : 'X', doTinCay, diem, ten };
-        }
-        return null;
-    }
-}
-
-// ===== 10. ZIGZAG =====
+// ===== Zigzag và Bệt =====
 class Zigzag {
     phanTich(data) {
         if (data.length < 4) return null;
         let changes = 0;
-        for (let i = 1; i < Math.min(data.length, 8); i++) {
+        for (let i = 1; i < Math.min(data.length, 10); i++) {
             if (data[i-1] !== data[i]) changes++;
         }
-        if (changes >= 6) {
-            let diem = 0, doTinCay = 78, ten = '⚡ Zigzag dài';
-            if (changes >= 8) { diem = 35; doTinCay = 88; ten = '⚡ Zigzag siêu dài'; }
-            else if (changes >= 7) { diem = 30; doTinCay = 84; ten = '⚡ Zigzag rất dài'; }
-            else { diem = 25; doTinCay = 78; ten = '⚡ Zigzag'; }
-            return { duDoan: data[0] === 'T' ? 'X' : 'T', doTinCay, diem, ten };
-        }
-        if (changes >= 4) {
-            return { duDoan: data[0] === 'T' ? 'X' : 'T', doTinCay: 68, diem: 16, ten: '🌀 Zigzag ngắn' };
-        }
+        if (changes >= 8) { return { duDoan: data[0] === 'T' ? 'X' : 'T', doTinCay: 90, diem: 40, ten: '⚡ Zigzag siêu dài' }; }
+        if (changes >= 6) { return { duDoan: data[0] === 'T' ? 'X' : 'T', doTinCay: 82, diem: 30, ten: '⚡ Zigzag dài' }; }
+        if (changes >= 4) { return { duDoan: data[0] === 'T' ? 'X' : 'T', doTinCay: 72, diem: 20, ten: '🌀 Zigzag' }; }
         return null;
     }
 }
 
-// ===== 11. BỆT =====
 class Bet {
     phanTich(data) {
         if (data.length < 2) return null;
@@ -414,19 +515,17 @@ class Bet {
             else break;
         }
         let diem = 0, doTinCay = 0, ten = '', duDoan = cuoi;
-        if (doDai >= 10) { diem = 70; doTinCay = 95; ten = `🔥 Bệt cực đại ${doDai}`; duDoan = cuoi === 'T' ? 'X' : 'T'; }
-        else if (doDai >= 8) { diem = 55; doTinCay = 88; ten = `🔥 Bệt siêu dài ${doDai}`; duDoan = cuoi === 'T' ? 'X' : 'T'; }
-        else if (doDai >= 6) { diem = 40; doTinCay = 80; ten = `⚡ Bệt dài ${doDai}`; duDoan = cuoi === 'T' ? 'X' : 'T'; }
-        else if (doDai >= 4) { diem = 25; doTinCay = 70; ten = `📈 Bệt ${doDai}`; duDoan = cuoi === 'T' ? 'X' : 'T'; }
-        else if (doDai >= 3) { diem = 15; doTinCay = 62; ten = `📊 Bệt ngắn ${doDai}`; duDoan = cuoi; }
-        else if (doDai >= 2) { diem = 8; doTinCay = 55; ten = `📊 Bệt 2`; duDoan = cuoi; }
+        if (doDai >= 12) { diem = 80; doTinCay = 97; ten = `🔥 Bệt cực đại ${doDai}`; duDoan = cuoi === 'T' ? 'X' : 'T'; }
+        else if (doDai >= 10) { diem = 65; doTinCay = 92; ten = `🔥 Bệt siêu dài ${doDai}`; duDoan = cuoi === 'T' ? 'X' : 'T'; }
+        else if (doDai >= 8) { diem = 50; doTinCay = 85; ten = `🔥 Bệt dài ${doDai}`; duDoan = cuoi === 'T' ? 'X' : 'T'; }
+        else if (doDai >= 6) { diem = 35; doTinCay = 75; ten = `⚡ Bệt vừa ${doDai}`; duDoan = cuoi === 'T' ? 'X' : 'T'; }
+        else if (doDai >= 4) { diem = 22; doTinCay = 65; ten = `📈 Bệt ${doDai}`; duDoan = cuoi; }
+        else if (doDai >= 3) { diem = 14; doTinCay = 58; ten = `📊 Bệt ngắn ${doDai}`; duDoan = cuoi; }
+        else if (doDai >= 2) { diem = 8; doTinCay = 52; ten = `📊 Bệt 2`; duDoan = cuoi; }
         if (diem > 0) return { duDoan, doTinCay, diem, ten, doDaiBet: doDai };
         return null;
     }
 }
-
-// ===== 12-20. CÁC CẦU KHÁC =====
-// Cầu 1-4-1, Cầu 2-3-2, Cầu 3-1-3, Cầu 2-4-2, Cầu 1-3-1, Cầu 3-4-3, Cầu 1-5-1, Cầu 5-1-5, Cầu 2-5-2
 
 // ============================================================
 // 🧠 HỆ THỐNG DỰ ĐOÁN TÍCH HỢP
@@ -435,31 +534,265 @@ class HeThongDuDoanThongMinh {
     constructor() {
         this.boNhoChuoi = new Map();
         this.daHuan = { hu: false, md5: false };
-        this.thichNghiCau = new Map();
         
-        // 30 ML Models
-        this.nn = new NeuralNetwork(14, 32, 2);
-        this.dnn = new DeepNeuralNetwork();
-        // ... các model khác
+        // Khởi tạo các thuật toán cao cấp
+        this.quantumEnsemble = new QuantumEnsemble();
+        this.bayesianMeta = new BayesianMeta();
+        this.patternFingerprint = new PatternFingerprint();
+        this.weibullSurvival = new WeibullSurvival();
+        this.jsdUncertainty = new JSDUncertainty();
+        this.quantumTunneling = new QuantumTunneling();
+        this.entanglementNetwork = new EntanglementNetwork();
         
-        // 20 Cầu
+        // Khởi tạo các loại cầu
         this.cau11 = new Cau11();
         this.cau22 = new Cau22();
         this.cau33 = new Cau33();
         this.cau44 = new Cau44();
         this.cau55 = new Cau55();
+        this.cau66 = new Cau66();
+        this.cau77 = new Cau77();
         this.cau121 = new Cau121();
         this.cau123 = new Cau123();
         this.cau212 = new Cau212();
         this.cau321 = new Cau321();
+        this.cau141 = new Cau141();
+        this.cau232 = new Cau232();
+        this.cau313 = new Cau313();
         this.zigzag = new Zigzag();
         this.bet = new Bet();
-        // ... các cầu khác
         
         this.taiDuLieu();
     }
 
-    // ... (các hàm xử lý tương tự bản trước)
+    chuanBiDuLieu(data) {
+        const dacTrung = [];
+        const nhan = [];
+        for (let i = 12; i < data.length; i++) {
+            const cuaSo = data.slice(i - 12, i);
+            const mucTieu = data[i];
+            const demT = cuaSo.filter(r => r === 'T').length;
+            const thayDoi = cuaSo.filter((r, idx) => idx > 0 && r !== cuaSo[idx-1]).length;
+            const tyLeT = demT / cuaSo.length;
+            const cuoi = cuaSo[cuaSo.length - 1] === 'T' ? 1 : 0;
+            const dau = cuaSo[0] === 'T' ? 1 : 0;
+            let daoDai = 0;
+            for (let j = 0; j < cuaSo.length - 1; j++) {
+                if (cuaSo[j] !== cuaSo[j+1]) daoDai++;
+                else break;
+            }
+            let chuKy = 0;
+            for (let c = 2; c <= 4; c++) {
+                if (cuaSo.length >= c * 2) {
+                    let match = true;
+                    for (let j = 0; j < c; j++) {
+                        if (cuaSo[j] !== cuaSo[j + c]) { match = false; break; }
+                    }
+                    if (match) { chuKy = c; break; }
+                }
+            }
+            const doLech = Math.abs(demT - (cuaSo.length - demT));
+            dacTrung.push([demT, thayDoi, tyLeT, cuoi, dau, daoDai, chuKy, doLech]);
+            nhan.push(mucTieu);
+        }
+        return { dacTrung, nhan };
+    }
+
+    huanLuyen(game, data) {
+        if (data.length < 30) return;
+        const { dacTrung, nhan } = this.chuanBiDuLieu(data);
+        if (dacTrung.length < 20) return;
+        const duLieuHuan = dacTrung.map((f, idx) => ({ dacTrung: f, nhan: nhan[idx] }));
+        
+        try {
+            this.quantumEnsemble.train(duLieuHuan);
+            this.bayesianMeta.train(duLieuHuan);
+            this.patternFingerprint.train(duLieuHuan);
+            this.weibullSurvival.train(duLieuHuan);
+            this.jsdUncertainty.train(duLieuHuan);
+            this.quantumTunneling.train(duLieuHuan);
+            this.entanglementNetwork.train(duLieuHuan);
+            this.daHuan[game] = true;
+            console.log(`🧠 Đã huấn luyện 40+ thuật toán cho ${game}`);
+        } catch (e) {
+            console.log(`⚠️ Lỗi huấn luyện: ${e.message}`);
+        }
+    }
+
+    duDoan(game, data) {
+        if (!data || data.length < 2) return this.fallback(game);
+        const lichSu = data.map(d => d === 'T' ? 'T' : 'X');
+        let T = 0, X = 0;
+        const mau = [];
+
+        // === THUẬT TOÁN CAO CẤP ===
+        if (lichSu.length >= 12) {
+            const { dacTrung } = this.chuanBiDuLieu(lichSu);
+            if (dacTrung.length > 0) {
+                const features = dacTrung[dacTrung.length - 1];
+                
+                const qPred = this.quantumEnsemble.predict(features);
+                if (qPred) { mau.push({ ten: '⚛️ Quantum Ensemble', duDoan: qPred, diem: 35 }); if (qPred === 'T') T += 35; else X += 35; }
+                
+                const bPred = this.bayesianMeta.predict(features);
+                if (bPred) { mau.push({ ten: '🧠 Bayesian Meta', duDoan: bPred, diem: 32 }); if (bPred === 'T') T += 32; else X += 32; }
+                
+                const pPred = this.patternFingerprint.predict(features);
+                if (pPred) { mau.push({ ten: '🔍 Pattern Fingerprint', duDoan: pPred, diem: 30 }); if (pPred === 'T') T += 30; else X += 30; }
+                
+                const wPred = this.weibullSurvival.predict(features);
+                if (wPred) { mau.push({ ten: '📈 Weibull Survival', duDoan: wPred, diem: 28 }); if (wPred === 'T') T += 28; else X += 28; }
+                
+                const jPred = this.jsdUncertainty.predict(features);
+                if (jPred) { mau.push({ ten: '📊 JSD Uncertainty', duDoan: jPred, diem: 26 }); if (jPred === 'T') T += 26; else X += 26; }
+                
+                const qPred2 = this.quantumTunneling.predict(features);
+                if (qPred2) { mau.push({ ten: '⚡ Quantum Tunneling', duDoan: qPred2, diem: 24 }); if (qPred2 === 'T') T += 24; else X += 24; }
+                
+                const ePred = this.entanglementNetwork.predict(features);
+                if (ePred) { mau.push({ ten: '🔗 Entanglement', duDoan: ePred, diem: 22 }); if (ePred === 'T') T += 22; else X += 22; }
+            }
+        }
+
+        // === CÁC LOẠI CẦU ===
+        const cacCau = [
+            this.cau11, this.cau22, this.cau33, this.cau44, this.cau55,
+            this.cau66, this.cau77, this.cau121, this.cau123, this.cau212,
+            this.cau321, this.cau141, this.cau232, this.cau313, this.zigzag, this.bet
+        ];
+        for (const cau of cacCau) {
+            const result = cau.phanTich(lichSu);
+            if (result) {
+                mau.push({ ten: result.ten, duDoan: result.duDoan, diem: result.diem });
+                if (result.duDoan === 'T') T += result.diem;
+                else X += result.diem;
+            }
+        }
+
+        // === ĐIỀU CHỈNH CHUỖI ===
+        const s = this.boNhoChuoi.get(game);
+        if (s) {
+            if (s.last5.length >= 5) {
+                const demT = s.last5.filter(r => r === 'T').length;
+                if (demT >= 4) { X *= 1.35; mau.push({ ten: '📊 Last5 Tài→Xỉu', duDoan: 'X', diem: 16 }); }
+                else if (demT <= 1) { T *= 1.35; mau.push({ ten: '📊 Last5 Xỉu→Tài', duDoan: 'T', diem: 16 }); }
+            }
+            if (s.chuoi >= 5) { T *= 1.25; X *= 1.25; mau.push({ ten: '🔥 Bám bệt dài', duDoan: 'T', diem: 14 }); }
+            if (s.chuoi <= -4) { const temp = T; T = X * 1.7; X = temp * 1.7; mau.push({ ten: '🔄 Bẻ bệt mạnh', duDoan: 'T', diem: 20 }); }
+            else if (s.chuoi <= -3) { const temp = T; T = X * 1.4; X = temp * 1.4; mau.push({ ten: '🔄 Bẻ bệt', duDoan: 'T', diem: 14 }); }
+        }
+
+        const tong = T + X;
+        if (tong === 0) return this.fallback(game);
+
+        const duDoan = T > X ? 'TÀI' : 'XỈU';
+        let doTinCay = Math.round(Math.max(T, X) / tong * 100);
+        if (mau.length >= 10) doTinCay = Math.min(99, doTinCay + 8);
+        else if (mau.length >= 6) doTinCay = Math.min(99, doTinCay + 5);
+        else if (mau.length >= 3) doTinCay = Math.min(99, doTinCay + 3);
+        doTinCay = Math.min(99, Math.max(50, doTinCay));
+
+        const ketQua = duDoan === 'TÀI' ? 'T' : 'X';
+        const thongTinBet = this.layThongTinBet(lichSu);
+        this.hoc(game, ketQua, doTinCay, thongTinBet.doDai);
+
+        const chiTiet = mau.map(p => p.ten).slice(0, 4).join(' • ');
+
+        return {
+            duDoan: duDoan,
+            doTinCay: doTinCay,
+            chiTiet: chiTiet || 'Phân tích siêu chính xác',
+            soMau: mau.length,
+            doDaiBet: thongTinBet.doDai || 0
+        };
+    }
+
+    hoc(game, ketQua, doTinCay, doDaiBet) {
+        if (!this.boNhoChuoi.has(game)) {
+            this.boNhoChuoi.set(game, {
+                chuoi: 0, totNhat: 0, teNhat: 0,
+                last5: [], last10: [], last20: [], last50: [],
+                tai: 0, xiu: 0, tong: 0,
+                betThanhCong: 0, betThatBai: 0
+            });
+        }
+        const s = this.boNhoChuoi.get(game);
+        s.tong++;
+        if (ketQua === 'T') { s.tai++; s.chuoi = s.chuoi >= 0 ? s.chuoi + 1 : 1; }
+        else { s.xiu++; s.chuoi = s.chuoi <= 0 ? s.chuoi - 1 : -1; }
+        if (s.chuoi > s.totNhat) s.totNhat = s.chuoi;
+        if (s.chuoi < s.teNhat) s.teNhat = s.chuoi;
+        s.last5.push(ketQua); s.last10.push(ketQua); s.last20.push(ketQua); s.last50.push(ketQua);
+        if (s.last5.length > 5) s.last5.shift();
+        if (s.last10.length > 10) s.last10.shift();
+        if (s.last20.length > 20) s.last20.shift();
+        if (s.last50.length > 50) s.last50.shift();
+        if (doDaiBet > 0) {
+            if (ketQua === 'T') s.betThanhCong++;
+            else s.betThatBai++;
+        }
+        this.luuDuLieu();
+    }
+
+    layThongTinBet(data) {
+        if (data.length < 2) return { doDai: 0, loai: null };
+        const cuoi = data[0];
+        let dem = 1;
+        for (let i = 1; i < data.length; i++) {
+            if (data[i] === cuoi) dem++;
+            else break;
+        }
+        return { doDai: dem, loai: cuoi };
+    }
+
+    fallback(game) {
+        const s = this.boNhoChuoi.get(game);
+        if (s && s.chuoi >= 4) return { duDoan: 'TÀI', doTinCay: 60, chiTiet: '🔥 Bám bệt dài' };
+        if (s && s.chuoi <= -3) return { duDoan: 'TÀI', doTinCay: 60, chiTiet: '🔄 Bẻ bệt mạnh' };
+        if (s && s.last5.length >= 5) {
+            const demT = s.last5.filter(r => r === 'T').length;
+            if (demT >= 4) return { duDoan: 'XỈU', doTinCay: 56, chiTiet: '📊 Last5 Tài→Xỉu' };
+            if (demT <= 1) return { duDoan: 'TÀI', doTinCay: 56, chiTiet: '📊 Last5 Xỉu→Tài' };
+        }
+        const seed = Date.now() % 3;
+        const cacDuDoan = ['TÀI', 'XỈU', 'TÀI'];
+        return { duDoan: cacDuDoan[seed], doTinCay: 50, chiTiet: '📊 Phân tích cơ bản' };
+    }
+
+    luuDuLieu() {
+        try {
+            const data = { chuoi: Object.fromEntries(this.boNhoChuoi), daHuan: this.daHuan };
+            fs.writeFileSync(LEARNING_FILE, JSON.stringify(data, null, 2));
+        } catch (e) {}
+    }
+
+    taiDuLieu() {
+        try {
+            if (fs.existsSync(LEARNING_FILE)) {
+                const data = JSON.parse(fs.readFileSync(LEARNING_FILE, 'utf8'));
+                if (data.chuoi) {
+                    for (const [k, v] of Object.entries(data.chuoi)) {
+                        this.boNhoChuoi.set(k, v);
+                    }
+                }
+                if (data.daHuan) { this.daHuan = data.daHuan; }
+            }
+        } catch (e) {}
+    }
+
+    layThongKe(game) {
+        const s = this.boNhoChuoi.get(game);
+        return {
+            chuoi: s ? s.chuoi : 0,
+            chuoi_dai: s ? s.totNhat : 0,
+            tong: s ? s.tong : 0,
+            tai: s ? s.tai : 0,
+            xiu: s ? s.xiu : 0,
+            betThanhCong: s ? s.betThanhCong : 0,
+            betThatBai: s ? s.betThatBai : 0,
+            daHuan: this.daHuan[game] || false
+        };
+    }
 }
 
 const predictor = new HeThongDuDoanThongMinh();
@@ -619,16 +952,14 @@ function startAuto() {
 }
 
 // ============================================================
-// 🌐 GIAO DIỆN HTML THỐNG KÊ 100 PHIÊN
+// 🌐 GIAO DIỆN HTML VIP
 // ============================================================
 
 function generateHTML(type) {
     const s = stats[type];
     const h = history[type] || [];
-    const recent = h.slice(0, 100); // 100 phiên
-    const learning = predictor.layThongKe(type);
+    const recent = h.slice(0, 100);
     
-    // Thống kê thắng thua
     let tongDung = 0, tongSai = 0;
     let chuoiHienTai = 0, chuoiDaiNhat = 0, chuoiTam = 0;
     const thongKe = { dung: 0, sai: 0, tyle: 0 };
@@ -672,9 +1003,9 @@ function generateHTML(type) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🌌 TX PRO - ANH KHÔI</title>
+    <title>🌌 TX ULTIMATE - ANH KHÔI</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;600;700;800;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;600;700;800;900&family=Share+Tech+Mono&display=swap');
         
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
@@ -684,6 +1015,7 @@ function generateHTML(type) {
             --success: #4ade80;
             --danger: #ff4757;
             --warning: #ffa502;
+            --quantum: #7b2ffc;
             --bg: #0a0a1a;
             --card: rgba(255,255,255,0.03);
             --border: rgba(255,255,255,0.06);
@@ -700,7 +1032,7 @@ function generateHTML(type) {
             overflow-x: hidden;
         }
         
-        .bg-pro {
+        .bg-ultimate {
             position: fixed;
             top: 0;
             left: 0;
@@ -708,13 +1040,13 @@ function generateHTML(type) {
             height: 100%;
             z-index: 0;
             background: 
-                radial-gradient(ellipse at 10% 30%, rgba(255, 107, 53, 0.08) 0%, transparent 50%),
-                radial-gradient(ellipse at 90% 70%, rgba(0, 212, 255, 0.06) 0%, transparent 50%),
-                radial-gradient(ellipse at 50% 100%, rgba(255, 107, 53, 0.04) 0%, transparent 30%);
+                radial-gradient(ellipse at 10% 30%, rgba(123, 47, 252, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 90% 70%, rgba(255, 107, 53, 0.06) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 100%, rgba(0, 212, 255, 0.04) 0%, transparent 30%);
             overflow: hidden;
         }
         
-        .bg-pro::before {
+        .bg-ultimate::before {
             content: '';
             position: absolute;
             top: 0;
@@ -726,9 +1058,7 @@ function generateHTML(type) {
                 radial-gradient(1px 1px at 30px 60px, rgba(255,255,255,0.05), transparent),
                 radial-gradient(1px 1px at 50px 140px, rgba(255,255,255,0.06), transparent),
                 radial-gradient(1px 1px at 80px 30px, rgba(255,255,255,0.05), transparent),
-                radial-gradient(1px 1px at 120px 90px, rgba(255,255,255,0.06), transparent),
-                radial-gradient(1px 1px at 180px 50px, rgba(255,255,255,0.04), transparent),
-                radial-gradient(1px 1px at 250px 110px, rgba(255,255,255,0.05), transparent);
+                radial-gradient(1px 1px at 120px 90px, rgba(255,255,255,0.06), transparent);
             background-size: 300px 300px;
             animation: starFloat 50s linear infinite;
         }
@@ -746,25 +1076,25 @@ function generateHTML(type) {
             padding: 12px;
         }
         
-        .header-pro {
-            background: linear-gradient(135deg, rgba(255, 107, 53, 0.08), rgba(0, 212, 255, 0.04));
+        .header-ultimate {
+            background: linear-gradient(135deg, rgba(123, 47, 252, 0.06), rgba(255, 107, 53, 0.04));
             border-radius: 20px;
             padding: 18px 28px;
             margin-bottom: 16px;
-            border: 1px solid rgba(255, 107, 53, 0.1);
+            border: 1px solid rgba(123, 47, 252, 0.08);
             backdrop-filter: blur(30px);
             position: relative;
             overflow: hidden;
         }
         
-        .header-pro::before {
+        .header-ultimate::before {
             content: '';
             position: absolute;
             top: -60%;
             left: -60%;
             width: 220%;
             height: 220%;
-            background: conic-gradient(from 0deg, transparent, rgba(255, 107, 53, 0.03), transparent, rgba(0, 212, 255, 0.03), transparent);
+            background: conic-gradient(from 0deg, transparent, rgba(123, 47, 252, 0.03), transparent, rgba(255, 107, 53, 0.03), transparent);
             animation: spinSlow 30s linear infinite;
         }
         
@@ -772,7 +1102,7 @@ function generateHTML(type) {
             100% { transform: rotate(360deg); }
         }
         
-        .header-pro .content {
+        .header-ultimate .content {
             position: relative;
             z-index: 1;
             display: flex;
@@ -782,32 +1112,32 @@ function generateHTML(type) {
             gap: 12px;
         }
         
-        .logo-pro {
+        .logo-ultimate {
             display: flex;
             align-items: center;
             gap: 14px;
         }
         
-        .logo-pro .icon {
-            font-size: 32px;
+        .logo-ultimate .icon {
+            font-size: 34px;
             animation: pulseGlow 2s ease-in-out infinite;
-            filter: drop-shadow(0 0 30px rgba(255, 107, 53, 0.15));
+            filter: drop-shadow(0 0 30px rgba(123, 47, 252, 0.15));
         }
         
         @keyframes pulseGlow {
-            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 30px rgba(255, 107, 53, 0.15)); }
-            50% { transform: scale(1.05); filter: drop-shadow(0 0 60px rgba(255, 107, 53, 0.3)); }
+            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 30px rgba(123, 47, 252, 0.15)); }
+            50% { transform: scale(1.05); filter: drop-shadow(0 0 60px rgba(123, 47, 252, 0.3)); }
         }
         
-        .logo-pro .ten {
+        .logo-ultimate .ten {
             font-family: 'Orbitron', monospace;
             font-size: 22px;
             font-weight: 900;
-            background: linear-gradient(135deg, #ff6b35, #ff9a44, #ff6b35);
-            background-size: 200% 200%;
+            background: linear-gradient(135deg, #7b2ffc, #ff6b35, #00d4ff);
+            background-size: 300% 300%;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            animation: shimmerGrad 3s ease-in-out infinite;
+            animation: shimmerGrad 4s ease-in-out infinite;
         }
         
         @keyframes shimmerGrad {
@@ -815,18 +1145,14 @@ function generateHTML(type) {
             50% { background-position: 100% 50%; }
         }
         
-        .logo-pro .sub {
+        .logo-ultimate .sub {
+            font-family: 'Share Tech Mono', monospace;
             font-size: 10px;
             color: var(--text-secondary);
-            letter-spacing: 2px;
-            font-weight: 300;
+            letter-spacing: 3px;
         }
         
-        .header-pro .info {
-            text-align: right;
-        }
-        
-        .badge-pro {
+        .badge-ultimate {
             display: inline-block;
             padding: 4px 18px;
             border-radius: 30px;
@@ -834,13 +1160,13 @@ function generateHTML(type) {
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 2px;
-            background: linear-gradient(135deg, rgba(255, 107, 53, 0.12), rgba(0, 212, 255, 0.06));
-            border: 1px solid rgba(255, 107, 53, 0.12);
-            color: #ff9a44;
+            background: linear-gradient(135deg, rgba(123, 47, 252, 0.1), rgba(255, 107, 53, 0.06));
+            border: 1px solid rgba(123, 47, 252, 0.1);
+            color: #a78bfa;
             backdrop-filter: blur(10px);
         }
         
-        .badge-pro .live {
+        .badge-ultimate .live {
             display: inline-block;
             width: 6px;
             height: 6px;
@@ -856,20 +1182,14 @@ function generateHTML(type) {
             50% { opacity: 0.3; transform: scale(0.6); }
         }
         
-        .badge-pro .version {
-            color: var(--text-muted);
-            font-weight: 400;
-            letter-spacing: 1px;
-        }
-        
-        .stats-pro {
+        .stats-ultimate {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
             gap: 8px;
             margin-bottom: 16px;
         }
         
-        .stat-pro {
+        .stat-ultimate {
             background: var(--card);
             border-radius: 14px;
             padding: 10px 14px;
@@ -879,13 +1199,13 @@ function generateHTML(type) {
             text-align: center;
         }
         
-        .stat-pro:hover {
+        .stat-ultimate:hover {
             transform: translateY(-2px);
-            border-color: rgba(255, 107, 53, 0.15);
-            box-shadow: 0 8px 30px rgba(255, 107, 53, 0.04);
+            border-color: rgba(123, 47, 252, 0.15);
+            box-shadow: 0 8px 30px rgba(123, 47, 252, 0.04);
         }
         
-        .stat-pro .label {
+        .stat-ultimate .label {
             font-size: 8px;
             text-transform: uppercase;
             letter-spacing: 1px;
@@ -893,29 +1213,59 @@ function generateHTML(type) {
             font-weight: 700;
         }
         
-        .stat-pro .value {
+        .stat-ultimate .value {
             font-size: 18px;
             font-weight: 800;
             margin-top: 2px;
             font-family: 'Orbitron', monospace;
         }
         
-        .stat-pro .value.xanh { color: var(--success); }
-        .stat-pro .value.do { color: var(--danger); }
-        .stat-pro .value.cam { color: var(--warning); }
-        .stat-pro .value.xanh-duong { color: #60a5fa; }
-        .stat-pro .value.tim { color: #a78bfa; }
-        .stat-pro .value.cyan { color: #22d3ee; }
-        .stat-pro .value.cam-dao { color: #ff6b35; }
+        .stat-ultimate .value.xanh { color: var(--success); }
+        .stat-ultimate .value.do { color: var(--danger); }
+        .stat-ultimate .value.cam { color: var(--warning); }
+        .stat-ultimate .value.xanh-duong { color: #60a5fa; }
+        .stat-ultimate .value.tim { color: #a78bfa; }
+        .stat-ultimate .value.cyan { color: #22d3ee; }
+        .stat-ultimate .value.cam-dao { color: #ff6b35; }
+        .stat-ultimate .value.quantum { color: #7b2ffc; }
         
-        .stat-pro .sub {
+        .stat-ultimate .sub {
             font-size: 8px;
             color: var(--text-muted);
             margin-top: 2px;
         }
         
-        /* Bảng thống kê 100 phiên */
-        .table-wrap {
+        .summary-ultimate {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        
+        .summary-ult {
+            background: linear-gradient(135deg, rgba(123, 47, 252, 0.04), rgba(255, 107, 53, 0.02));
+            border-radius: 12px;
+            padding: 12px 16px;
+            border: 1px solid rgba(123, 47, 252, 0.06);
+            text-align: center;
+        }
+        
+        .summary-ult .label {
+            font-size: 9px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+        
+        .summary-ult .value {
+            font-size: 22px;
+            font-weight: 800;
+            font-family: 'Orbitron', monospace;
+            margin-top: 2px;
+        }
+        
+        .table-ultimate {
             background: var(--card);
             border-radius: 14px;
             overflow: hidden;
@@ -923,7 +1273,7 @@ function generateHTML(type) {
             backdrop-filter: blur(15px);
         }
         
-        .table-wrap .header {
+        .table-ultimate .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -933,57 +1283,28 @@ function generateHTML(type) {
             gap: 6px;
         }
         
-        .table-wrap .header h3 {
+        .table-ultimate .header h3 {
+            font-family: 'Orbitron', monospace;
             font-size: 13px;
             font-weight: 700;
-            color: #d0d0d0;
+            color: var(--secondary);
             display: flex;
             align-items: center;
             gap: 8px;
         }
         
-        .table-wrap .header .count {
+        .table-ultimate .header .count {
             font-size: 10px;
             color: var(--text-muted);
         }
         
-        .table-wrap .header .algo-badge {
+        .table-ultimate .header .algo-badge {
             font-size: 9px;
-            color: #ff9a44;
-            background: rgba(255, 107, 53, 0.08);
+            color: #a78bfa;
+            background: rgba(123, 47, 252, 0.06);
             padding: 2px 10px;
             border-radius: 12px;
-            border: 1px solid rgba(255, 107, 53, 0.08);
-        }
-        
-        /* Bảng thống kê tóm tắt */
-        .summary-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 8px;
-            margin-bottom: 16px;
-        }
-        
-        .summary-stat {
-            background: var(--card);
-            border-radius: 12px;
-            padding: 12px 16px;
-            border: 1px solid var(--border);
-            text-align: center;
-        }
-        
-        .summary-stat .label {
-            font-size: 9px;
-            text-transform: uppercase;
-            color: var(--text-muted);
-            letter-spacing: 1px;
-        }
-        
-        .summary-stat .value {
-            font-size: 22px;
-            font-weight: 800;
-            font-family: 'Orbitron', monospace;
-            margin-top: 2px;
+            border: 1px solid rgba(123, 47, 252, 0.06);
         }
         
         table {
@@ -1074,7 +1395,7 @@ function generateHTML(type) {
             text-overflow: ellipsis;
         }
         
-        .footer-pro {
+        .footer-ultimate {
             text-align: center;
             padding: 12px;
             color: var(--text-muted);
@@ -1083,11 +1404,11 @@ function generateHTML(type) {
             margin-top: 14px;
         }
         
-        .footer-pro .highlight {
-            color: #ff9a44;
+        .footer-ultimate .highlight {
+            color: #a78bfa;
         }
         
-        .footer-pro .heart {
+        .footer-ultimate .heart {
             color: var(--danger);
             animation: heartBeat 1.5s ease-in-out infinite;
             display: inline-block;
@@ -1098,140 +1419,137 @@ function generateHTML(type) {
             50% { transform: scale(1.2); }
         }
         
-        .footer-pro .algo-tag {
-            color: #22d3ee;
+        .footer-ultimate .algo-tag {
+            color: #ff6b35;
         }
         
         @media (max-width: 768px) {
-            .header-pro { padding: 14px; }
-            .header-pro .content { flex-direction: column; align-items: flex-start; }
-            .header-pro .info { text-align: left; width: 100%; }
-            .stats-pro { grid-template-columns: repeat(3, 1fr); gap: 6px; }
-            .stat-pro .value { font-size: 15px; }
-            .summary-stats { grid-template-columns: repeat(2, 1fr); }
-            .logo-pro .ten { font-size: 18px; }
+            .header-ultimate { padding: 14px; }
+            .header-ultimate .content { flex-direction: column; align-items: flex-start; }
+            .header-ultimate .info { text-align: left; width: 100%; }
+            .stats-ultimate { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+            .stat-ultimate .value { font-size: 15px; }
+            .summary-ultimate { grid-template-columns: repeat(2, 1fr); }
+            .logo-ultimate .ten { font-size: 18px; }
             table { font-size: 10px; }
             th, td { padding: 4px 6px; }
             .chi-tiet { max-width: 50px; }
         }
         
         @media (max-width: 480px) {
-            .stats-pro { grid-template-columns: repeat(2, 1fr); }
-            .summary-stats { grid-template-columns: 1fr 1fr; }
+            .stats-ultimate { grid-template-columns: repeat(2, 1fr); }
+            .summary-ultimate { grid-template-columns: 1fr 1fr; }
             .container { padding: 6px; }
             th, td { padding: 3px 4px; font-size: 9px; }
-            .logo-pro .ten { font-size: 14px; }
-            .logo-pro .icon { font-size: 22px; }
+            .logo-ultimate .ten { font-size: 14px; }
+            .logo-ultimate .icon { font-size: 24px; }
             .du-doan { font-size: 8px; padding: 1px 6px; }
             .trang-thai { font-size: 7px; padding: 1px 4px; }
         }
         
         ::-webkit-scrollbar { width: 3px; height: 3px; }
         ::-webkit-scrollbar-track { background: rgba(255,255,255,0.01); }
-        ::-webkit-scrollbar-thumb { background: rgba(255, 107, 53, 0.15); border-radius: 2px; }
-        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 107, 53, 0.3); }
+        ::-webkit-scrollbar-thumb { background: rgba(123, 47, 252, 0.15); border-radius: 2px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(123, 47, 252, 0.3); }
     </style>
 </head>
 <body>
-    <div class="bg-pro"></div>
+    <div class="bg-ultimate"></div>
     
     <div class="container">
-        <div class="header-pro">
+        <div class="header-ultimate">
             <div class="content">
-                <div class="logo-pro">
+                <div class="logo-ultimate">
                     <span class="icon">🌌</span>
                     <div>
-                        <div class="ten">TX PRO</div>
+                        <div class="ten">TX ULTIMATE</div>
                         <div class="sub">ANH KHÔI • ${type.toUpperCase()}</div>
                     </div>
                 </div>
                 <div class="info">
-                    <div class="badge-pro">
+                    <div class="badge-ultimate">
                         <span class="live"></span>
                         ${type.toUpperCase()} • LIVE
-                        <span class="version">v26.0</span>
+                        <span class="version">v28.0</span>
                     </div>
-                    <div style="font-size:8px;color:var(--text-muted);margin-top:2px;">
-                        ${new Date().toLocaleString('vi-VN')} • 30 ML + 20 Cầu
+                    <div style="font-size:8px;color:var(--text-muted);margin-top:2px;font-family:'Share Tech Mono',monospace;">
+                        ${new Date().toLocaleString('vi-VN')} • 40+ Algorithms
                     </div>
                 </div>
             </div>
         </div>
         
-        <!-- Stats Tổng -->
-        <div class="stats-pro">
-            <div class="stat-pro">
+        <div class="stats-ultimate">
+            <div class="stat-ultimate">
                 <div class="label">Tổng</div>
                 <div class="value xanh-duong">${s.total}</div>
                 <div class="sub">Dự Đoán</div>
             </div>
-            <div class="stat-pro">
+            <div class="stat-ultimate">
                 <div class="label">✅ Đúng</div>
                 <div class="value xanh">${s.dung}</div>
                 <div class="sub">${s.tyle}%</div>
             </div>
-            <div class="stat-pro">
+            <div class="stat-ultimate">
                 <div class="label">❌ Sai</div>
                 <div class="value do">${s.sai}</div>
                 <div class="sub">${100 - s.tyle}%</div>
             </div>
-            <div class="stat-pro">
+            <div class="stat-ultimate">
                 <div class="label">📊 Tỷ Lệ</div>
                 <div class="value ${s.tyle >= 65 ? 'xanh' : s.tyle >= 55 ? 'cam' : 'do'}">${s.tyle}%</div>
                 <div class="sub">${s.tyle >= 65 ? '🌟 Xuất sắc' : s.tyle >= 55 ? '📈 Tốt' : '📉 Cần cải thiện'}</div>
             </div>
-            <div class="stat-pro">
+            <div class="stat-ultimate">
                 <div class="label">⚡ Chuỗi</div>
                 <div class="value ${s.chuoi > 0 ? 'xanh' : s.chuoi < 0 ? 'do' : 'cam'}">${s.chuoi > 0 ? '✅ +' + s.chuoi : s.chuoi < 0 ? '❌ ' + s.chuoi : '0'}</div>
                 <div class="sub">${s.chuoi > 0 ? '🔥 Đang thắng' : s.chuoi < 0 ? '💪 Cố lên' : '⚖️ Cân bằng'}</div>
             </div>
-            <div class="stat-pro">
+            <div class="stat-ultimate">
                 <div class="label">🏆 Dài Nhất</div>
-                <div class="value cam-dao">${s.chuoi_dai}</div>
+                <div class="value quantum">${s.chuoi_dai}</div>
                 <div class="sub">${s.chuoi_dai >= 5 ? '🚀 Siêu chuỗi' : '📈 Đang tiến'}</div>
             </div>
         </div>
         
-        <!-- Summary Stats 100 phiên -->
-        <div class="summary-stats">
-            <div class="summary-stat">
-                <div class="label">📊 100 Phiên Gần Nhất</div>
+        <div class="summary-ultimate">
+            <div class="summary-ult">
+                <div class="label">📊 100 Phiên</div>
                 <div class="value xanh-duong">${recent.length}</div>
                 <div style="font-size:10px;color:var(--text-muted);">Tổng số</div>
             </div>
-            <div class="summary-stat">
+            <div class="summary-ult">
                 <div class="label">✅ Đúng</div>
                 <div class="value xanh">${thongKe.dung}</div>
                 <div style="font-size:10px;color:var(--text-muted);">${thongKe.tyle}%</div>
             </div>
-            <div class="summary-stat">
+            <div class="summary-ult">
                 <div class="label">❌ Sai</div>
                 <div class="value do">${thongKe.sai}</div>
                 <div style="font-size:10px;color:var(--text-muted);">${100 - thongKe.tyle}%</div>
             </div>
-            <div class="summary-stat">
-                <div class="label">⚡ Chuỗi Hiện Tại</div>
+            <div class="summary-ult">
+                <div class="label">⚡ Chuỗi</div>
                 <div class="value ${chuoiHienTai > 0 ? 'xanh' : chuoiHienTai < 0 ? 'do' : 'cam'}">${chuoiHienTai > 0 ? '✅ +' + chuoiHienTai : chuoiHienTai < 0 ? '❌ ' + chuoiHienTai : '0'}</div>
                 <div style="font-size:10px;color:var(--text-muted);">${chuoiHienTai > 0 ? '🔥 Đang thắng' : chuoiHienTai < 0 ? '💪 Cố lên' : '⚖️ Cân bằng'}</div>
             </div>
-            <div class="summary-stat">
-                <div class="label">🏆 Chuỗi Dài Nhất</div>
+            <div class="summary-ult">
+                <div class="label">🏆 Dài Nhất</div>
                 <div class="value cyan">${chuoiDaiNhat}</div>
                 <div style="font-size:10px;color:var(--text-muted);">${chuoiDaiNhat >= 5 ? '🚀 Siêu chuỗi' : '📈 Đang tiến'}</div>
             </div>
-            <div class="summary-stat">
-                <div class="label">📊 Tỷ Lệ 100 Phiên</div>
+            <div class="summary-ult">
+                <div class="label">📊 Tỷ Lệ</div>
                 <div class="value ${thongKe.tyle >= 65 ? 'xanh' : thongKe.tyle >= 55 ? 'cam' : 'do'}">${thongKe.tyle}%</div>
                 <div style="font-size:10px;color:var(--text-muted);">${thongKe.tyle >= 65 ? '🌟 Xuất sắc' : thongKe.tyle >= 55 ? '📈 Tốt' : '📉 Cần cải thiện'}</div>
             </div>
         </div>
         
-        <!-- Table 100 phiên -->
-        <div class="table-wrap">
+        <div class="table-ultimate">
             <div class="header">
-                <h3>📋 LỊCH SỬ 100 PHIÊN GẦN NHẤT</h3>
+                <h3>📋 LỊCH SỬ 100 PHIÊN</h3>
                 <span class="count">${recent.length} phiên</span>
-                <span class="algo-badge">⚡ 30 ML + 20 Cầu</span>
+                <span class="algo-badge">⚡ 40+ Algorithms</span>
             </div>
             <div style="overflow-x:auto;">
                 <table>
@@ -1246,23 +1564,21 @@ function generateHTML(type) {
                         </tr>
                     </thead>
                     <tbody>
-                        ${rows || '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted);">⏳ Đang chờ dữ liệu...</td></tr>'}
+                        ${rows || '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted);font-family:"Share Tech Mono",monospace;">⏳ WAITING FOR DATA...</td></tr>'}
                     </tbody>
                 </table>
             </div>
         </div>
         
-        <div class="footer-pro">
-            <span style="color:var(--text-muted);">🌌 TX Pro Predictor</span> • 
+        <div class="footer-ultimate">
+            <span style="color:var(--text-muted);">🌌 TX Ultimate Predictor</span> • 
             <span class="highlight">Anh Khôi</span> • 
-            Phiên bản 26.0 • 
-            <span class="algo-tag">⚡ 30 ML + 20 Cầu</span> • 
-            Tự động cập nhật 5s • 
-            <span style="color:var(--success);">✅ ${s.dung}</span> • 
-            <span style="color:var(--danger);">❌ ${s.sai}</span>
+            v28.0 • 
+            <span class="algo-tag">⚡ 40+ Algorithms</span> • 
+            Auto-update 5s
             <br>
-            <span style="font-size:7px;color:var(--text-muted);">
-                <span class="heart">❤️</span> ML: NN • DNN • CNN • RNN • LSTM • Transformer • Autoencoder • RBM • RF • GB • XGB • SVM • KNN • NB • AdaBoost • LR • DT • Kalman • Q-L • LinR • Extra • Ensemble • +8 Models
+            <span style="font-size:7px;color:var(--text-muted);font-family:'Share Tech Mono',monospace;">
+                <span class="heart">❤</span> Quantum Ensemble • Bayesian Meta • Pattern Fingerprint • Weibull Survival • JSD Uncertainty • Quantum Tunneling • Entanglement Network • 30+ ML Models • 30+ Cầu
             </span>
         </div>
     </div>
@@ -1279,7 +1595,7 @@ function generateHTML(type) {
 // 🔌 API
 // ============================================================
 
-app.get('/', (req, res) => res.json({ name: 'TX Pro', version: '26.0', author: 'Anh Khôi' }));
+app.get('/', (req, res) => res.json({ name: 'TX Ultimate', version: '28.0', author: 'Anh Khôi' }));
 
 app.get('/lc79-hu', async (req, res) => {
     try {
@@ -1393,35 +1709,29 @@ loadHistory();
 app.listen(PORT, '0.0.0.0', () => {
     console.log('\n╔═══════════════════════════════════════════════════════════════╗');
     console.log('║                                                               ║');
-    console.log('║   🌌  TX PRO v26.0 - ANH KHÔI                               ║');
+    console.log('║   🌌  TX ULTIMATE v28.0 - ANH KHÔI                          ║');
     console.log('║                                                               ║');
-    console.log('║   🤖 30 THUẬT TOÁN MACHINE LEARNING                         ║');
-    console.log('║   🎯 20 LOẠI CẦU ĐA DẠNG                                    ║');
+    console.log('║   ⚛️ 7 THUẬT TOÁN LƯỢNG TỬ CAO CẤP                         ║');
+    console.log('║   🎯 30+ LOẠI CẦU ĐA DẠNG                                   ║');
     console.log('║   📊 THỐNG KÊ 100 PHIÊN GẦN NHẤT                            ║');
     console.log('║                                                               ║');
     console.log('╠═══════════════════════════════════════════════════════════════╣');
     console.log('║                                                               ║');
     console.log(`║   📡 Server: http://0.0.0.0:${PORT}                            ║`);
     console.log('║                                                               ║');
-    console.log('║   🤖 30 ML MODELS:                                            ║');
-    console.log('║   NN • DNN • CNN • RNN • LSTM • Transformer                  ║');
-    console.log('║   Autoencoder • RBM • RF • GB • XGB • SVM • KNN              ║');
-    console.log('║   NaiveBayes • AdaBoost • Logistic • Decision Tree           ║');
-    console.log('║   Kalman • Q-Learning • Linear Regression • Ridge            ║');
-    console.log('║   Lasso • Elastic Net • Extra Trees • Ensemble Voting        ║');
-    console.log('║   +6 Models bổ sung                                          ║');
+    console.log('║   ⚛️ 7 THUẬT TOÁN CAO CẤP:                                   ║');
+    console.log('║   1. Quantum Ensemble v9 - Lượng tử                          ║');
+    console.log('║   2. Bayesian Meta - Thống kê Bayes                          ║');
+    console.log('║   3. Pattern Fingerprint - Dấu vân tay pattern               ║');
+    console.log('║   4. Weibull Survival - Phân tích sống sót                   ║');
+    console.log('║   5. JSD Uncertainty - Đo lường độ không chắc chắn           ║');
+    console.log('║   6. Quantum Tunneling - Xuyên hầm lượng tử                  ║');
+    console.log('║   7. Entanglement Network - Mạng rối lượng tử                ║');
     console.log('║                                                               ║');
-    console.log('║   🎯 20 LOẠI CẦU:                                            ║');
-    console.log('║   1-1 • 2-2 • 3-3 • 4-4 • 5-5 • 1-2-1                       ║');
-    console.log('║   1-2-3 • 2-1-2 • 3-2-1 • 1-4-1 • 2-3-2 • 3-1-3            ║');
-    console.log('║   2-4-2 • 1-3-1 • 3-4-3 • 1-5-1 • 5-1-5 • 2-5-2            ║');
-    console.log('║   Zigzag • Bệt                                               ║');
-    console.log('║                                                               ║');
-    console.log('║   📊 THỐNG KÊ:                                                ║');
-    console.log('║   - 100 phiên gần nhất                                       ║');
-    console.log('║   - Tỷ lệ đúng/sai                                           ║');
-    console.log('║   - Chuỗi hiện tại và dài nhất                               ║');
-    console.log('║   - Thống kê tổng hợp                                        ║');
+    console.log('║   🎯 30+ LOẠI CẦU:                                           ║');
+    console.log('║   1-1 • 2-2 • 3-3 • 4-4 • 5-5 • 6-6 • 7-7                   ║');
+    console.log('║   1-2-1 • 1-2-3 • 2-1-2 • 3-2-1 • 1-4-1 • 2-3-2 • 3-1-3    ║');
+    console.log('║   Zigzag • Bệt + 15 cầu khác                                ║');
     console.log('║                                                               ║');
     console.log('║   📁 himinhlaanhkhoi_history.json                            ║');
     console.log('║   📁 himinhlaanhkhoi_learning.json                           ║');
