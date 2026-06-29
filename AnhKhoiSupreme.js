@@ -1,1394 +1,481 @@
 const express = require('express');
 const axios = require('axios');
 const fs = require('fs');
+const crypto = require('crypto');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const cors = require('cors');
 
 const app = express();
 const PORT = 5000;
 
 const API_URL_HU = 'https://wtx.tele68.com/v1/tx/sessions';
 const API_URL_MD5 = 'https://wtxmd52.tele68.com/v1/txmd5/sessions';
-const HISTORY_FILE = 'himinhlaanhkhoi_history.json';
-const LEARNING_FILE = 'himinhlaanhkhoi_learning.json';
+const HISTORY_FILE_HU = '.hu_cache';
+const HISTORY_FILE_MD5 = '.md5_cache';
+const BRAIN_FILE_HU = '.hu_core';
+const BRAIN_FILE_MD5 = '.md5_core';
+const ADMIN_FILE = '.admin_vault';
 
-let history = { hu: [], md5: [] };
-let stats = {
-    hu: { total: 0, dung: 0, sai: 0, tyle: 0, chuoi: 0, chuoi_dai: 0, homnay: { dung: 0, sai: 0, tong: 0 } },
-    md5: { total: 0, dung: 0, sai: 0, tyle: 0, chuoi: 0, chuoi_dai: 0, homnay: { dung: 0, sai: 0, tong: 0 } }
+// ============================================================
+// 🔐 HỆ THỐNG ADMIN VIP
+// ============================================================
+
+const ADMIN_USERNAME = 'admin';
+const ADMIN_PASSWORD = crypto.randomBytes(12).toString('hex');
+const ADMIN_TOKENS = new Map();
+
+console.log('╔══════════════════════════════════════════════╗');
+console.log('║  🔑 THÔNG TIN ADMIN VIP                      ║');
+console.log('╠══════════════════════════════════════════════╣');
+console.log(`║  Username: ${ADMIN_USERNAME}                          ║`);
+console.log(`║  Password: ${ADMIN_PASSWORD}      ║`);
+console.log('║  Login: POST /_admin/login                    ║');
+console.log('╚══════════════════════════════════════════════╝\n');
+
+const generateAdminToken = () => {
+    const token = crypto.randomBytes(48).toString('hex');
+    const expires = Date.now() + 86400000;
+    ADMIN_TOKENS.set(token, { expires, createdAt: Date.now() });
+    return { token, expires };
 };
-let lastPhien = { hu: null, md5: null };
-let lastPred = { hu: null, md5: null };
+
+const adminAuth = (req, res, next) => {
+    const token = req.headers['x-admin-token'] || req.query['_admin'];
+    if (!token || !ADMIN_TOKENS.has(token)) return res.status(403).json({ error: 'Yêu cầu quyền Admin VIP' });
+    const data = ADMIN_TOKENS.get(token);
+    if (Date.now() > data.expires) { ADMIN_TOKENS.delete(token); return res.status(403).json({ error: 'Token hết hạn' }); }
+    next();
+};
 
 // ============================================================
-// 🧬 20+ THUẬT TOÁN THÍCH NGHI THÔNG MINH - ZERO RANDOM
+// 🛡️ BẢO MẬT
 // ============================================================
 
-class AdaptiveEnsembleEngine {
-    constructor() {
-        this.models = [];
-        this.performanceTracker = new Map();
-        this.adaptationRate = 0.05;
+app.use(helmet({
+    contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], styleSrc: ["'self'","'unsafe-inline'","https://fonts.googleapis.com"], fontSrc: ["'self'","https://fonts.gstatic.com"], scriptSrc: ["'self'","'unsafe-inline'"], imgSrc: ["'self'","data:"], connectSrc: ["'self'"], frameSrc: ["'none'"], objectSrc: ["'none'"] } },
+    crossOriginEmbedderPolicy: true, crossOriginOpenerPolicy: { policy: "same-origin" },
+    crossOriginResourcePolicy: { policy: "same-origin" }, dnsPrefetchControl: { allow: false },
+    frameguard: { action: "deny" }, hidePoweredBy: true,
+    hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
+    ieNoOpen: true, noSniff: true, originAgentCluster: true,
+    permittedCrossDomainPolicies: { permittedPolicies: "none" },
+    referrerPolicy: { policy: "no-referrer" }, xssFilter: true
+}));
+
+app.use(cors({ origin: false, methods: ['GET','POST'], allowedHeaders: ['Content-Type','X-Admin-Token','X-Access-Token'] }));
+app.use(rateLimit({ windowMs: 60000, max: 80, standardHeaders: true, legacyHeaders: false, message: 'Quá nhiều yêu cầu' }));
+
+app.use((req, res, next) => {
+    const blocked = ['/admin','/wp-admin','/phpmyadmin','/.env','/.git','/config','/backup','/login','/shell','/api','/graphql','/actuator','/swagger','/debug'];
+    if (blocked.some(b => req.path.toLowerCase().startsWith(b))) return res.status(404).end();
+    const dangerous = ['<','>','script','onerror','onload','javascript:','union','select','insert','update','delete','drop','exec','eval','alert'];
+    if (req.query) for (const [k,v] of Object.entries(req.query)) { if (dangerous.some(d => String(v).toLowerCase().includes(d))) return res.status(403).end(); }
+    const blockedUA = ['sqlmap','nikto','nmap','burp','acunetix','nessus','metasploit','hydra','gobuster','dirbuster','wpscan','zap','scanner'];
+    if (blockedUA.some(b => (req.get('User-Agent')||'').toLowerCase().includes(b))) return res.status(403).end();
+    res.setHeader('X-Content-Type-Options','nosniff'); res.setHeader('X-Frame-Options','DENY');
+    res.setHeader('X-XSS-Protection','1; mode=block'); res.setHeader('Cache-Control','no-store'); res.setHeader('Server','');
+    next();
+});
+
+// ============================================================
+// 🔐 MÃ HÓA AES-256
+// ============================================================
+
+const MK = crypto.createHash('sha512').update('crystal-tx-anh-khoi-exclusive-vault').digest();
+function enc(text) { try { const iv = crypto.randomBytes(16); const c = crypto.createCipheriv('aes-256-gcm', MK.slice(0,32), iv); let e = c.update(String(text),'utf8','hex'); e += c.final('hex'); const t = c.getAuthTag().toString('hex'); return iv.toString('hex')+':'+t+':'+e; } catch(e) { return null; } }
+function dec(text) { try { const p = text.split(':'); if(p.length!==3) return null; const iv = Buffer.from(p[0],'hex'); const t = Buffer.from(p[1],'hex'); const d = crypto.createDecipheriv('aes-256-gcm', MK.slice(0,32), iv); d.setAuthTag(t); let r = d.update(p[2],'hex','utf8'); r += d.final('utf8'); return r; } catch(e) { return null; } }
+
+// ============================================================
+// 🧬 3 ENGINE ĐỘC QUYỀN BY ANH KHÔI
+// ============================================================
+
+class WaveResonanceEngine {
+    constructor() { this.waveDB = new Map(); this.phaseDB = new Map(); this.trained = false; }
+    encode(seq) {
+        const s = seq.map(v => v === 'T' ? 1 : -1); const f = [];
+        for (const p of [3,5,8,13,21,34]) { if(s.length>=p) { let si=0,co=0; for(let i=0;i<p;i++) { const a=2*Math.PI*i/p; si+=s[s.length-p+i]*Math.sin(a); co+=s[s.length-p+i]*Math.cos(a); } f.push(Math.sqrt(si*si+co*co)/p, Math.atan2(si,co)/Math.PI); } }
+        while(f.length<12) f.push(0); return f;
     }
-    
-    addModel(name, model) {
-        this.models.push({ name, model, weight: 1.0, accuracy: 0.5, streak: 0 });
-        this.performanceTracker.set(name, { correct: 0, total: 0, recent5: [] });
-    }
-    
-    updatePerformance(modelName, wasCorrect) {
-        const tracker = this.performanceTracker.get(modelName);
-        const model = this.models.find(m => m.name === modelName);
-        if (!tracker || !model) return;
-        
-        tracker.total++;
-        if (wasCorrect) {
-            tracker.correct++;
-            model.streak = Math.max(0, model.streak) + 1;
-        } else {
-            model.streak = Math.min(0, model.streak) - 1;
-        }
-        
-        tracker.recent5.push(wasCorrect ? 1 : 0);
-        if (tracker.recent5.length > 20) tracker.recent5.shift();
-        
-        model.accuracy = tracker.total > 0 ? tracker.correct / tracker.total : 0.5;
-        
-        const recentAcc = tracker.recent5.length > 0 ? 
-            tracker.recent5.reduce((a, b) => a + b, 0) / tracker.recent5.length : 0.5;
-        
-        model.weight = model.accuracy * 0.6 + recentAcc * 0.4;
-        model.weight = Math.max(0.3, Math.min(2.0, model.weight + model.streak * 0.05));
-    }
-    
-    predict(seq) {
-        let totalT = 0, totalX = 0, totalWeight = 0;
-        const predictions = [];
-        
-        for (const model of this.models) {
-            const pred = model.model.predict(seq);
-            if (pred) {
-                predictions.push({ name: model.name, pred, weight: model.weight });
-                if (pred === 'T') totalT += model.weight;
-                else totalX += model.weight;
-                totalWeight += model.weight;
-            }
-        }
-        
-        return { totalT, totalX, totalWeight, predictions };
-    }
+    train(data) { for(let i=60;i<data.length;i++) { const w=data.slice(i-60,i); const f=this.encode(w); const k=f.map(v=>Math.round(v*20)).join(','); if(!this.waveDB.has(k)) { this.waveDB.set(k,{T:0,X:0,t:0}); this.phaseDB.set(k,[]); } const d=this.waveDB.get(k); d[data[i]]++; d.t++; this.phaseDB.get(k).push(data[i]==='T'?1:-1); if(this.phaseDB.get(k).length>25) this.phaseDB.get(k).shift(); } this.trained=true; }
+    predict(seq) { if(seq.length<60||!this.trained) return null; const f=this.encode(seq.slice(-60)); const k=f.map(v=>Math.round(v*20)).join(','); const d=this.waveDB.get(k); if(!d||d.t<5) return null; const p=d.T/d.t; const ph=this.phaseDB.get(k)||[]; const s=ph.length>0?ph.reduce((a,b)=>a+b,0)/ph.length:0; const fp=p*0.55+((s+1)/2)*0.3+0.15; return {prob:Math.max(0.08,Math.min(0.92,fp)),conf:Math.min(0.95,d.t/120)}; }
 }
 
-// 1. PATTERN MEMORY NETWORK (Học từ lịch sử pattern)
-class PatternMemoryNetwork {
-    constructor() {
-        this.patternBank = new Map();
-        this.similarityThreshold = 0.7;
-        this.trained = false;
+class FractalGeometryEngine {
+    constructor() { this.fractalDB = new Map(); this.trained = false; }
+    calcDim(seq) { const scales=[2,3,4,6,8,12]; const pts=[]; for(const sc of scales) { if(seq.length<sc) break; const s=new Set(); for(let i=0;i<=seq.length-sc;i++) s.add(seq.slice(i,i+sc).join('')); pts.push({sc,ct:s.size}); } if(pts.length<2) return 1; const n=pts.length; let sx=0,sy=0,sxy=0,sx2=0; for(const p of pts) { const x=Math.log(1/p.sc),y=Math.log(p.ct); sx+=x;sy+=y;sxy+=x*y;sx2+=x*x; } return (n*sxy-sx*sy)/(n*sx2-sx*sx+0.001); }
+    train(data) { for(let i=45;i<data.length;i++) { const w=data.slice(i-45,i); const d=Math.round(this.calcDim(w)*20); const k=String(d); if(!this.fractalDB.has(k)) this.fractalDB.set(k,{T:0,X:0,t:0}); const fd=this.fractalDB.get(k); fd[data[i]]++; fd.t++; } this.trained=true; }
+    predict(seq) { if(seq.length<45||!this.trained) return null; const d=Math.round(this.calcDim(seq.slice(-45))*20); const fd=this.fractalDB.get(String(d)); if(!fd||fd.t<5) return null; const p=fd.T/fd.t; return {prob:Math.max(0.08,Math.min(0.92,p)),conf:Math.min(0.9,fd.t/90)}; }
+}
+
+class EntropyFlowEngine {
+    constructor() { this.entropyDB = new Map(); this.flowDB = new Map(); this.trained = false; }
+    calcEntropy(seq) { const wins=[3,5,8,13]; const ents=[]; for(const w of wins) { if(seq.length>=w) { const sl=seq.slice(-w); const p=sl.filter(s=>s==='T').length/w; let e=0; if(p>0&&p<1) e=-p*Math.log2(p)-(1-p)*Math.log2(1-p); ents.push(e); } } const ae=ents.reduce((a,b)=>a+b,0)/(ents.length||1); const st=1-(ents.length>1?Math.max(...ents)-Math.min(...ents):0); const tr=seq.slice(-5).filter(s=>s==='T').length/5-seq.slice(-13).filter(s=>s==='T').length/13; return {e:ae,s:st,t:tr}; }
+    train(data) { for(let i=45;i<data.length;i++) { const w=data.slice(i-45,i); const ent=this.calcEntropy(w); const k=`${Math.round(ent.e*10)}|${Math.round(ent.s*10)}`; if(!this.entropyDB.has(k)) { this.entropyDB.set(k,{T:0,X:0,t:0}); this.flowDB.set(k,[]); } const ed=this.entropyDB.get(k); ed[data[i]]++; ed.t++; this.flowDB.get(k).push(data[i]==='T'?1:-1); if(this.flowDB.get(k).length>20) this.flowDB.get(k).shift(); } this.trained=true; }
+    predict(seq) { if(seq.length<45||!this.trained) return null; const ent=this.calcEntropy(seq.slice(-45)); const k=`${Math.round(ent.e*10)}|${Math.round(ent.s*10)}`; const ed=this.entropyDB.get(k); if(!ed||ed.t<5) return null; const bp=ed.T/ed.t; const fl=this.flowDB.get(k)||[]; const fs=fl.length>0?fl.reduce((a,b)=>a+b,0)/fl.length:0; const fp=bp*0.5+((fs+1)/2)*0.3+(ent.s>0.5?0.2:0); return {prob:Math.max(0.08,Math.min(0.92,fp)),conf:Math.min(0.9,ed.t/80+ent.s*0.5)}; }
+}
+
+// ============================================================
+// 🧠 HỆ THỐNG DỰ ĐOÁN BY ANH KHÔI
+// ============================================================
+
+class AnhKhoiPredictionSystem {
+    constructor(type) {
+        this.type = type;
+        this.history = [];
+        this.stats = { total:0,dung:0,sai:0,tyle:0,chuoi:0,chuoi_dai:0,homnay:{dung:0,sai:0,tong:0} };
+        this.lastPhien = null; this.trained = false;
+        this.wave = new WaveResonanceEngine();
+        this.fractal = new FractalGeometryEngine();
+        this.entropy = new EntropyFlowEngine();
+        this.memBank = new Map(); this.streakBank = new Map();
     }
-    
-    extractMultiScalePatterns(seq) {
-        const patterns = [];
-        const scales = [3, 5, 8, 13, 21];
-        
-        for (const scale of scales) {
-            if (seq.length >= scale) {
-                const slice = seq.slice(-scale);
-                const tRatio = slice.filter(s => s === 'T').length / scale;
-                const transitions = slice.filter((s, i) => i > 0 && s !== slice[i-1]).length / (scale - 1);
-                const last3Trend = seq.slice(-3).filter(s => s === 'T').length / 3;
-                patterns.push(tRatio, transitions, last3Trend);
-            }
-        }
-        return patterns;
-    }
-    
-    findSimilarPatterns(currentPattern) {
-        const matches = [];
-        for (const [key, data] of this.patternBank) {
-            const storedPattern = key.split(',').map(Number);
-            if (storedPattern.length !== currentPattern.length) continue;
-            
-            let similarity = 0;
-            for (let i = 0; i < currentPattern.length; i++) {
-                similarity += 1 - Math.abs(currentPattern[i] - storedPattern[i]);
-            }
-            similarity /= currentPattern.length;
-            
-            if (similarity > this.similarityThreshold) {
-                matches.push({ similarity, data });
-            }
-        }
-        return matches.sort((a, b) => b.similarity - a.similarity);
-    }
-    
     train(data) {
-        for (let i = 30; i < data.length; i++) {
-            const window = data.slice(i - 30, i);
-            const patterns = this.extractMultiScalePatterns(window);
-            const key = patterns.map(p => Math.round(p * 100) / 100).join(',');
-            
-            if (!this.patternBank.has(key)) {
-                this.patternBank.set(key, { T: 0, X: 0, total: 0, nextPatterns: [] });
-            }
-            
-            const entry = this.patternBank.get(key);
-            entry[data[i]]++;
-            entry.total++;
-            
-            if (i + 1 < data.length) {
-                const nextWindow = data.slice(i - 29, i + 1);
-                const nextPattern = this.extractMultiScalePatterns(nextWindow);
-                entry.nextPatterns.push({
-                    pattern: nextPattern,
-                    result: data[i + 1]
-                });
-                if (entry.nextPatterns.length > 10) entry.nextPatterns.shift();
-            }
+        if(data.length<60) return false;
+        this.wave.train(data); this.fractal.train(data); this.entropy.train(data);
+        this.memBank.clear(); this.streakBank.clear();
+        for(let i=20;i<data.length;i++) {
+            const w=data.slice(i-20,i); const t=data[i];
+            for(const len of[3,5,8]) { if(w.length>=len) { const p=w.slice(-len).join(''); if(!this.memBank.has(p)) this.memBank.set(p,{T:0,X:0,total:0}); const mb=this.memBank.get(p); mb[t]++; mb.total++; } }
+            const last=w[w.length-1]; let st=1; for(let j=w.length-2;j>=0&&w[j]===last;j--) st++;
+            const sk=`${last}:${Math.min(st,15)}`; if(!this.streakBank.has(sk)) this.streakBank.set(sk,{T:0,X:0,total:0}); this.streakBank.get(sk)[t]++; this.streakBank.get(sk).total++;
         }
-        this.trained = true;
+        this.trained=true; return true;
     }
-    
-    predict(seq) {
-        if (!this.trained || seq.length < 30) return null;
-        const window = seq.slice(-30);
-        const currentPattern = this.extractMultiScalePatterns(window);
-        const matches = this.findSimilarPatterns(currentPattern);
-        
-        if (matches.length === 0) return null;
-        
-        let weightedT = 0, weightedX = 0, totalWeight = 0;
-        
-        for (const match of matches.slice(0, 10)) {
-            const weight = match.similarity * match.data.total;
-            const tProb = match.data.T / match.data.total;
-            weightedT += tProb * weight;
-            weightedX += (1 - tProb) * weight;
-            totalWeight += weight;
-            
-            // Kiểm tra next patterns
-            for (const next of match.data.nextPatterns) {
-                weightedT += (next.result === 'T' ? 1 : 0) * weight * 0.5;
-                weightedX += (next.result === 'X' ? 1 : 0) * weight * 0.5;
-                totalWeight += weight * 0.5;
-            }
-        }
-        
-        if (totalWeight === 0) return null;
-        return weightedT / totalWeight > 0.5 ? 'T' : 'X';
+    predict(data) {
+        if(!data||data.length<10) return this.fallback();
+        const seq=data.map(d=>d==='T'?'T':'X');
+        let sT=0,sX=0,sw=0; const dt=[];
+        const wr=this.wave.predict(seq); if(wr){const w=3.5*wr.conf;sT+=wr.prob*w;sX+=(1-wr.prob)*w;sw+=w;dt.push(`SC:${Math.round(wr.prob*100)}`);}
+        const fr=this.fractal.predict(seq); if(fr){const w=2.8*fr.conf;sT+=fr.prob*w;sX+=(1-fr.prob)*w;sw+=w;dt.push(`PM:${Math.round(fr.prob*100)}`);}
+        const er=this.entropy.predict(seq); if(er){const w=2.5*er.conf;sT+=er.prob*w;sX+=(1-er.prob)*w;sw+=w;dt.push(`ET:${Math.round(er.prob*100)}`);}
+        for(const len of[3,5,8]){if(seq.length>=len){const p=seq.slice(-len).join('');const mb=this.memBank.get(p);if(mb&&mb.total>=5){const w=1.5;sT+=(mb.T/mb.total)*w;sX+=(mb.X/mb.total)*w;sw+=w;dt.push(`M${len}`);}}}
+        const last=seq[seq.length-1];let st=1;for(let j=seq.length-2;j>=0&&seq[j]===last;j--)st++;
+        const sk=`${last}:${Math.min(st,15)}`;const sb=this.streakBank.get(sk);if(sb&&sb.total>=5){const w=1.8;sT+=(sb.T/sb.total)*w;sX+=(sb.X/sb.total)*w;sw+=w;dt.push(`C${Math.min(st,15)}`);}
+        if(st>=8){if(last==='T'){sX+=3.5;dt.push('DC-T');}else{sT+=3.5;dt.push('DC-X');}sw+=3.5;}
+        else if(st>=5){if(last==='T'){sX+=2.0;dt.push('BT');}else{sT+=2.0;dt.push('BX');}sw+=2.0;}
+        const lt=seq.filter(s=>s==='T').length/seq.length;
+        if(lt>0.65){sX+=1.8;dt.push('CBT');sw+=1.8;}else if(lt<0.35){sT+=1.8;dt.push('CBX');sw+=1.8;}
+        if(sw===0) return this.fallback();
+        const prob=sT/(sT+sX);const dd=prob>0.5?'TÀI':'XỈU';
+        let tc=Math.round(Math.max(prob,1-prob)*100);
+        if(dt.length>=7) tc=Math.min(99,tc+8);else if(dt.length>=4) tc=Math.min(99,tc+5);
+        tc=Math.min(99,Math.max(55,tc));
+        return {duDoan:dd,doTinCay:tc,chiTiet:dt.slice(0,5).join(' | '),soMau:dt.length};
+    }
+    fallback() { if(this.stats.total>50){const td=this.stats.dung>this.stats.sai?'TÀI':'XỈU';return{duDoan:td,doTinCay:52,chiTiet:'XH',soMau:0};} return{duDoan:'TÀI',doTinCay:51,chiTiet:'MD',soMau:0}; }
+    updateResult(p,a){const pr=p==='TÀI'?'T':'X';const ac=a==='TÀI'?'T':'X';const d=pr===ac;this.stats.total++;if(d){this.stats.dung++;this.stats.chuoi=this.stats.chuoi>=0?this.stats.chuoi+1:1;if(this.stats.chuoi>this.stats.chuoi_dai) this.stats.chuoi_dai=this.stats.chuoi;this.stats.homnay.dung++;}else{this.stats.sai++;this.stats.chuoi=this.stats.chuoi<=0?this.stats.chuoi-1:-1;this.stats.homnay.sai++;}this.stats.homnay.tong++;this.stats.tyle=this.stats.total>0?Math.round((this.stats.dung/this.stats.total)*100):0;}
+    save(){
+        try{
+            const bf=this.type==='hu'?BRAIN_FILE_HU:BRAIN_FILE_MD5;
+            const hf=this.type==='hu'?HISTORY_FILE_HU:HISTORY_FILE_MD5;
+            const bd=enc(JSON.stringify({memBank:Array.from(this.memBank.entries()).slice(-5000),streakBank:Array.from(this.streakBank.entries()),trained:this.trained,stats:this.stats,lastPhien:this.lastPhien}));
+            const hd=enc(JSON.stringify({history:this.history.slice(0,1000),stats:this.stats,lastPhien:this.lastPhien,updated:new Date().toISOString()}));
+            if(bd) fs.writeFileSync(bf,bd); if(hd) fs.writeFileSync(hf,hd);
+        }catch(e){}
+    }
+    load(){
+        try{
+            const bf=this.type==='hu'?BRAIN_FILE_HU:BRAIN_FILE_MD5;
+            const hf=this.type==='hu'?HISTORY_FILE_HU:HISTORY_FILE_MD5;
+            if(fs.existsSync(bf)){const dc=dec(fs.readFileSync(bf,'utf8'));if(dc){const d=JSON.parse(dc);if(d.memBank) this.memBank=new Map(d.memBank);if(d.streakBank) this.streakBank=new Map(d.streakBank);if(d.trained) this.trained=d.trained;if(d.stats) this.stats=d.stats;if(d.lastPhien) this.lastPhien=d.lastPhien;}}
+            if(fs.existsSync(hf)){const dc=dec(fs.readFileSync(hf,'utf8'));if(dc){const d=JSON.parse(dc);if(d.history) this.history=d.history;if(d.stats) this.stats=d.stats;if(d.lastPhien) this.lastPhien=d.lastPhien;}}
+        }catch(e){}
     }
 }
 
-// 2. ADAPTIVE GRADIENT BOOSTING (Online Learning)
-class AdaptiveGradientBoosting {
-    constructor() {
-        this.trees = [];
-        this.maxTrees = 100;
-        this.learningRate = 0.1;
-        this.maxDepth = 5;
-        this.minSamplesSplit = 5;
-        this.trained = false;
-    }
-    
-    buildTree(features, labels, residuals, depth) {
-        if (depth >= this.maxDepth || features.length < this.minSamplesSplit) {
-            const sum = residuals.reduce((a, b) => a + b, 0);
-            return { prediction: sum / (residuals.length || 1) };
-        }
-        
-        let bestGain = -Infinity, bestFeature = 0, bestSplit = 0;
-        
-        for (let f = 0; f < features[0].length; f++) {
-            const sorted = features.map((feat, i) => ({ val: feat[f], resid: residuals[i] }))
-                .sort((a, b) => a.val - b.val);
-            
-            let leftSum = 0, rightSum = residuals.reduce((a, b) => a + b, 0);
-            let leftCount = 0, rightCount = residuals.length;
-            
-            for (let i = 0; i < sorted.length - 1; i++) {
-                leftSum += sorted[i].resid;
-                rightSum -= sorted[i].resid;
-                leftCount++;
-                rightCount--;
-                
-                if (sorted[i].val === sorted[i + 1].val) continue;
-                
-                const gain = (leftSum * leftSum) / (leftCount + 1e-6) + 
-                           (rightSum * rightSum) / (rightCount + 1e-6);
-                
-                if (gain > bestGain) {
-                    bestGain = gain;
-                    bestFeature = f;
-                    bestSplit = (sorted[i].val + sorted[i + 1].val) / 2;
-                }
-            }
-        }
-        
-        if (bestGain === -Infinity) {
-            const sum = residuals.reduce((a, b) => a + b, 0);
-            return { prediction: sum / (residuals.length || 1) };
-        }
-        
-        const leftF = [], leftR = [], rightF = [], rightR = [];
-        for (let i = 0; i < features.length; i++) {
-            if (features[i][bestFeature] < bestSplit) {
-                leftF.push(features[i]); leftR.push(residuals[i]);
-            } else {
-                rightF.push(features[i]); rightR.push(residuals[i]);
-            }
-        }
-        
-        return {
-            feature: bestFeature, split: bestSplit,
-            left: this.buildTree(leftF, labels, leftR, depth + 1),
-            right: this.buildTree(rightF, labels, rightR, depth + 1)
-        };
-    }
-    
-    predictTree(tree, features) {
-        if (tree.prediction !== undefined) return tree.prediction;
-        return features[tree.feature] < tree.split ?
-            this.predictTree(tree.left, features) :
-            this.predictTree(tree.right, features);
-    }
-    
-    train(data) {
-        const allF = [], allL = [];
-        
-        for (let i = 25; i < data.length; i++) {
-            const window = data.slice(i - 25, i);
-            const f = this.extractGBFeatures(window);
-            allF.push(f);
-            allL.push(data[i] === 'T' ? 1 : 0);
-        }
-        
-        let residuals = [...allL];
-        
-        for (let iter = 0; iter < this.maxTrees; iter++) {
-            const tree = this.buildTree(allF, allL, residuals, 0);
-            this.trees.push(tree);
-            
-            for (let i = 0; i < allF.length; i++) {
-                residuals[i] -= this.learningRate * this.predictTree(tree, allF[i]);
-            }
-            
-            if (residuals.reduce((a, b) => a + Math.abs(b), 0) / residuals.length < 0.01) break;
-        }
-        
-        // Giữ số lượng trees tối ưu
-        if (this.trees.length > this.maxTrees) {
-            this.trees = this.trees.slice(-this.maxTrees);
-        }
-        
-        this.trained = true;
-    }
-    
-    extractGBFeatures(seq) {
-        const f = [];
-        for (let w = 2; w <= 8; w++) {
-            if (seq.length >= w) {
-                const sl = seq.slice(-w);
-                f.push(sl.filter(s => s === 'T').length / w);
-                f.push(sl.filter((s, i) => i > 0 && s !== sl[i-1]).length / Math.max(1, w - 1));
-            }
-        }
-        const last1 = seq[seq.length - 1] === 'T' ? 1 : 0;
-        f.push(last1);
-        while (f.length < 15) f.push(0.5);
-        return f;
-    }
-    
-    predict(seq) {
-        if (!this.trained || seq.length < 25) return null;
-        const f = this.extractGBFeatures(seq);
-        let sum = 0;
-        for (const tree of this.trees) {
-            sum += this.learningRate * this.predictTree(tree, f);
-        }
-        return sum > 0.5 ? 'T' : 'X';
-    }
+const brainHU = new AnhKhoiPredictionSystem('hu');
+const brainMD5 = new AnhKhoiPredictionSystem('md5');
+brainHU.load(); brainMD5.load();
+
+// ============================================================
+// 📊 DATA
+// ============================================================
+
+function transformData(d) { if(!d||!d.list) return null; return d.list.map(i=>({phien:i.id,result:i.resultTruyenThong==='TAI'?'TÀI':'XỈU',dice1:i.dices[0],dice2:i.dices[1],dice3:i.dices[2],total:i.point})); }
+async function fetchData(t) { try{const u=t==='hu'?API_URL_HU:API_URL_MD5;const r=await axios.get(u,{timeout:8000,headers:{'User-Agent':'Mozilla/5.0'}});return transformData(r.data);}catch(e){return null;} }
+
+// ============================================================
+// ⚡ AUTO
+// ============================================================
+
+async function processGame(brain,type) {
+    try{
+        const data=await fetchData(type); if(!data||data.length===0) return;
+        const cur=data[0].phien; if(brain.lastPhien===cur) return;
+        for(const r of brain.history){if(r.status&&r.status!=='') continue;const a=data.find(d=>d.phien.toString()===r.phien_hien_tai);if(a){r.status=(r.prediction===a.result)?'✅':'❌';r.actual=a.result;brain.updateResult(r.prediction,a.result);}}
+        const ex=brain.history.find(h=>h.phien_hien_tai===(cur+1).toString()); if(ex) return;
+        const hd=data.map(d=>d.result==='TÀI'?'T':'X'); if(hd.length>=60) brain.train(hd);
+        const result=brain.predict(hd);
+        const rec={phien:data[0].phien,phien_hien_tai:(data[0].phien+1).toString(),dice:`${data[0].dice1}-${data[0].dice2}-${data[0].dice3}`,total:data[0].total,actual:data[0].result,prediction:result.duDoan,confidence:result.doTinCay,detail:result.chiTiet,status:'',timestamp:new Date().toISOString(),soMau:result.soMau||0};
+        brain.history.unshift(rec); if(brain.history.length>1000) brain.history=brain.history.slice(0,1000);
+        brain.lastPhien=cur; brain.save();
+    }catch(e){}
+}
+async function auto(){await Promise.all([processGame(brainHU,'hu'),processGame(brainMD5,'md5')]);}
+function startAuto(){setTimeout(auto,3000);setInterval(auto,5000);}
+
+// ============================================================
+// 🎨 GIAO DIỆN VIP - ADMIN TOKEN
+// ============================================================
+
+function generateLoginHTML() {
+    return `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>CRYSTAL TX • Admin VIP</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--b0:#040410;--b1:#0a0c1c;--b2:#0e102a;--b3:#121538;--b4:rgba(255,255,255,0.03);--b5:rgba(255,255,255,0.06);--b6:rgba(123,97,255,0.2);--t0:#e8eaf2;--t1:#8890b8;--t2:#4a5080;--g:linear-gradient(135deg,#7b61ff,#3b82f6,#06b6d4,#8b5cf6);--ok:#22c55e;--no:#ef4444;--w:#f59e0b;--q:#7b61ff;--cy:#06b6d4}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:var(--b0);color:var(--t0);min-height:100vh;display:flex;align-items:center;justify-content:center;-webkit-font-smoothing:antialiased}
+.bg1{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;background:radial-gradient(ellipse 80% 60% at 30% 30%,rgba(123,97,255,0.06) 0%,transparent 60%),radial-gradient(ellipse 60% 80% at 70% 70%,rgba(6,182,212,0.05) 0%,transparent 60%)}
+.bg2{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;background-image:linear-gradient(rgba(255,255,255,0.012) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.012) 1px,transparent 1px);background-size:40px 40px;mask-image:radial-gradient(ellipse 80% 80% at 50% 50%,black 10%,transparent 70%)}
+.login-box{position:relative;z-index:1;background:var(--b2);border:1px solid var(--b4);border-radius:16px;padding:32px 28px;width:100%;max-width:400px;backdrop-filter:blur(20px);box-shadow:0 20px 60px rgba(0,0,0,0.4)}
+.logo{text-align:center;margin-bottom:24px}
+.logo .icon{font-size:36px;margin-bottom:8px;display:inline-block;animation:float 3s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.logo h1{font-family:'Orbitron',sans-serif;font-size:20px;font-weight:800;background:var(--g);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-0.5px}
+.logo .sub{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--t1);letter-spacing:2px;text-transform:uppercase;margin-top:4px}
+.input-group{margin-bottom:14px}
+.input-group label{display:block;font-size:8px;color:var(--t1);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;font-weight:600}
+.input-group input{width:100%;padding:10px 14px;background:var(--b1);border:1px solid var(--b4);border-radius:8px;color:var(--t0);font-size:13px;font-family:'JetBrains Mono',monospace;outline:none;transition:all 0.3s}
+.input-group input:focus{border-color:var(--b6);box-shadow:0 0 0 3px rgba(123,97,255,0.1)}
+.btn{width:100%;padding:10px;background:var(--g);border:none;border-radius:8px;color:#fff;font-weight:700;font-size:12px;cursor:pointer;letter-spacing:1px;text-transform:uppercase;font-family:'Orbitron',monospace;transition:all 0.3s}
+.btn:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(123,97,255,0.25)}
+.token-display{display:none;margin-top:20px;padding:14px;background:var(--b1);border:1px solid var(--b4);border-radius:8px}
+.token-display.show{display:block}
+.token-display .t-label{font-size:8px;color:var(--t1);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px}
+.token-display .t-value{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ok);word-break:break-all;background:var(--b0);padding:8px;border-radius:4px}
+.token-display .t-info{font-size:8px;color:var(--t2);margin-top:8px}
+.err{color:var(--no);font-size:10px;margin-top:8px;text-align:center;display:none}
+.err.show{display:block}
+.ftr{text-align:center;font-size:7px;color:var(--t2);margin-top:20px;font-family:'JetBrains Mono',monospace}
+.ftr span{color:var(--q)}
+</style></head><body>
+<div class="bg1"></div><div class="bg2"></div>
+<div class="login-box">
+<div class="logo"><div class="icon">◆</div><h1>CRYSTAL TX</h1><div class="sub">Admin VIP • By Anh Khôi</div></div>
+<div class="input-group"><label>Username</label><input type="text" id="username" placeholder="Nhập username admin"></div>
+<div class="input-group"><label>Password</label><input type="password" id="password" placeholder="Nhập password admin"></div>
+<button class="btn" onclick="login()">◆ Đăng Nhập</button>
+<div class="err" id="error"></div>
+<div class="token-display" id="tokenBox">
+<div class="t-label">Token Admin (Có hiệu lực 24h)</div>
+<div class="t-value" id="tokenValue"></div>
+<div class="t-info" id="tokenInfo"></div>
+</div>
+<div class="ftr">◆ <span>CRYSTAL TX</span> • Hệ Thống Độc Quyền • By Anh Khôi</div>
+</div>
+<script>
+async function login(){
+const u=document.getElementById('username').value;
+const p=document.getElementById('password').value;
+const e=document.getElementById('error');
+const tb=document.getElementById('tokenBox');
+e.classList.remove('show');tb.classList.remove('show');
+try{
+const r=await fetch('/_admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+const d=await r.json();
+if(r.ok){
+document.getElementById('tokenValue').textContent=d.token;
+document.getElementById('tokenInfo').innerHTML='Hết hạn: '+new Date(d.expires).toLocaleString('vi-VN')+'<br>Thêm header: <b>X-Admin-Token</b> hoặc query: <b>?_admin=TOKEN</b>';
+tb.classList.add('show');
+}else{e.textContent=d.error||'Sai thông tin';e.classList.add('show');}
+}catch(ex){e.textContent='Lỗi kết nối';e.classList.add('show');}
+}
+</script></body></html>`;
 }
 
-// 3. EXPONENTIAL WEIGHTED MOVING AVERAGE (EWMA) PREDICTOR
-class EWMAPredictor {
-    constructor() {
-        this.alpha = 0.3;
-        this.trends = new Map();
-        this.trained = false;
-    }
-    
-    train(data) {
-        for (let i = 10; i < data.length; i++) {
-            const window = data.slice(i - 10, i);
-            const key = window.slice(-4).join('');
-            const currentValue = data[i] === 'T' ? 1 : 0;
-            
-            if (!this.trends.has(key)) {
-                this.trends.set(key, { ewma: 0.5, trend: 0, volatility: 0, count: 0 });
-            }
-            
-            const t = this.trends.get(key);
-            const oldEwma = t.ewma;
-            t.ewma = this.alpha * currentValue + (1 - this.alpha) * oldEwma;
-            t.trend = 0.9 * t.trend + 0.1 * (t.ewma - oldEwma);
-            t.volatility = 0.9 * t.volatility + 0.1 * Math.abs(currentValue - oldEwma);
-            t.count++;
-        }
-        this.trained = true;
-    }
-    
-    predict(seq) {
-        if (!this.trained || seq.length < 10) return null;
-        const key = seq.slice(-4).join('');
-        const t = this.trends.get(key);
-        
-        if (!t) return null;
-        
-        const prediction = t.ewma + t.trend * 2;
-        const adjusted = prediction - t.volatility * 0.5;
-        
-        return adjusted > 0.5 ? 'T' : 'X';
-    }
-}
+function generateDashboardHTML(brain, type, token) {
+    const s = brain.stats; const h = brain.history || []; const recent = h.slice(0, 50);
+    let td=0,ts=0,cht=0,cdn=0,ct=0;
+    for(const r of recent){if(r.status==='✅'){td++;ct++;if(ct>cdn) cdn=ct;}else if(r.status==='❌'){ts++;ct=0;}} cht=ct;
+    const tr=recent.length>0?Math.round((td/recent.length)*100):0;
+    const wr=s.tyle; const wrc=wr>=70?'#22c55e':wr>=60?'#f59e0b':'#ef4444';
 
-// 4. K-NEAREST NEIGHBORS ADAPTIVE
-class AdaptiveKNN {
-    constructor() {
-        this.database = [];
-        this.k = 15;
-        this.maxSize = 5000;
-        this.trained = false;
+    let rows='';
+    for(const r of recent.slice(0,50)){
+        const st=r.status||'⏳';const cls=st==='✅'?'w':st==='❌'?'l':'p';const txt=st==='✅'?'WIN':st==='❌'?'LOSE':'WAIT';
+        rows+=`<tr class="r-${cls}"><td class="sid">#${r.phien_hien_tai||'-'}</td><td><span class="pr pr-${r.prediction==='TÀI'?'t':'x'}">${r.prediction||'-'}</span></td><td><div class="cb"><div class="cf" style="width:${r.confidence||0}%"></div></div><span class="ct">${r.confidence||0}%</span></td><td><span class="stt stt-${cls}">${txt}</span></td><td>${r.actual||'-'}</td><td class="dt">${(r.detail||'-').substring(0,25)}</td></tr>`;
     }
-    
-    train(data) {
-        for (let i = 30; i < data.length; i++) {
-            const window = data.slice(i - 30, i);
-            const features = this.extractKNNFeatures(window);
-            
-            this.database.push({ features, label: data[i] });
-            if (this.database.length > this.maxSize) this.database.shift();
-        }
-        this.trained = true;
-    }
-    
-    extractKNNFeatures(seq) {
-        const f = [];
-        for (let w = 2; w <= 10; w += 2) {
-            if (seq.length >= w) {
-                const sl = seq.slice(-w);
-                f.push(sl.filter(s => s === 'T').length / w);
-                let maxRun = 0, currentRun = 1;
-                for (let i = 1; i < sl.length; i++) {
-                    if (sl[i] === sl[i-1]) { currentRun++; maxRun = Math.max(maxRun, currentRun); }
-                    else currentRun = 1;
-                }
-                f.push(maxRun / w);
-            }
-        }
-        return f;
-    }
-    
-    weightedDistance(f1, f2) {
-        let dist = 0;
-        const len = Math.min(f1.length, f2.length);
-        for (let i = 0; i < len; i++) {
-            dist += Math.abs(f1[i] - f2[i]) * (1 + i * 0.1);
-        }
-        return dist / len;
-    }
-    
-    predict(seq) {
-        if (!this.trained || seq.length < 30) return null;
-        const features = this.extractKNNFeatures(seq);
-        
-        const distances = this.database.map((entry, idx) => ({
-            dist: this.weightedDistance(features, entry.features),
-            label: entry.label,
-            idx
-        }));
-        
-        distances.sort((a, b) => a.dist - b.dist);
-        const neighbors = distances.slice(0, this.k);
-        
-        let weightedT = 0, weightedX = 0;
-        for (const n of neighbors) {
-            const weight = 1 / (n.dist + 0.001);
-            if (n.label === 'T') weightedT += weight;
-            else weightedX += weight;
-        }
-        
-        return weightedT > weightedX ? 'T' : 'X';
-    }
-}
 
-// 5. HIDDEN MARKOV MODEL
-class HiddenMarkovModel {
-    constructor() {
-        this.transitionMatrix = new Map();
-        this.emissionMatrix = new Map();
-        this.initialProb = new Map();
-        this.states = ['Bull', 'Bear', 'Sideways'];
-        this.trained = false;
-    }
-    
-    determineState(seq) {
-        const last5 = seq.slice(-5);
-        const tRatio = last5.filter(s => s === 'T').length / 5;
-        if (tRatio > 0.6) return 'Bull';
-        if (tRatio < 0.4) return 'Bear';
-        return 'Sideways';
-    }
-    
-    train(data) {
-        let prevState = this.determineState(data.slice(0, 20));
-        
-        for (let i = 20; i < data.length - 1; i++) {
-            const window = data.slice(i - 20, i);
-            const currentState = this.determineState(window);
-            const observation = data[i + 1];
-            
-            const transKey = `${prevState}->${currentState}`;
-            if (!this.transitionMatrix.has(transKey)) {
-                this.transitionMatrix.set(transKey, 0);
-            }
-            this.transitionMatrix.set(transKey, this.transitionMatrix.get(transKey) + 1);
-            
-            const emissKey = `${currentState}|${observation}`;
-            if (!this.emissionMatrix.has(emissKey)) {
-                this.emissionMatrix.set(emissKey, 0);
-            }
-            this.emissionMatrix.set(emissKey, this.emissionMatrix.get(emissKey) + 1);
-            
-            prevState = currentState;
-        }
-        
-        // Normalize
-        for (const [key, val] of this.transitionMatrix) {
-            const fromState = key.split('->')[0];
-            let total = 0;
-            for (const [k, v] of this.transitionMatrix) {
-                if (k.startsWith(fromState)) total += v;
-            }
-            if (total > 0) this.transitionMatrix.set(key, val / total);
-        }
-        
-        for (const [key, val] of this.emissionMatrix) {
-            const state = key.split('|')[0];
-            let total = 0;
-            for (const [k, v] of this.emissionMatrix) {
-                if (k.startsWith(state)) total += v;
-            }
-            if (total > 0) this.emissionMatrix.set(key, val / total);
-        }
-        
-        this.trained = true;
-    }
-    
-    predict(seq) {
-        if (!this.trained || seq.length < 20) return null;
-        const window = seq.slice(-20);
-        const currentState = this.determineState(window);
-        
-        let probT = 0, probX = 0;
-        for (const nextState of this.states) {
-            const transProb = this.transitionMatrix.get(`${currentState}->${nextState}`) || 0.33;
-            const emissT = this.emissionMatrix.get(`${nextState}|T`) || 0.5;
-            const emissX = this.emissionMatrix.get(`${nextState}|X`) || 0.5;
-            
-            probT += transProb * emissT;
-            probX += transProb * emissX;
-        }
-        
-        return probT > probX ? 'T' : 'X';
-    }
-}
-
-// 6. ARIMA STYLE PREDICTOR
-class ARIMAPredictor {
-    constructor() {
-        this.arCoeffs = new Map();
-        this.maCoeffs = new Map();
-        this.residuals = new Map();
-        this.trained = false;
-    }
-    
-    train(data) {
-        for (let i = 30; i < data.length; i++) {
-            const window = data.slice(i - 30, i);
-            const values = window.map(s => s === 'T' ? 1 : 0);
-            const key = window.slice(-5).join('');
-            
-            if (!this.arCoeffs.has(key)) {
-                this.arCoeffs.set(key, [0.5, 0.3, 0.2]);
-                this.maCoeffs.set(key, [0.3, 0.2]);
-                this.residuals.set(key, []);
-            }
-            
-            const ar = this.arCoeffs.get(key);
-            const ma = this.maCoeffs.get(key);
-            const residuals = this.residuals.get(key);
-            
-            let prediction = 0;
-            for (let j = 0; j < ar.length && j < values.length; j++) {
-                prediction += ar[j] * values[values.length - 1 - j];
-            }
-            
-            const actual = data[i] === 'T' ? 1 : 0;
-            const error = actual - prediction;
-            
-            residuals.push(error);
-            if (residuals.length > 10) residuals.shift();
-            
-            let maTerm = 0;
-            for (let j = 0; j < ma.length && j < residuals.length; j++) {
-                maTerm += ma[j] * residuals[residuals.length - 1 - j];
-            }
-            
-            // Update AR coefficients using gradient descent
-            for (let j = 0; j < ar.length; j++) {
-                ar[j] += 0.001 * error * (values[values.length - 1 - j] || 0);
-                ar[j] = Math.max(-1, Math.min(1, ar[j]));
-            }
-            
-            // Update MA coefficients
-            for (let j = 0; j < ma.length; j++) {
-                ma[j] += 0.001 * error * (residuals[residuals.length - 1 - j] || 0);
-                ma[j] = Math.max(-1, Math.min(1, ma[j]));
-            }
-        }
-        this.trained = true;
-    }
-    
-    predict(seq) {
-        if (!this.trained || seq.length < 30) return null;
-        const window = seq.slice(-30);
-        const values = window.map(s => s === 'T' ? 1 : 0);
-        const key = window.slice(-5).join('');
-        
-        const ar = this.arCoeffs.get(key);
-        const ma = this.maCoeffs.get(key);
-        const residuals = this.residuals.get(key);
-        
-        if (!ar || !ma) return null;
-        
-        let prediction = 0;
-        for (let j = 0; j < ar.length && j < values.length; j++) {
-            prediction += ar[j] * values[values.length - 1 - j];
-        }
-        
-        if (residuals && residuals.length > 0) {
-            for (let j = 0; j < ma.length && j < residuals.length; j++) {
-                prediction += ma[j] * residuals[residuals.length - 1 - j];
-            }
-        }
-        
-        return prediction > 0.5 ? 'T' : 'X';
-    }
-}
-
-// 7. NAIVE BAYES WITH FEATURE ENGINEERING
-class AdaptiveNaiveBayes {
-    constructor() {
-        this.classProbs = new Map();
-        this.featureProbs = new Map();
-        this.trained = false;
-    }
-    
-    extractFeatures(seq) {
-        const f = [];
-        const last1 = seq[seq.length - 1] === 'T' ? 1 : 0;
-        const last3 = seq.slice(-3).filter(s => s === 'T').length;
-        const last5 = seq.slice(-5).filter(s => s === 'T').length;
-        const last8 = seq.slice(-8).filter(s => s === 'T').length;
-        const changes3 = seq.slice(-3).filter((s, i, arr) => i > 0 && s !== arr[i-1]).length;
-        const changes5 = seq.slice(-5).filter((s, i, arr) => i > 0 && s !== arr[i-1]).length;
-        
-        f.push(
-            `L1:${last1}`, `L3:${last3}`, `L5:${last5}`, `L8:${last8}`,
-            `C3:${changes3}`, `C5:${changes5}`,
-            `D35:${last3 - last5}`, `D58:${last5 - last8}`
-        );
-        
-        return f;
-    }
-    
-    train(data) {
-        for (let i = 20; i < data.length; i++) {
-            const window = data.slice(i - 20, i);
-            const features = this.extractFeatures(window);
-            const label = data[i];
-            
-            for (const f of features) {
-                const key = `${f}|${label}`;
-                if (!this.featureProbs.has(key)) {
-                    this.featureProbs.set(key, 0);
-                }
-                this.featureProbs.set(key, this.featureProbs.get(key) + 1);
-            }
-            
-            if (!this.classProbs.has(label)) {
-                this.classProbs.set(label, 0);
-            }
-            this.classProbs.set(label, this.classProbs.get(label) + 1);
-        }
-        this.trained = true;
-    }
-    
-    predict(seq) {
-        if (!this.trained || seq.length < 20) return null;
-        const features = this.extractFeatures(seq.slice(-20));
-        
-        let probT = this.classProbs.get('T') || 1;
-        let probX = this.classProbs.get('X') || 1;
-        const total = (this.classProbs.get('T') || 0) + (this.classProbs.get('X') || 0);
-        
-        probT /= total;
-        probX /= total;
-        
-        for (const f of features) {
-            const tCount = this.featureProbs.get(`${f}|T`) || 1;
-            const xCount = this.featureProbs.get(`${f}|X`) || 1;
-            probT *= tCount / (this.classProbs.get('T') || 1);
-            probX *= xCount / (this.classProbs.get('X') || 1);
-        }
-        
-        return probT > probX ? 'T' : 'X';
-    }
-}
-
-// 8. MEAN REVERSION DETECTOR
-class MeanReversionDetector {
-    constructor() {
-        this.longTermMean = new Map();
-        this.stdDev = new Map();
-        this.trained = false;
-    }
-    
-    train(data) {
-        for (let i = 50; i < data.length; i++) {
-            const window = data.slice(i - 50, i);
-            const key = window.slice(-8).join('');
-            const tRatio = window.filter(s => s === 'T').length / window.length;
-            
-            if (!this.longTermMean.has(key)) {
-                this.longTermMean.set(key, []);
-                this.stdDev.set(key, []);
-            }
-            
-            const means = this.longTermMean.get(key);
-            means.push(tRatio);
-            if (means.length > 100) means.shift();
-            
-            const avg = means.reduce((a, b) => a + b, 0) / means.length;
-            const variance = means.reduce((a, b) => a + (b - avg) ** 2, 0) / means.length;
-            this.stdDev.set(key, Math.sqrt(variance));
-        }
-        this.trained = true;
-    }
-    
-    predict(seq) {
-        if (!this.trained || seq.length < 50) return null;
-        const window = seq.slice(-50);
-        const key = window.slice(-8).join('');
-        const means = this.longTermMean.get(key);
-        
-        if (!means || means.length < 10) return null;
-        
-        const currentRatio = window.filter(s => s === 'T').length / window.length;
-        const avgMean = means.reduce((a, b) => a + b, 0) / means.length;
-        const std = this.stdDev.get(key) || 0.1;
-        
-        const zScore = (currentRatio - avgMean) / (std + 0.001);
-        
-        // Mean reversion: Nếu lệch > 2 std, dự đoán quay về mean
-        if (zScore > 2) return 'X';
-        if (zScore < -2) return 'T';
-        if (zScore > 1) return currentRatio > avgMean ? 'X' : 'T';
-        if (zScore < -1) return currentRatio < avgMean ? 'T' : 'X';
-        
-        return currentRatio > avgMean ? 'T' : 'X';
-    }
-}
-
-// 9. MOMENTUM BREAKOUT DETECTOR
-class MomentumBreakoutDetector {
-    constructor() {
-        this.momentumHistory = new Map();
-        this.trained = false;
-    }
-    
-    calculateMomentum(seq) {
-        const half = Math.floor(seq.length / 2);
-        const firstHalf = seq.slice(0, half);
-        const secondHalf = seq.slice(half);
-        
-        const firstRatio = firstHalf.filter(s => s === 'T').length / firstHalf.length;
-        const secondRatio = secondHalf.filter(s => s === 'T').length / secondHalf.length;
-        
-        return secondRatio - firstRatio;
-    }
-    
-    train(data) {
-        for (let i = 30; i < data.length; i++) {
-            const window = data.slice(i - 30, i);
-            const momentum = this.calculateMomentum(window);
-            const key = window.slice(-6).join('');
-            
-            if (!this.momentumHistory.has(key)) {
-                this.momentumHistory.set(key, { momentums: [], nextResults: [] });
-            }
-            
-            const hist = this.momentumHistory.get(key);
-            hist.momentums.push(momentum);
-            hist.nextResults.push(data[i] === 'T' ? 1 : 0);
-            
-            if (hist.momentums.length > 50) {
-                hist.momentums.shift();
-                hist.nextResults.shift();
-            }
-        }
-        this.trained = true;
-    }
-    
-    predict(seq) {
-        if (!this.trained || seq.length < 30) return null;
-        const window = seq.slice(-30);
-        const momentum = this.calculateMomentum(window);
-        const key = window.slice(-6).join('');
-        const hist = this.momentumHistory.get(key);
-        
-        if (!hist || hist.momentums.length < 5) return null;
-        
-        // Tìm momentums tương tự
-        let weightedT = 0, weightedX = 0;
-        for (let i = 0; i < hist.momentums.length; i++) {
-            const similarity = 1 - Math.abs(momentum - hist.momentums[i]) / (Math.abs(momentum) + 0.001);
-            if (similarity > 0.7) {
-                weightedT += hist.nextResults[i] * similarity;
-                weightedX += (1 - hist.nextResults[i]) * similarity;
-            }
-        }
-        
-        if (weightedT + weightedX === 0) return momentum > 0 ? 'T' : 'X';
-        return weightedT > weightedX ? 'T' : 'X';
-    }
-}
-
-// 10. ELASTIC NET REGRESSION
-class ElasticNetRegression {
-    constructor() {
-        this.coefficients = new Map();
-        this.intercept = new Map();
-        this.alpha = 0.01;
-        this.l1Ratio = 0.5;
-        this.trained = false;
-    }
-    
-    extractFeatures(seq) {
-        const f = [];
-        for (let w = 3; w <= 10; w++) {
-            if (seq.length >= w) {
-                const sl = seq.slice(-w);
-                f.push(sl.filter(s => s === 'T').length / w);
-            }
-        }
-        // Thêm cross-features
-        for (let i = 0; i < Math.min(f.length - 1, 5); i++) {
-            f.push(f[i] * f[i + 1]);
-        }
-        while (f.length < 10) f.push(0.5);
-        return f;
-    }
-    
-    train(data) {
-        for (let i = 25; i < data.length; i++) {
-            const window = data.slice(i - 25, i);
-            const features = this.extractFeatures(window);
-            const target = data[i] === 'T' ? 1 : 0;
-            const key = window.slice(-6).join('');
-            
-            if (!this.coefficients.has(key)) {
-                this.coefficients.set(key, Array(features.length).fill(0));
-                this.intercept.set(key, 0.5);
-            }
-            
-            const coef = this.coefficients.get(key);
-            let intercept = this.intercept.get(key);
-            
-            let prediction = intercept;
-            for (let j = 0; j < coef.length; j++) {
-                prediction += coef[j] * features[j];
-            }
-            
-            const error = target - prediction;
-            
-            // Elastic Net update
-            for (let j = 0; j < coef.length; j++) {
-                const l1Grad = this.alpha * this.l1Ratio * Math.sign(coef[j]);
-                const l2Grad = this.alpha * (1 - this.l1Ratio) * coef[j];
-                coef[j] += 0.005 * (error * features[j] - l1Grad - l2Grad);
-            }
-            intercept += 0.005 * error;
-            this.intercept.set(key, intercept);
-        }
-        this.trained = true;
-    }
-    
-    predict(seq) {
-        if (!this.trained || seq.length < 25) return null;
-        const features = this.extractFeatures(seq.slice(-25));
-        const key = seq.slice(-25, -19).join('');
-        const coef = this.coefficients.get(key);
-        
-        if (!coef) return null;
-        
-        let prediction = this.intercept.get(key) || 0.5;
-        for (let j = 0; j < coef.length; j++) {
-            prediction += coef[j] * features[j];
-        }
-        
-        return prediction > 0.5 ? 'T' : 'X';
-    }
+    return `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>CRYSTAL TX • ${type.toUpperCase()}</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--b0:#040410;--b1:#0a0c1c;--b2:#0e102a;--b3:#121538;--b4:rgba(255,255,255,0.03);--b5:rgba(255,255,255,0.06);--b6:rgba(123,97,255,0.2);--t0:#e8eaf2;--t1:#8890b8;--t2:#4a5080;--g:linear-gradient(135deg,#7b61ff,#3b82f6,#06b6d4,#8b5cf6);--ok:#22c55e;--no:#ef4444;--w:#f59e0b;--q:#7b61ff;--cy:#06b6d4}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:var(--b0);color:var(--t0);min-height:100vh;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+.bg1{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;background:radial-gradient(ellipse 80% 60% at 20% 30%,rgba(123,97,255,0.05) 0%,transparent 60%),radial-gradient(ellipse 60% 80% at 80% 70%,rgba(6,182,212,0.04) 0%,transparent 60%)}
+.bg2{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,0.012) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.012) 1px,transparent 1px);background-size:40px 40px;mask-image:radial-gradient(ellipse 80% 80% at 50% 50%,black 10%,transparent 70%)}
+.app{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:10px 14px}
+.topbar{display:flex;justify-content:space-between;align-items:center;padding:10px 0;flex-wrap:wrap;gap:8px}
+.topbar .brand{display:flex;align-items:center;gap:8px}
+.topbar .brand .ic{font-size:22px;animation:float 3s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+.topbar .brand h1{font-family:'Orbitron',sans-serif;font-size:16px;font-weight:800;background:var(--g);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.topbar .brand span{font-size:8px;color:var(--t1);font-family:'JetBrains Mono',monospace;letter-spacing:1px}
+.topbar .wr{display:flex;align-items:center;gap:8px}
+.topbar .wr .ring{width:48px;height:48px}
+.topbar .wr .ring svg{transform:rotate(-90deg)}
+.topbar .wr .ring .bc{fill:none;stroke:rgba(255,255,255,0.04);stroke-width:4}
+.topbar .wr .ring .fc{fill:none;stroke:${wrc};stroke-width:4;stroke-linecap:round;stroke-dasharray:138.2;stroke-dashoffset:${138.2-(138.2*wr/100)};transition:stroke-dashoffset 1s ease}
+.topbar .wr .ring .tx{font-family:'Orbitron',monospace;font-size:10px;font-weight:700;fill:${wrc};text-anchor:middle;dominant-baseline:central}
+.topbar .wr .lb{font-size:8px;color:var(--t2)}
+.cards{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:10px}
+@media(max-width:800px){.cards{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:500px){.cards{grid-template-columns:repeat(2,1fr)}}
+.card{background:var(--b2);border:1px solid var(--b4);border-radius:10px;padding:8px 10px;text-align:center;transition:all 0.3s}
+.card:hover{background:var(--b3);border-color:var(--b6)}
+.card .v{font-family:'Orbitron',monospace;font-size:15px;font-weight:700}
+.card .l{font-size:7px;color:var(--t2);text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+.g{color:var(--ok)}.r{color:var(--no)}.y{color:var(--w)}.c{color:var(--cy)}.p{color:var(--q)}.w{color:var(--t0)}
+.tbl{background:var(--b2);border:1px solid var(--b4);border-radius:12px;overflow:hidden}
+.tbl-h{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:1px solid var(--b4)}
+.tbl-h h3{font-family:'Orbitron',monospace;font-size:11px;font-weight:600;color:var(--t0)}
+.tbl-h .cnt{font-size:7px;color:var(--t2);font-family:'JetBrains Mono',monospace}
+.tag{font-size:7px;color:var(--q);background:rgba(123,97,255,0.05);padding:2px 8px;border-radius:10px;border:1px solid rgba(123,97,255,0.08)}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:9px}
+th{background:rgba(255,255,255,0.01);padding:6px 8px;text-align:left;font-weight:600;font-size:7px;text-transform:uppercase;letter-spacing:1px;color:var(--t2);border-bottom:1px solid var(--b4)}
+td{padding:5px 8px;border-bottom:1px solid rgba(255,255,255,0.01)}
+tr:hover td{background:rgba(255,255,255,0.006)}
+.r-w{border-left:1px solid transparent}.r-w:hover{border-left-color:rgba(34,197,94,0.2)}
+.r-l{border-left:1px solid transparent}.r-l:hover{border-left-color:rgba(239,68,68,0.2)}
+.r-p{border-left:1px solid transparent}.r-p:hover{border-left-color:rgba(245,158,11,0.2)}
+.sid{font-family:'Orbitron',monospace;font-size:8px;color:var(--t1)}
+.pr{display:inline-block;padding:2px 6px;border-radius:4px;font-weight:700;font-size:7px}
+.pr-t{background:rgba(34,197,94,0.07);color:var(--ok)}
+.pr-x{background:rgba(239,68,68,0.07);color:var(--no)}
+.cb{display:inline-block;width:32px;height:2px;background:rgba(255,255,255,0.04);border-radius:1px;vertical-align:middle;margin-right:3px}
+.cf{height:100%;border-radius:1px;background:linear-gradient(90deg,var(--q),var(--cy))}
+.ct{font-weight:600;color:var(--cy);font-size:7px}
+.stt-w{display:inline-block;padding:1px 5px;border-radius:3px;font-weight:700;font-size:6px;text-transform:uppercase;letter-spacing:1px;background:rgba(34,197,94,0.07);color:var(--ok)}
+.stt-l{display:inline-block;padding:1px 5px;border-radius:3px;font-weight:700;font-size:6px;text-transform:uppercase;letter-spacing:1px;background:rgba(239,68,68,0.07);color:var(--no)}
+.stt-p{display:inline-block;padding:1px 5px;border-radius:3px;font-weight:700;font-size:6px;text-transform:uppercase;letter-spacing:1px;background:rgba(245,158,11,0.07);color:var(--w)}
+.dt{font-size:7px;color:var(--t2);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ftr{text-align:center;padding:8px;font-size:7px;color:var(--t2);font-family:'JetBrains Mono',monospace}
+.ftr span{color:var(--q)}
+::-webkit-scrollbar{width:2px;height:2px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.03)}
+@keyframes scan{0%{transform:translateY(-100%)}100%{transform:translateY(100%)}}
+.scan{position:fixed;top:0;left:0;width:100%;height:1px;background:linear-gradient(90deg,transparent,rgba(123,97,255,0.1),transparent);z-index:2;pointer-events:none;animation:scan 5s linear infinite}
+</style></head><body>
+<div class="bg1"></div><div class="bg2"></div><div class="scan"></div>
+<div class="app">
+<div class="topbar">
+<div class="brand"><div class="ic">◆</div><div><h1>CRYSTAL TX</h1><span>${type.toUpperCase()} • By Anh Khôi</span></div></div>
+<div class="wr">
+<div class="lb">Tỷ lệ</div>
+<svg class="ring" viewBox="0 0 48 48"><circle class="bc" cx="24" cy="24" r="22"/><circle class="fc" cx="24" cy="24" r="22"/><text class="tx" x="24" y="24">${wr}%</text></svg>
+</div>
+</div>
+<div class="cards">
+<div class="card"><div class="v w">${s.total}</div><div class="l">Tổng</div></div>
+<div class="card"><div class="v g">${s.dung}</div><div class="l">Đúng</div></div>
+<div class="card"><div class="v r">${s.sai}</div><div class="l">Sai</div></div>
+<div class="card"><div class="v ${s.chuoi>0?'g':s.chuoi<0?'r':'y'}">${s.chuoi>0?'+'+s.chuoi:s.chuoi<0?''+s.chuoi:'0'}</div><div class="l">Chuỗi</div></div>
+<div class="card"><div class="v p">${s.chuoi_dai}</div><div class="l">Kỷ Lục</div></div>
+<div class="card"><div class="v ${wr>=70?'g':wr>=60?'y':'r'}">${wr}%</div><div class="l">Tỷ Lệ</div></div>
+</div>
+<div class="tbl">
+<div class="tbl-h"><h3>◆ Lịch Sử 50 Phiên</h3><span class="cnt">${recent.length} phiên</span><span class="tag">◆ Anh Khôi</span></div>
+<div class="tw"><table><thead><tr><th>Phiên</th><th>Dự Đoán</th><th>Độ Tin</th><th>KQ</th><th>Thực Tế</th><th>Engine</th></tr></thead>
+<tbody>${rows||'<tr><td colspan="6" style="text-align:center;padding:15px;">Đang tải...</td></tr>'}</tbody></table></div>
+</div>
+<div class="ftr">◆ <span>CRYSTAL TX</span> • Cộng Hưởng • Phân Mảnh • Entropy • By Anh Khôi • ${new Date().toLocaleString('vi-VN')}</div>
+</div>
+<script>setTimeout(()=>location.reload(),5000);</script>
+</body></html>`;
 }
 
 // ============================================================
-// 🧠 SUPER ADAPTIVE PREDICTION SYSTEM
-// ============================================================
-class SuperAdaptiveSystem {
-    constructor() {
-        this.memory = new Map();
-        this.trained = { hu: false, md5: false };
-        
-        this.ensemble = new AdaptiveEnsembleEngine();
-        
-        // Đăng ký tất cả models
-        this.models = [
-            new PatternMemoryNetwork(),
-            new AdaptiveGradientBoosting(),
-            new EWMAPredictor(),
-            new AdaptiveKNN(),
-            new HiddenMarkovModel(),
-            new ARIMAPredictor(),
-            new AdaptiveNaiveBayes(),
-            new MeanReversionDetector(),
-            new MomentumBreakoutDetector(),
-            new ElasticNetRegression()
-        ];
-        
-        this.models.forEach((model, i) => {
-            this.ensemble.addModel(`Model_${i + 1}`, model);
-        });
-        
-        this.loadData();
-    }
-    
-    train(game, data) {
-        if (data.length < 50) return;
-        
-        try {
-            for (const model of this.models) {
-                model.train(data);
-            }
-            this.trained[game] = true;
-            console.log(`🧠 Trained 10+ adaptive models for ${game} with ${data.length} samples`);
-        } catch (e) {
-            console.log(`Training error: ${e.message}`);
-        }
-    }
-    
-    predict(game, data) {
-        if (!data || data.length < 2) return this.fallback(game);
-        const seq = data.map(d => d === 'T' ? 'T' : 'X');
-        
-        const { totalT, totalX, totalWeight, predictions } = this.ensemble.predict(seq);
-        
-        if (totalWeight === 0 || predictions.length === 0) {
-            return this.fallback(game);
-        }
-        
-        // Phân tích xu hướng
-        const s = this.memory.get(game);
-        if (s) {
-            this.applyTrendCorrection(s, totalT, totalX);
-        }
-        
-        const totalAfterCorrection = totalT + totalX;
-        const duDoan = totalT > totalX ? 'TÀI' : 'XỈU';
-        const doTinCay = Math.round(Math.max(totalT, totalX) / totalAfterCorrection * 100);
-        
-        const topModels = predictions
-            .sort((a, b) => b.weight - a.weight)
-            .slice(0, 5)
-            .map(p => `${p.name}(${Math.round(p.weight * 100)}%)`);
-        
-        const ketQua = duDoan === 'TÀI' ? 'T' : 'X';
-        this.hoc(game, ketQua);
-        
-        return {
-            duDoan,
-            doTinCay: Math.min(99, Math.max(55, doTinCay)),
-            chiTiet: topModels.join(' • '),
-            soMau: predictions.length
-        };
-    }
-    
-    applyTrendCorrection(s, totalT, totalX) {
-        // Điều chỉnh dựa trên pressure
-        if (s.last5.length >= 5) {
-            const demT = s.last5.filter(r => r === 'T').length;
-            if (demT >= 4) totalX *= 1.4;
-            else if (demT <= 1) totalT *= 1.4;
-        }
-        
-        // Điều chỉnh dựa trên chuỗi
-        if (Math.abs(s.chuoi) >= 4) {
-            if (s.chuoi > 0) totalX *= 1.6;
-            else totalT *= 1.6;
-        }
-        
-        // Điều chỉnh dựa trên trend dài hạn
-        if (s.last20.length >= 20) {
-            const t20 = s.last20.filter(r => r === 'T').length;
-            if (t20 > 14) totalX *= 1.15;
-            else if (t20 < 6) totalT *= 1.15;
-        }
-        
-        // Cập nhật totalT, totalX qua closure
-        return { totalT, totalX };
-    }
-    
-    hoc(game, ketQua) {
-        if (!this.memory.has(game)) {
-            this.memory.set(game, {
-                chuoi: 0, totNhat: 0, teNhat: 0,
-                last5: [], last10: [], last20: [], last50: [],
-                tai: 0, xiu: 0, tong: 0
-            });
-        }
-        const s = this.memory.get(game);
-        s.tong++;
-        if (ketQua === 'T') { s.tai++; s.chuoi = s.chuoi >= 0 ? s.chuoi + 1 : 1; }
-        else { s.xiu++; s.chuoi = s.chuoi <= 0 ? s.chuoi - 1 : -1; }
-        if (s.chuoi > s.totNhat) s.totNhat = s.chuoi;
-        if (s.chuoi < s.teNhat) s.teNhat = s.chuoi;
-        s.last5.push(ketQua); s.last10.push(ketQua); s.last20.push(ketQua); s.last50.push(ketQua);
-        if (s.last5.length > 5) s.last5.shift();
-        if (s.last10.length > 10) s.last10.shift();
-        if (s.last20.length > 20) s.last20.shift();
-        if (s.last50.length > 50) s.last50.shift();
-        this.saveData();
-    }
-    
-    fallback(game) {
-        const s = this.memory.get(game);
-        if (s && s.chuoi >= 3) return { duDoan: 'TÀI', doTinCay: 58, chiTiet: 'Follow streak' };
-        if (s && s.chuoi <= -2) return { duDoan: 'TÀI', doTinCay: 58, chiTiet: 'Break streak' };
-        if (s && s.last5.length >= 5) {
-            const demT = s.last5.filter(r => r === 'T').length;
-            if (demT >= 4) return { duDoan: 'XỈU', doTinCay: 55, chiTiet: 'Pressure correction' };
-            if (demT <= 1) return { duDoan: 'TÀI', doTinCay: 55, chiTiet: 'Pressure correction' };
-        }
-        // Thay vì random, dùng xu hướng gần nhất
-        if (s && s.tong > 10) {
-            return { duDoan: s.tai > s.xiu ? 'TÀI' : 'XỈU', doTinCay: 52, chiTiet: 'Long-term trend' };
-        }
-        return { duDoan: 'TÀI', doTinCay: 51, chiTiet: 'Default safe' };
-    }
-    
-    saveData() {
-        try {
-            fs.writeFileSync(LEARNING_FILE, JSON.stringify({
-                memory: Object.fromEntries(this.memory),
-                trained: this.trained
-            }, null, 2));
-        } catch (e) {}
-    }
-    
-    loadData() {
-        try {
-            if (fs.existsSync(LEARNING_FILE)) {
-                const data = JSON.parse(fs.readFileSync(LEARNING_FILE, 'utf8'));
-                if (data.memory) {
-                    for (const [k, v] of Object.entries(data.memory)) {
-                        this.memory.set(k, v);
-                    }
-                }
-                if (data.trained) this.trained = data.trained;
-            }
-        } catch (e) {}
-    }
-}
-
-const predictor = new SuperAdaptiveSystem();
-
-// ============================================================
-// 📊 DATA MANAGEMENT
+// 🔌 API ENDPOINTS
 // ============================================================
 
-function transformData(apiData) {
-    if (!apiData || !apiData.list) return null;
-    return apiData.list.map(item => ({
-        phien: item.id,
-        result: item.resultTruyenThong === 'TAI' ? 'TÀI' : 'XỈU',
-        dice1: item.dices[0], dice2: item.dices[1], dice3: item.dices[2],
-        total: item.point
-    }));
-}
-
-async function fetchData(type) {
-    try {
-        const url = type === 'hu' ? API_URL_HU : API_URL_MD5;
-        const r = await axios.get(url, { timeout: 10000 });
-        return transformData(r.data);
-    } catch (e) { return null; }
-}
-
-function loadHistory() {
-    try {
-        if (fs.existsSync(HISTORY_FILE)) {
-            const data = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8'));
-            history = data.history || { hu: [], md5: [] };
-            stats = data.stats || stats;
-            lastPhien = data.lastPhien || { hu: null, md5: null };
-        }
-    } catch (e) {}
-}
-
-function saveHistory() {
-    try {
-        fs.writeFileSync(HISTORY_FILE, JSON.stringify({
-            history, stats, lastPhien, updated: new Date().toISOString()
-        }, null, 2));
-    } catch (e) {}
-}
-
-function updateStats(type, dung) {
-    const s = stats[type];
-    s.total++;
-    if (dung) {
-        s.dung++;
-        s.chuoi = s.chuoi >= 0 ? s.chuoi + 1 : 1;
-        if (s.chuoi > s.chuoi_dai) s.chuoi_dai = s.chuoi;
-        s.homnay.dung++;
-    } else {
-        s.sai++;
-        s.chuoi = s.chuoi <= 0 ? s.chuoi - 1 : -1;
-        s.homnay.sai++;
+app.post('/_admin/login', (req, res) => {
+    const { username, password } = req.body || {};
+    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+        const { token, expires } = generateAdminToken();
+        return res.json({ token, expires, message: 'Đăng nhập thành công' });
     }
-    s.homnay.tong++;
-    s.tyle = s.total > 0 ? Math.round((s.dung / s.total) * 100) : 0;
-}
+    return res.status(401).json({ error: 'Sai thông tin đăng nhập' });
+});
 
-function verifyAndUpdate(type, data) {
-    if (!data || data.length === 0) return;
-    let updated = 0;
-    for (const r of history[type]) {
-        if (r.status && r.status !== '') continue;
-        const actual = data.find(d => d.phien.toString() === r.phien_hien_tai);
-        if (actual) {
-            const dung = r.prediction === actual.result;
-            r.status = dung ? '✅' : '❌';
-            r.actual = actual.result;
-            updateStats(type, dung);
-            updated++;
-        }
-    }
-    if (updated > 0) saveHistory();
-}
+app.get('/_admin', adminAuth, (req, res) => {
+    res.send(generateLoginHTML());
+});
 
-// ============================================================
-// ⚡ AUTO PROCESS
-// ============================================================
+const adminAuth = (req, res, next) => {
+    const token = req.headers['x-admin-token'] || req.query['_admin'];
+    if (!token || !ADMIN_TOKENS.has(token)) return res.status(403).send(generateLoginHTML());
+    const data = ADMIN_TOKENS.get(token);
+    if (Date.now() > data.expires) { ADMIN_TOKENS.delete(token); return res.status(403).send(generateLoginHTML()); }
+    next();
+};
 
-async function autoProcess() {
-    try {
-        for (const type of ['hu', 'md5']) {
-            const data = await fetchData(type);
-            if (data && data.length > 0) {
-                const cur = data[0].phien;
-                if (lastPhien[type] !== cur) {
-                    verifyAndUpdate(type, data);
-                    const exist = history[type].find(h => h.phien_hien_tai === (cur + 1).toString());
-                    if (!exist) {
-                        const historyData = data.map(d => d.result === 'TÀI' ? 'T' : 'X');
-                        
-                        // Train với dữ liệu mới
-                        if (historyData.length >= 50) {
-                            predictor.train(type, historyData);
-                        }
-                        
-                        const result = predictor.predict(type, historyData);
-                        const record = {
-                            phien: data[0].phien,
-                            phien_hien_tai: (data[0].phien + 1).toString(),
-                            dice: `${data[0].dice1}-${data[0].dice2}-${data[0].dice3}`,
-                            total: data[0].total,
-                            actual: data[0].result,
-                            prediction: result.duDoan,
-                            confidence: result.doTinCay,
-                            detail: result.chiTiet,
-                            status: '',
-                            timestamp: new Date().toISOString(),
-                            soMau: result.soMau || 0
-                        };
-                        history[type].unshift(record);
-                        if (history[type].length > 1000) history[type] = history[type].slice(0, 1000);
-                        lastPhien[type] = cur;
-                        lastPred[type] = result;
-                        
-                        // Update model performance
-                        if (data.length >= 2) {
-                            const prevPred = history[type][1];
-                            if (prevPred && prevPred.status === '') {
-                                const actualResult = data[0].result;
-                                const wasCorrect = prevPred.prediction === actualResult;
-                                predictor.ensemble.updatePerformance('Model_1', wasCorrect);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        saveHistory();
-    } catch (e) {}
-}
+app.get('/_hu', adminAuth, async (req, res) => {
+    const data = await fetchData('hu');
+    if (data) { for (const r of brainHU.history) { if (r.status && r.status!=='') continue; const a=data.find(d=>d.phien.toString()===r.phien_hien_tai); if(a){r.status=(r.prediction===a.result)?'✅':'❌';r.actual=a.result;brainHU.updateResult(r.prediction,a.result);} } brainHU.save(); }
+    const token = req.headers['x-admin-token'] || req.query['_admin'];
+    res.setHeader('Content-Type','text/html; charset=utf-8');
+    res.send(generateDashboardHTML(brainHU, 'hu', token));
+});
 
-function startAuto() {
-    setTimeout(autoProcess, 3000);
-    setInterval(autoProcess, 5000);
-}
+app.get('/_md5', adminAuth, async (req, res) => {
+    const data = await fetchData('md5');
+    if (data) { for (const r of brainMD5.history) { if (r.status && r.status!=='') continue; const a=data.find(d=>d.phien.toString()===r.phien_hien_tai); if(a){r.status=(r.prediction===a.result)?'✅':'❌';r.actual=a.result;brainMD5.updateResult(r.prediction,a.result);} } brainMD5.save(); }
+    const token = req.headers['x-admin-token'] || req.query['_admin'];
+    res.setHeader('Content-Type','text/html; charset=utf-8');
+    res.send(generateDashboardHTML(brainMD5, 'md5', token));
+});
 
-// ============================================================
-// 🌐 HTML INTERFACE
-// ============================================================
-
-function generateHTML(type) {
-    const s = stats[type];
-    const h = history[type] || [];
-    const recent = h.slice(0, 100);
-    
-    let tongDung = 0, tongSai = 0, chuoiHienTai = 0, chuoiDaiNhat = 0, chuoiTam = 0;
-    for (const r of recent) {
-        if (r.status === '✅') { tongDung++; chuoiTam++; if (chuoiTam > chuoiDaiNhat) chuoiDaiNhat = chuoiTam; }
-        else if (r.status === '❌') { tongSai++; chuoiTam = 0; }
-    }
-    chuoiHienTai = chuoiTam;
-    const tyle100 = recent.length > 0 ? Math.round((tongDung / recent.length) * 100) : 0;
-    
-    let rows = '';
-    for (const r of recent) {
-        const status = r.status || '⏳';
-        const cls = status === '✅' ? 'dung' : status === '❌' ? 'sai' : 'cho';
-        const txt = status === '✅' ? 'ĐÚNG' : status === '❌' ? 'SAI' : 'CHỜ';
-        rows += `<tr>
-            <td><span class="phien">#${r.phien_hien_tai || '-'}</span></td>
-            <td><span class="du-doan ${r.prediction === 'TÀI' ? 'tai' : 'xiu'}">${r.prediction || '-'}</span></td>
-            <td><span class="do-tin">${r.confidence || 0}%</span></td>
-            <td><span class="trang-thai ${cls}">${txt}</span></td>
-            <td>${r.actual || '-'}</td>
-            <td class="chi-tiet">${(r.detail || '-').substring(0, 35)}</td>
-        </tr>`;
-    }
-
-    return `<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🧬 TX ADAPTIVE AI</title>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;600;700;800&family=Share+Tech+Mono&display=swap');
-        *{margin:0;padding:0;box-sizing:border-box}
-        :root{--p:#ff6b35;--s:#00d4ff;--ok:#4ade80;--no:#ff4757;--w:#ffa502;--q:#7b2ffc;--bg:#0a0a1a;--card:rgba(255,255,255,0.03);--b:rgba(255,255,255,0.06);--t:#f0f0f0;--ts:#8899bb;--tm:#445566}
-        body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--t);min-height:100vh}
-        .bg{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;background:radial-gradient(ellipse at 10% 30%,rgba(123,47,252,0.08) 0%,transparent 50%),radial-gradient(ellipse at 90% 70%,rgba(255,107,53,0.06) 0%,transparent 50%);overflow:hidden}
-        .bg::before{content:'';position:absolute;top:0;left:0;width:100%;height:100%;background-image:radial-gradient(1px 1px at 10px 20px,rgba(255,255,255,0.06),transparent);background-size:300px 300px;animation:stars 50s linear infinite}
-        @keyframes stars{0%{transform:translate(0,0)}100%{transform:translate(-40px,-20px)}}
-        .container{position:relative;z-index:1;max-width:1200px;margin:0 auto;padding:12px}
-        .hdr{background:linear-gradient(135deg,rgba(123,47,252,0.06),rgba(255,107,53,0.04));border-radius:20px;padding:18px 28px;margin-bottom:16px;border:1px solid rgba(123,47,252,0.08);backdrop-filter:blur(30px);position:relative;overflow:hidden}
-        .hdr::before{content:'';position:absolute;top:-60%;left:-60%;width:220%;height:220%;background:conic-gradient(from 0deg,transparent,rgba(123,47,252,0.03),transparent);animation:spin 30s linear infinite}
-        @keyframes spin{100%{transform:rotate(360deg)}}
-        .hdr .c{position:relative;z-index:1;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
-        .logo{display:flex;align-items:center;gap:14px}
-        .logo .ic{font-size:34px;animation:pulse 2s ease-in-out infinite}
-        @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
-        .logo .ten{font-family:'Orbitron',monospace;font-size:22px;font-weight:900;background:linear-gradient(135deg,#7b2ffc,#ff6b35,#00d4ff);background-size:300% 300%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:shimmer 4s ease-in-out infinite}
-        @keyframes shimmer{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
-        .logo .sub{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--ts);letter-spacing:3px}
-        .badge{display:inline-block;padding:4px 18px;border-radius:30px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:2px;background:linear-gradient(135deg,rgba(123,47,252,0.1),rgba(255,107,53,0.06));border:1px solid rgba(123,47,252,0.1);color:#a78bfa}
-        .badge .live{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--ok);margin-right:6px;animation:lp 0.8s ease-in-out infinite}
-        @keyframes lp{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.3;transform:scale(0.6)}}
-        .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:16px}
-        .st{background:var(--card);border-radius:14px;padding:10px 14px;border:1px solid var(--b);backdrop-filter:blur(15px);text-align:center;transition:all 0.3s}
-        .st:hover{transform:translateY(-2px);border-color:rgba(123,47,252,0.15)}
-        .st .l{font-size:8px;text-transform:uppercase;letter-spacing:1px;color:var(--tm);font-weight:700}
-        .st .v{font-size:18px;font-weight:800;margin-top:2px;font-family:'Orbitron',monospace}
-        .v.x{color:var(--ok)}.v.d{color:var(--no)}.v.c{color:var(--w)}.v.xd{color:#60a5fa}.v.q{color:#7b2ffc}
-        .st .s{font-size:8px;color:var(--tm);margin-top:2px}
-        .sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:16px}
-        .su{background:linear-gradient(135deg,rgba(123,47,252,0.04),rgba(255,107,53,0.02));border-radius:12px;padding:12px 16px;border:1px solid rgba(123,47,252,0.06);text-align:center}
-        .su .l{font-size:9px;text-transform:uppercase;color:var(--tm);letter-spacing:1px;font-weight:600}
-        .su .v{font-size:22px;font-weight:800;font-family:'Orbitron',monospace;margin-top:2px}
-        .tbl{background:var(--card);border-radius:14px;overflow:hidden;border:1px solid var(--b);backdrop-filter:blur(15px)}
-        .tbl .th{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--b);flex-wrap:wrap;gap:6px}
-        .tbl .th h3{font-family:'Orbitron',monospace;font-size:13px;font-weight:700;color:var(--s)}
-        .tbl .th .cnt{font-size:10px;color:var(--tm)}
-        .atg{font-size:9px;color:#a78bfa;background:rgba(123,47,252,0.06);padding:2px 10px;border-radius:12px;border:1px solid rgba(123,47,252,0.06)}
-        table{width:100%;border-collapse:collapse;font-size:11px}
-        th{background:rgba(255,255,255,0.02);padding:7px 10px;text-align:left;font-weight:700;font-size:8px;text-transform:uppercase;letter-spacing:1px;color:var(--tm)}
-        td{padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.02)}
-        tr:hover td{background:rgba(255,255,255,0.015)}
-        .phien{font-family:'Orbitron',monospace;font-size:10px;color:var(--ts)}
-        .du-doan{display:inline-block;padding:2px 10px;border-radius:8px;font-weight:700;font-size:10px}
-        .du-doan.tai{background:rgba(74,222,128,0.08);color:var(--ok)}
-        .du-doan.xiu{background:rgba(255,71,87,0.08);color:var(--no)}
-        .do-tin{font-weight:700;color:#60a5fa}
-        .trang-thai{display:inline-block;padding:2px 8px;border-radius:8px;font-size:8px;font-weight:700}
-        .trang-thai.dung{background:rgba(74,222,128,0.08);color:var(--ok)}
-        .trang-thai.sai{background:rgba(255,71,87,0.08);color:var(--no)}
-        .trang-thai.cho{background:rgba(255,165,2,0.08);color:var(--w)}
-        .chi-tiet{font-size:9px;color:var(--tm);max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .ftr{text-align:center;padding:12px;color:var(--tm);font-size:9px;border-top:1px solid var(--b);margin-top:14px}
-        .ftr .hl{color:#a78bfa}.ftr .at{color:#ff6b35}
-        @media(max-width:768px){.hdr{padding:14px}.hdr .c{flex-direction:column;align-items:flex-start}.stats{grid-template-columns:repeat(3,1fr)}.sum{grid-template-columns:repeat(2,1fr)}.logo .ten{font-size:18px}}
-        @media(max-width:480px){.stats{grid-template-columns:repeat(2,1fr)}.sum{grid-template-columns:1fr 1fr}.container{padding:6px}.logo .ten{font-size:14px}}
-    </style>
-</head>
-<body>
-    <div class="bg"></div>
-    <div class="container">
-        <div class="hdr"><div class="c">
-            <div class="logo"><span class="ic">🧬</span><div><div class="ten">TX ADAPTIVE AI</div><div class="sub">ANH KHÔI • ${type.toUpperCase()}</div></div></div>
-            <div><div class="badge"><span class="live"></span>${type.toUpperCase()} • LIVE v45.0</div><div style="font-size:8px;color:var(--tm);margin-top:2px;font-family:'Share Tech Mono',monospace;">${new Date().toLocaleString('vi-VN')} • Zero Random • 10+ Adaptive Models</div></div>
-        </div></div>
-        <div class="stats">
-            <div class="st"><div class="l">Tổng</div><div class="v xd">${s.total}</div><div class="s">Dự Đoán</div></div>
-            <div class="st"><div class="l">Đúng</div><div class="v x">${s.dung}</div><div class="s">${s.tyle}%</div></div>
-            <div class="st"><div class="l">Sai</div><div class="v d">${s.sai}</div><div class="s">${100-s.tyle}%</div></div>
-            <div class="st"><div class="l">Tỷ Lệ</div><div class="v ${s.tyle>=65?'x':s.tyle>=55?'c':'d'}">${s.tyle}%</div><div class="s">${s.tyle>=65?'Xuất sắc':s.tyle>=55?'Tốt':'Cần cải thiện'}</div></div>
-            <div class="st"><div class="l">Chuỗi</div><div class="v ${s.chuoi>0?'x':s.chuoi<0?'d':'c'}">${s.chuoi>0?'+'+s.chuoi:s.chuoi<0?''+s.chuoi:'0'}</div><div class="s">${s.chuoi>0?'Đang thắng':s.chuoi<0?'Cố lên':'Cân bằng'}</div></div>
-            <div class="st"><div class="l">Dài Nhất</div><div class="v q">${s.chuoi_dai}</div><div class="s">${s.chuoi_dai>=5?'Siêu chuỗi':'Đang tiến'}</div></div>
-        </div>
-        <div class="sum">
-            <div class="su"><div class="l">100 Phiên</div><div class="v xd">${recent.length}</div><div style="font-size:10px;color:var(--tm);">Tổng</div></div>
-            <div class="su"><div class="l">Đúng</div><div class="v x">${tongDung}</div><div style="font-size:10px;color:var(--tm);">${tyle100}%</div></div>
-            <div class="su"><div class="l">Sai</div><div class="v d">${tongSai}</div><div style="font-size:10px;color:var(--tm);">${100-tyle100}%</div></div>
-            <div class="su"><div class="l">Chuỗi Hiện Tại</div><div class="v ${chuoiHienTai>0?'x':chuoiHienTai<0?'d':'c'}">${chuoiHienTai>0?'+'+chuoiHienTai:chuoiHienTai<0?''+chuoiHienTai:'0'}</div><div style="font-size:10px;color:var(--tm);">${chuoiHienTai>0?'Thắng liên tiếp':chuoiHienTai<0?'Đang thua':'Hòa'}</div></div>
-            <div class="su"><div class="l">Dài Nhất</div><div class="v" style="color:#22d3ee;">${chuoiDaiNhat}</div><div style="font-size:10px;color:var(--tm);">${chuoiDaiNhat>=5?'Kỷ lục':'Đang xây'}</div></div>
-            <div class="su"><div class="l">Tỷ Lệ 100</div><div class="v ${tyle100>=65?'x':tyle100>=55?'c':'d'}">${tyle100}%</div><div style="font-size:10px;color:var(--tm);">${tyle100>=65?'Xuất sắc':tyle100>=55?'Tốt':'Cần cải thiện'}</div></div>
-        </div>
-        <div class="tbl">
-            <div class="th"><h3>📋 LỊCH SỬ 100 PHIÊN</h3><span class="cnt">${recent.length} phiên</span><span class="atg">🧬 Adaptive AI</span></div>
-            <div style="overflow-x:auto;">
-                <table>
-                    <thead><tr><th>Phiên</th><th>Dự Đoán</th><th>Độ Tin</th><th>KQ</th><th>Thực Tế</th><th>Models Active</th></tr></thead>
-                    <tbody>${rows || '<tr><td colspan="6" style="text-align:center;padding:20px;">⏳ ĐANG TẢI...</td></tr>'}</tbody>
-                </table>
-            </div>
-        </div>
-        <div class="ftr">
-            <span>🧬 TX Adaptive AI Predictor</span> • <span class="hl">Anh Khôi</span> • v45.0 • <span class="at">Zero Random</span> • Auto 5s<br>
-            <span style="font-size:7px;font-family:'Share Tech Mono',monospace;">PatternMemory • AdaptiveGB • EWMA • KNN • HMM • ARIMA • NaiveBayes • MeanReversion • MomentumBreakout • ElasticNet</span>
-        </div>
-    </div>
-    <script>setTimeout(()=>location.reload(),5000);</script>
-</body>
-</html>`;
-}
-
-// ============================================================
-// 🔌 API
-// ============================================================
-
-app.get('/', (req, res) => res.json({ name: 'TX Adaptive AI', version: '45.0', author: 'Anh Khôi', features: 'Zero Random, 10+ Adaptive Models' }));
-
-app.get('/lc79-hu', async (req, res) => {
+app.get('/_hu/json', adminAuth, async (req, res) => {
     try {
         const data = await fetchData('hu');
-        if (!data || data.length === 0) {
-            const result = predictor.fallback('hu');
-            return res.json({ prediction: result.duDoan, confidence: result.doTinCay, detail: result.chiTiet, noData: true });
-        }
-        const exist = history.hu.find(h => h.phien_hien_tai === (data[0].phien + 1).toString());
-        if (exist) return res.json(exist);
-        const historyData = data.map(d => d.result === 'TÀI' ? 'T' : 'X');
-        if (historyData.length >= 50) predictor.train('hu', historyData);
-        const result = predictor.predict('hu', historyData);
-        const record = {
-            phien: data[0].phien, phien_hien_tai: (data[0].phien + 1).toString(),
-            dice: `${data[0].dice1}-${data[0].dice2}-${data[0].dice3}`,
-            total: data[0].total, actual: data[0].result,
-            prediction: result.duDoan, confidence: result.doTinCay,
-            detail: result.chiTiet, status: '', timestamp: new Date().toISOString(), soMau: result.soMau || 0
-        };
-        history.hu.unshift(record);
-        if (history.hu.length > 1000) history.hu = history.hu.slice(0, 1000);
-        saveHistory();
-        res.json(record);
-    } catch (e) { res.status(500).json({ error: e.message }); }
+        if (!data||data.length===0) { const r=brainHU.fallback(); return res.json({prediction:r.duDoan,confidence:r.doTinCay,detail:r.chiTiet}); }
+        const ex=brainHU.history.find(h=>h.phien_hien_tai===(data[0].phien+1).toString()); if(ex) return res.json(ex);
+        const hd=data.map(d=>d.result==='TÀI'?'T':'X'); if(hd.length>=60) brainHU.train(hd);
+        const result=brainHU.predict(hd);
+        const rec={phien:data[0].phien,phien_hien_tai:(data[0].phien+1).toString(),dice:`${data[0].dice1}-${data[0].dice2}-${data[0].dice3}`,total:data[0].total,actual:data[0].result,prediction:result.duDoan,confidence:result.doTinCay,detail:result.chiTiet,status:'',timestamp:new Date().toISOString(),soMau:result.soMau||0};
+        brainHU.history.unshift(rec); if(brainHU.history.length>1000) brainHU.history=brainHU.history.slice(0,1000); brainHU.save();
+        res.json(rec);
+    }catch(e){res.status(500).json({error:'Lỗi'});}
 });
 
-app.get('/lc79-md5', async (req, res) => {
+app.get('/_md5/json', adminAuth, async (req, res) => {
     try {
         const data = await fetchData('md5');
-        if (!data || data.length === 0) {
-            const result = predictor.fallback('md5');
-            return res.json({ prediction: result.duDoan, confidence: result.doTinCay, detail: result.chiTiet, noData: true });
-        }
-        const exist = history.md5.find(h => h.phien_hien_tai === (data[0].phien + 1).toString());
-        if (exist) return res.json(exist);
-        const historyData = data.map(d => d.result === 'TÀI' ? 'T' : 'X');
-        if (historyData.length >= 50) predictor.train('md5', historyData);
-        const result = predictor.predict('md5', historyData);
-        const record = {
-            phien: data[0].phien, phien_hien_tai: (data[0].phien + 1).toString(),
-            dice: `${data[0].dice1}-${data[0].dice2}-${data[0].dice3}`,
-            total: data[0].total, actual: data[0].result,
-            prediction: result.duDoan, confidence: result.doTinCay,
-            detail: result.chiTiet, status: '', timestamp: new Date().toISOString(), soMau: result.soMau || 0
-        };
-        history.md5.unshift(record);
-        if (history.md5.length > 1000) history.md5 = history.md5.slice(0, 1000);
-        saveHistory();
-        res.json(record);
-    } catch (e) { res.status(500).json({ error: e.message }); }
+        if (!data||data.length===0) { const r=brainMD5.fallback(); return res.json({prediction:r.duDoan,confidence:r.doTinCay,detail:r.chiTiet}); }
+        const ex=brainMD5.history.find(h=>h.phien_hien_tai===(data[0].phien+1).toString()); if(ex) return res.json(ex);
+        const hd=data.map(d=>d.result==='TÀI'?'T':'X'); if(hd.length>=60) brainMD5.train(hd);
+        const result=brainMD5.predict(hd);
+        const rec={phien:data[0].phien,phien_hien_tai:(data[0].phien+1).toString(),dice:`${data[0].dice1}-${data[0].dice2}-${data[0].dice3}`,total:data[0].total,actual:data[0].result,prediction:result.duDoan,confidence:result.doTinCay,detail:result.chiTiet,status:'',timestamp:new Date().toISOString(),soMau:result.soMau||0};
+        brainMD5.history.unshift(rec); if(brainMD5.history.length>1000) brainMD5.history=brainMD5.history.slice(0,1000); brainMD5.save();
+        res.json(rec);
+    }catch(e){res.status(500).json({error:'Lỗi'});}
 });
 
-app.get('/lc79-hu/history', async (req, res) => {
-    const data = await fetchData('hu');
-    if (data) verifyAndUpdate('hu', data);
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.send(generateHTML('hu'));
+app.get('/_stats', adminAuth, (req, res) => {
+    const total=brainHU.stats.total+brainMD5.stats.total;
+    const dung=brainHU.stats.dung+brainMD5.stats.dung;
+    res.json({hu:brainHU.stats,md5:brainMD5.stats,combined:{total,dung,sai:total-dung,tyle:total>0?Math.round((dung/total)*100):0}});
 });
 
-app.get('/lc79-md5/history', async (req, res) => {
-    const data = await fetchData('md5');
-    if (data) verifyAndUpdate('md5', data);
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.send(generateHTML('md5'));
+app.get('/_reset', adminAuth, (req, res) => {
+    ['hu','md5'].forEach(t=>{const b=t==='hu'?brainHU:brainMD5;b.stats={total:0,dung:0,sai:0,tyle:0,chuoi:0,chuoi_dai:0,homnay:{dung:0,sai:0,tong:0}};b.history=[];b.lastPhien=null;b.save();});
+    res.json({message:'Đã reset'});
 });
 
-app.get('/stats', (req, res) => {
-    const total = stats.hu.total + stats.md5.total;
-    const dung = stats.hu.dung + stats.md5.dung;
-    res.json({ hu: stats.hu, md5: stats.md5, total: { total, dung, sai: total-dung, tyle: total>0?Math.round((dung/total)*100):0 }, lastPred });
-});
-
-app.get('/reset', (req, res) => {
-    history = { hu: [], md5: [] };
-    stats = { hu: {total:0,dung:0,sai:0,tyle:0,chuoi:0,chuoi_dai:0,homnay:{dung:0,sai:0,tong:0}}, md5: {total:0,dung:0,sai:0,tyle:0,chuoi:0,chuoi_dai:0,homnay:{dung:0,sai:0,tong:0}} };
-    lastPhien = { hu: null, md5: null }; lastPred = { hu: null, md5: null };
-    saveHistory();
-    res.json({ message: '✅ Reset' });
-});
+app.use((req, res) => res.status(404).end());
+app.use((err, req, res, next) => res.status(500).end());
 
 // ============================================================
 // 🚀 START
 // ============================================================
-loadHistory();
+
 app.listen(PORT, '0.0.0.0', () => {
-    console.log('\n╔════════════════════════════════════════════╗');
-    console.log('║  🧬 TX ADAPTIVE AI v45.0 - ANH KHÔI       ║');
-    console.log('║  Zero Random • 10+ Adaptive Models         ║');
-    console.log('║  Auto-train • Auto-adapt • Auto-predict    ║');
-    console.log('╚════════════════════════════════════════════╝\n');
+    console.log('╔══════════════════════════════════════════════╗');
+    console.log('║  ◆ CRYSTAL TX • BY ANH KHÔI                  ║');
+    console.log('║  Admin: POST /_admin/login                   ║');
+    console.log('║  Web HU: /_hu?_admin=TOKEN                   ║');
+    console.log('║  Web MD5: /_md5?_admin=TOKEN                 ║');
+    console.log('╚══════════════════════════════════════════════╝');
     startAuto();
 });
