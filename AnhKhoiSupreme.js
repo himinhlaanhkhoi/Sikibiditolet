@@ -4,7 +4,10 @@ const fs = require('fs');
 const crypto = require('crypto');
 
 const app = express();
+
+// QUAN TRỌNG: Phải có dòng này để parse JSON body
 app.use(express.json());
+
 const PORT = process.env.PORT || 5000;
 
 const API_URL_HU = 'https://wtx.tele68.com/v1/tx/sessions';
@@ -23,9 +26,9 @@ const ADMIN_TOKENS = new Map();
 
 console.log('\n============================================');
 console.log('  ◆ CRYSTAL TX - BY ANH KHOI');
-console.log(`  Username: ${ADMIN_USERNAME}`);
-console.log(`  Password: ${ADMIN_PASSWORD}`);
-console.log(`  Login: POST /_admin/login`);
+console.log(`  ◆ Username: ${ADMIN_USERNAME}`);
+console.log(`  ◆ Password: ${ADMIN_PASSWORD}`);
+console.log(`  ◆ Login: POST /_admin/login`);
 console.log('============================================\n');
 
 const generateAdminToken = () => {
@@ -51,7 +54,7 @@ const adminAuth = (req, res, next) => {
 // 🛡️ BẢO MẬT CƠ BẢN
 // ============================================================
 app.use((req, res, next) => {
-    const blocked = ['/admin','/wp-admin','/phpmyadmin','/.env','/.git','/config','/backup','/login','/shell','/api','/graphql','/actuator','/swagger','/debug','/test','/dev','/wp-login','/xmlrpc.php'];
+    const blocked = ['/admin','/wp-admin','/phpmyadmin','/.env','/.git','/config','/backup','/login','/shell','/api','/graphql','/actuator','/swagger','/debug'];
     if (blocked.some(b => req.path.toLowerCase().startsWith(b))) return res.status(404).end();
     
     if (req.query) {
@@ -62,7 +65,7 @@ app.use((req, res, next) => {
     }
     
     const ua = (req.get('User-Agent') || '').toLowerCase();
-    const blockedUA = ['sqlmap','nikto','nmap','burp','acunetix','nessus','metasploit','hydra','gobuster','dirbuster','wpscan','zap','scanner','bot','crawler','spider'];
+    const blockedUA = ['sqlmap','nikto','nmap','burp','acunetix','nessus','metasploit','hydra','gobuster','dirbuster','wpscan','zap','scanner'];
     if (blockedUA.some(b => ua.includes(b))) return res.status(403).end();
     
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -73,14 +76,14 @@ app.use((req, res, next) => {
     next();
 });
 
-// Rate limiter đơn giản
+// Rate limiter
 const rateLimitMap = new Map();
 app.use((req, res, next) => {
     const ip = req.ip || 'unknown';
     const now = Date.now();
     if (!rateLimitMap.has(ip)) rateLimitMap.set(ip, []);
     const requests = rateLimitMap.get(ip).filter(t => now - t < 60000);
-    if (requests.length > 100) return res.status(429).json({ error: 'Quá nhiều yêu cầu' });
+    if (requests.length > 100) return res.status(429).json({ error: 'Qua nhieu yeu cau' });
     requests.push(now);
     rateLimitMap.set(ip, requests);
     next();
@@ -89,7 +92,7 @@ app.use((req, res, next) => {
 // ============================================================
 // 🔐 MÃ HÓA
 // ============================================================
-const MASTER_KEY = crypto.createHash('sha512').update('crystal-tx-secure-key').digest();
+const MASTER_KEY = crypto.createHash('sha512').update('crystal-tx-secure-key-2024').digest();
 
 function secureEncrypt(text) {
     try {
@@ -117,7 +120,7 @@ function secureDecrypt(text) {
 }
 
 // ============================================================
-// 🧬 3 ENGINE DỰ ĐOÁN SIÊU CHÍNH XÁC
+// 🧬 3 ENGINE DỰ ĐOÁN
 // ============================================================
 
 class SpectralAnalyzer {
@@ -228,8 +231,7 @@ class FlowAnalyzer {
         }
         const avgE = entropies.reduce((a, b) => a + b, 0) / (entropies.length || 1);
         const stability = 1 - (entropies.length > 1 ? Math.max(...entropies) - Math.min(...entropies) : 0);
-        const trend = seq.slice(-5).filter(s => s === 'T').length / 5 - seq.slice(-13).filter(s => s === 'T').length / 13;
-        return { entropy: avgE, stability, trend };
+        return { entropy: avgE, stability };
     }
     
     train(data) {
@@ -409,7 +411,7 @@ class PredictionSystem {
             }));
             if (bd) fs.writeFileSync(bf, bd);
             if (hd) fs.writeFileSync(hf, hd);
-        } catch (e) { console.error('Save error:', e.message); }
+        } catch (e) {}
     }
     
     load() {
@@ -436,7 +438,7 @@ class PredictionSystem {
                     if (d.lastPhien) this.lastPhien = d.lastPhien;
                 }
             }
-        } catch (e) { console.error('Load error:', e.message); }
+        } catch (e) {}
     }
 }
 
@@ -522,66 +524,100 @@ function startAuto() {
 // ============================================================
 
 function generateLoginHTML() {
-    return `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>CRYSTAL TX</title>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Inter',sans-serif;background:#040410;color:#e8eaf2;min-height:100vh;display:flex;align-items:center;justify-content:center}
-.bg{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;background:radial-gradient(ellipse 80% 60% at 30% 30%,rgba(123,97,255,0.06) 0%,transparent 60%),radial-gradient(ellipse 60% 80% at 70% 70%,rgba(6,182,212,0.05) 0%,transparent 60%)}
-.box{position:relative;z-index:1;background:#0e102a;border:1px solid rgba(255,255,255,0.03);border-radius:16px;padding:32px 28px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,0.4)}
-.logo{text-align:center;margin-bottom:24px}
-.logo .ic{font-size:36px;animation:float 3s ease-in-out infinite}
-@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
-.logo h1{font-family:'Orbitron',sans-serif;font-size:20px;font-weight:800;background:linear-gradient(135deg,#7b61ff,#3b82f6,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.logo span{font-family:'JetBrains Mono',monospace;font-size:8px;color:#8890b8;letter-spacing:2px;text-transform:uppercase}
-.grp{margin-bottom:14px}
-.grp label{display:block;font-size:8px;color:#8890b8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;font-weight:600}
-.grp input{width:100%;padding:10px 14px;background:#0a0c1c;border:1px solid rgba(255,255,255,0.03);border-radius:8px;color:#e8eaf2;font-size:13px;font-family:'JetBrains Mono',monospace;outline:none}
-.grp input:focus{border-color:rgba(123,97,255,0.2);box-shadow:0 0 0 3px rgba(123,97,255,0.1)}
-.btn{width:100%;padding:10px;background:linear-gradient(135deg,#7b61ff,#3b82f6);border:none;border-radius:8px;color:#fff;font-weight:700;font-size:12px;cursor:pointer;font-family:'Orbitron',monospace;text-transform:uppercase;letter-spacing:1px}
-.btn:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(123,97,255,0.25)}
-.tok{display:none;margin-top:20px;padding:14px;background:#0a0c1c;border:1px solid rgba(255,255,255,0.03);border-radius:8px}
-.tok.show{display:block}
-.tok .l{font-size:8px;color:#8890b8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px}
-.tok .v{font-family:'JetBrains Mono',monospace;font-size:10px;color:#22c55e;word-break:break-all;background:#040410;padding:8px;border-radius:4px}
-.tok .i{font-size:8px;color:#4a5080;margin-top:8px}
-.err{color:#ef4444;font-size:10px;margin-top:8px;text-align:center;display:none}
-.err.show{display:block}
-.ft{text-align:center;font-size:7px;color:#4a5080;margin-top:20px;font-family:'JetBrains Mono',monospace}
-.ft span{color:#7b61ff}
-</style></head><body>
+    return `<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <title>CRYSTAL TX - Dang Nhap</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Inter',sans-serif;background:#040410;color:#e8eaf2;min-height:100vh;display:flex;align-items:center;justify-content:center}
+        .bg{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;background:radial-gradient(ellipse 80% 60% at 30% 30%,rgba(123,97,255,0.06) 0%,transparent 60%),radial-gradient(ellipse 60% 80% at 70% 70%,rgba(6,182,212,0.05) 0%,transparent 60%)}
+        .box{position:relative;z-index:1;background:#0e102a;border:1px solid rgba(255,255,255,0.03);border-radius:16px;padding:32px 28px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,0.4)}
+        .logo{text-align:center;margin-bottom:24px}
+        .logo .ic{font-size:36px;animation:float 3s ease-in-out infinite}
+        @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+        .logo h1{font-family:'Orbitron',sans-serif;font-size:20px;font-weight:800;background:linear-gradient(135deg,#7b61ff,#3b82f6,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+        .logo span{font-family:'JetBrains Mono',monospace;font-size:8px;color:#8890b8;letter-spacing:2px;text-transform:uppercase}
+        .grp{margin-bottom:14px}
+        .grp label{display:block;font-size:8px;color:#8890b8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;font-weight:600}
+        .grp input{width:100%;padding:10px 14px;background:#0a0c1c;border:1px solid rgba(255,255,255,0.03);border-radius:8px;color:#e8eaf2;font-size:13px;font-family:'JetBrains Mono',monospace;outline:none}
+        .grp input:focus{border-color:rgba(123,97,255,0.2);box-shadow:0 0 0 3px rgba(123,97,255,0.1)}
+        .btn{width:100%;padding:10px;background:linear-gradient(135deg,#7b61ff,#3b82f6);border:none;border-radius:8px;color:#fff;font-weight:700;font-size:12px;cursor:pointer;font-family:'Orbitron',monospace;text-transform:uppercase;letter-spacing:1px}
+        .btn:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(123,97,255,0.25)}
+        .tok{display:none;margin-top:20px;padding:14px;background:#0a0c1c;border:1px solid rgba(255,255,255,0.03);border-radius:8px}
+        .tok.show{display:block}
+        .tok .l{font-size:8px;color:#8890b8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px}
+        .tok .v{font-family:'JetBrains Mono',monospace;font-size:10px;color:#22c55e;word-break:break-all;background:#040410;padding:8px;border-radius:4px}
+        .tok .i{font-size:8px;color:#4a5080;margin-top:8px;line-height:1.6}
+        .err{color:#ef4444;font-size:10px;margin-top:8px;text-align:center;display:none}
+        .err.show{display:block}
+        .ft{text-align:center;font-size:7px;color:#4a5080;margin-top:20px;font-family:'JetBrains Mono',monospace}
+        .ft span{color:#7b61ff}
+    </style>
+</head>
+<body>
 <div class="bg"></div>
 <div class="box">
-<div class="logo"><div class="ic">◆</div><h1>CRYSTAL TX</h1><span>Admin VIP • By Anh Khoi</span></div>
-<div class="grp"><label>Username</label><input type="text" id="u" placeholder="admin"></div>
-<div class="grp"><label>Password</label><input type="password" id="p" placeholder="••••"></div>
-<button class="btn" onclick="login()">◆ Dang Nhap</button>
-<div class="err" id="e"></div>
-<div class="tok" id="t">
-<div class="l">Token Admin (24h)</div>
-<div class="v" id="tv"></div>
-<div class="i" id="ti"></div>
-</div>
-<div class="ft">◆ <span>CRYSTAL TX</span> • By Anh Khoi</div>
+    <div class="logo"><div class="ic">◆</div><h1>CRYSTAL TX</h1><span>Admin VIP • By Anh Khoi</span></div>
+    <div class="grp"><label>Username</label><input type="text" id="u" placeholder="admin"></div>
+    <div class="grp"><label>Password</label><input type="password" id="p" placeholder="••••"></div>
+    <button class="btn" onclick="doLogin()">◆ Dang Nhap</button>
+    <div class="err" id="e"></div>
+    <div class="tok" id="t">
+        <div class="l">Token Admin (24h)</div>
+        <div class="v" id="tv"></div>
+        <div class="i" id="ti"></div>
+    </div>
+    <div class="ft">◆ <span>CRYSTAL TX</span> • By Anh Khoi</div>
 </div>
 <script>
-async function login(){
-const u=document.getElementById('u').value;
-const p=document.getElementById('p').value;
-const er=document.getElementById('e');
-const tb=document.getElementById('t');
-er.classList.remove('show');tb.classList.remove('show');
-try{
-const r=await fetch('/_admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
-const d=await r.json();
-if(r.ok){
-document.getElementById('tv').textContent=d.token;
-document.getElementById('ti').innerHTML='Het han: '+new Date(d.expires).toLocaleString('vi-VN')+'<br>/_hu?_admin='+d.token+'<br>/_md5?_admin='+d.token+'<br>/_hu/json?_admin='+d.token+'<br>/_md5/json?_admin='+d.token;
-tb.classList.add('show');
-}else{er.textContent=d.error||'Sai thong tin';er.classList.add('show');}
-}catch(ex){er.textContent='Loi ket noi';er.classList.add('show');}
+async function doLogin(){
+    var u = document.getElementById('u').value;
+    var p = document.getElementById('p').value;
+    var er = document.getElementById('e');
+    var tb = document.getElementById('t');
+    er.classList.remove('show');
+    tb.classList.remove('show');
+    
+    if(!u || !p) {
+        er.textContent = 'Vui long nhap day du thong tin';
+        er.classList.add('show');
+        return;
+    }
+    
+    try {
+        var r = await fetch('/_admin/login', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({username: u, password: p})
+        });
+        var d = await r.json();
+        
+        if(r.ok && d.token) {
+            document.getElementById('tv').textContent = d.token;
+            document.getElementById('ti').innerHTML = 
+                'Het han: ' + new Date(d.expires).toLocaleString('vi-VN') + '<br><br>' +
+                '<b>Dashboard:</b><br>' +
+                '/_hu?_admin=' + d.token + '<br>' +
+                '/_md5?_admin=' + d.token + '<br><br>' +
+                '<b>JSON API:</b><br>' +
+                '/_hu/json?_admin=' + d.token + '<br>' +
+                '/_md5/json?_admin=' + d.token;
+            tb.classList.add('show');
+        } else {
+            er.textContent = d.error || 'Sai thong tin dang nhap';
+            er.classList.add('show');
+        }
+    } catch(ex) {
+        er.textContent = 'Loi ket noi den may chu';
+        er.classList.add('show');
+    }
 }
-</script></body></html>`;
+</script>
+</body></html>`;
 }
 
 function generateDashboardHTML(brain, type) {
@@ -595,7 +631,6 @@ function generateDashboardHTML(brain, type) {
         else if (r.status === '❌') { ts++; ct = 0; }
     }
     cht = ct;
-    const tr = recent.length > 0 ? Math.round((td / recent.length) * 100) : 0;
     const wr = s.tyle;
     const wc = wr >= 70 ? '#22c55e' : wr >= 60 ? '#f59e0b' : '#ef4444';
     
@@ -691,18 +726,32 @@ tr:hover td{background:rgba(255,255,255,0.006)}
 }
 
 // ============================================================
-// 🔌 API
+// 🔌 API ENDPOINTS
 // ============================================================
 
+// LOGIN - Đây là endpoint quan trọng nhất để lấy token
 app.post('/_admin/login', (req, res) => {
+    console.log('Login attempt:', req.body);
     const { username, password } = req.body || {};
+    
+    if (!username || !password) {
+        return res.status(400).json({ error: 'Thieu username hoac password' });
+    }
+    
     if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
         const token = generateAdminToken();
-        return res.json({ token, expires: Date.now() + 86400000 });
+        console.log('Login successful, token generated');
+        return res.json({ 
+            token: token, 
+            expires: Date.now() + 86400000,
+            message: 'Dang nhap thanh cong' 
+        });
     }
-    return res.status(401).json({ error: 'Sai thong tin' });
+    
+    return res.status(401).json({ error: 'Sai username hoac password' });
 });
 
+// Dashboard
 app.get('/_hu', adminAuth, async (req, res) => {
     const data = await fetchData('hu');
     if (data) {
@@ -731,6 +780,7 @@ app.get('/_md5', adminAuth, async (req, res) => {
     res.send(generateDashboardHTML(brainMD5, 'md5'));
 });
 
+// JSON API
 app.get('/_hu/json', adminAuth, async (req, res) => {
     try {
         const data = await fetchData('hu');
@@ -782,14 +832,20 @@ app.get('/_reset', adminAuth, (req, res) => {
     res.json({ message: 'Da reset' });
 });
 
+// 404 handler
 app.use((req, res) => res.status(404).end());
-app.use((err, req, res, next) => { console.error(err); res.status(500).end(); });
+
+// Error handler
+app.use((err, req, res, next) => {
+    console.error('Server error:', err.message);
+    res.status(500).end();
+});
 
 // ============================================================
 // 🚀 START
 // ============================================================
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n◆ CRYSTAL TX running on port ${PORT}`);
-    console.log(`◆ Login: POST /_admin/login\n`);
+    console.log(`◆ Login: POST /_admin/login with JSON body {username, password}\n`);
     startAuto();
 });
