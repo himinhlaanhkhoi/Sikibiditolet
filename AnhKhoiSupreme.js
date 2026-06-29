@@ -2,34 +2,33 @@ const express = require('express');
 const axios = require('axios');
 const fs = require('fs');
 const crypto = require('crypto');
+const path = require('path');
 
 const app = express();
-
-// QUAN TRỌNG: Phải có dòng này để parse JSON body
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 const PORT = process.env.PORT || 5000;
 
 const API_URL_HU = 'https://wtx.tele68.com/v1/tx/sessions';
 const API_URL_MD5 = 'https://wtxmd52.tele68.com/v1/txmd5/sessions';
-const HISTORY_FILE_HU = '.hu_data';
-const HISTORY_FILE_MD5 = '.md5_data';
-const BRAIN_FILE_HU = '.hu_brain';
-const BRAIN_FILE_MD5 = '.md5_brain';
 
 // ============================================================
-// 🔐 ADMIN SYSTEM
+// 🔐 ADMIN SYSTEM - HIỂN THỊ MẶC ĐỊNH KHI KHỞI ĐỘNG
 // ============================================================
 const ADMIN_USERNAME = 'admin';
-const ADMIN_PASSWORD = crypto.randomBytes(12).toString('hex');
+const ADMIN_PASSWORD = crypto.randomBytes(8).toString('hex');
 const ADMIN_TOKENS = new Map();
 
-console.log('\n============================================');
-console.log('  ◆ CRYSTAL TX - BY ANH KHOI');
-console.log(`  ◆ Username: ${ADMIN_USERNAME}`);
-console.log(`  ◆ Password: ${ADMIN_PASSWORD}`);
-console.log(`  ◆ Login: POST /_admin/login`);
-console.log('============================================\n');
+// Hiển thị thông tin đăng nhập RÕ RÀNG khi khởi động
+console.log('\n╔══════════════════════════════════════════════════════╗');
+console.log('║  🔐 CRYSTAL TX - THÔNG TIN ĐĂNG NHẬP               ║');
+console.log('╠══════════════════════════════════════════════════════╣');
+console.log(`║  👤 Username: ${ADMIN_USERNAME}                              ║`);
+console.log(`║  🔑 Password: ${ADMIN_PASSWORD}                        ║`);
+console.log('╠══════════════════════════════════════════════════════╣');
+console.log('║  📍 Truy cập trang login để lấy token               ║');
+console.log('╚══════════════════════════════════════════════════════╝\n');
 
 const generateAdminToken = () => {
     const token = crypto.randomBytes(48).toString('hex');
@@ -39,40 +38,32 @@ const generateAdminToken = () => {
 };
 
 const adminAuth = (req, res, next) => {
-    const token = req.headers['x-admin-token'] || req.query['_admin'];
+    const token = req.headers['x-admin-token'] || req.query['_token'] || req.query['_admin'];
     if (!token || !ADMIN_TOKENS.has(token)) {
-        return res.status(403).send(generateLoginHTML());
+        return res.redirect('/_login?error=unauthorized');
     }
     if (Date.now() > ADMIN_TOKENS.get(token)) {
         ADMIN_TOKENS.delete(token);
-        return res.status(403).send(generateLoginHTML());
+        return res.redirect('/_login?error=expired');
     }
     next();
 };
 
 // ============================================================
-// 🛡️ BẢO MẬT CƠ BẢN
+// 🛡️ SECURITY
 // ============================================================
 app.use((req, res, next) => {
-    const blocked = ['/admin','/wp-admin','/phpmyadmin','/.env','/.git','/config','/backup','/login','/shell','/api','/graphql','/actuator','/swagger','/debug'];
+    const blocked = ['/admin','/wp-admin','/phpmyadmin','/.env','/.git','/config','/backup','/shell','/api','/graphql','/actuator','/swagger','/debug','/wp-login','/xmlrpc.php'];
     if (blocked.some(b => req.path.toLowerCase().startsWith(b))) return res.status(404).end();
     
-    if (req.query) {
-        const dangerous = ['<','>','script','onerror','onload','javascript:','union','select','insert','update','delete','drop','exec','eval','alert'];
-        for (const [k,v] of Object.entries(req.query)) {
-            if (dangerous.some(d => String(v).toLowerCase().includes(d))) return res.status(403).end();
-        }
-    }
-    
     const ua = (req.get('User-Agent') || '').toLowerCase();
-    const blockedUA = ['sqlmap','nikto','nmap','burp','acunetix','nessus','metasploit','hydra','gobuster','dirbuster','wpscan','zap','scanner'];
+    const blockedUA = ['sqlmap','nikto','nmap','burp','acunetix','nessus','metasploit','hydra','gobuster','dirbuster','wpscan','zap'];
     if (blockedUA.some(b => ua.includes(b))) return res.status(403).end();
     
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-XSS-Protection', '1; mode=block');
-    res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('Server', '');
+    res.setHeader('Server', 'CRYSTAL-TX');
     next();
 });
 
@@ -83,16 +74,16 @@ app.use((req, res, next) => {
     const now = Date.now();
     if (!rateLimitMap.has(ip)) rateLimitMap.set(ip, []);
     const requests = rateLimitMap.get(ip).filter(t => now - t < 60000);
-    if (requests.length > 100) return res.status(429).json({ error: 'Qua nhieu yeu cau' });
+    if (requests.length > 120) return res.status(429).send('Too Many Requests');
     requests.push(now);
     rateLimitMap.set(ip, requests);
     next();
 });
 
 // ============================================================
-// 🔐 MÃ HÓA
+// 🔐 ENCRYPTION
 // ============================================================
-const MASTER_KEY = crypto.createHash('sha512').update('crystal-tx-secure-key-2024').digest();
+const MASTER_KEY = crypto.createHash('sha512').update('crystal-tx-ultimate-secure-key-2024').digest();
 
 function secureEncrypt(text) {
     try {
@@ -120,16 +111,16 @@ function secureDecrypt(text) {
 }
 
 // ============================================================
-// 🧬 3 ENGINE DỰ ĐOÁN
+// 🧬 5 ENGINE DỰ ĐOÁN SIÊU CHÍNH XÁC
 // ============================================================
 
-class SpectralAnalyzer {
-    constructor() { this.spectralDB = new Map(); this.trained = false; }
+class QuantumSpectralEngine {
+    constructor() { this.db = new Map(); this.trained = false; }
     
     extractSpectrum(seq) {
         const signal = seq.map(v => v === 'T' ? 1 : -1);
         const features = [];
-        for (const period of [3, 5, 8, 13, 21, 34]) {
+        for (const period of [3, 5, 8, 13, 21, 34, 55]) {
             if (signal.length >= period) {
                 let sinSum = 0, cosSum = 0;
                 for (let i = 0; i < period; i++) {
@@ -141,7 +132,7 @@ class SpectralAnalyzer {
                 features.push(Math.atan2(sinSum, cosSum) / Math.PI);
             }
         }
-        while (features.length < 12) features.push(0);
+        while (features.length < 14) features.push(0);
         return features;
     }
     
@@ -150,10 +141,10 @@ class SpectralAnalyzer {
             const window = data.slice(i - 60, i);
             const spectrum = this.extractSpectrum(window);
             const key = spectrum.map(v => Math.round(v * 20)).join(',');
-            if (!this.spectralDB.has(key)) this.spectralDB.set(key, { T: 0, X: 0, total: 0 });
-            const db = this.spectralDB.get(key);
-            db[data[i]] = (db[data[i]] || 0) + 1;
-            db.total++;
+            if (!this.db.has(key)) this.db.set(key, { T: 0, X: 0, total: 0 });
+            const d = this.db.get(key);
+            d[data[i]] = (d[data[i]] || 0) + 1;
+            d.total++;
         }
         this.trained = true;
     }
@@ -162,18 +153,17 @@ class SpectralAnalyzer {
         if (seq.length < 60 || !this.trained) return null;
         const spectrum = this.extractSpectrum(seq.slice(-60));
         const key = spectrum.map(v => Math.round(v * 20)).join(',');
-        const db = this.spectralDB.get(key);
-        if (!db || db.total < 5) return null;
-        const prob = db.T / db.total;
-        return { prob: Math.max(0.1, Math.min(0.9, prob)), confidence: Math.min(0.95, db.total / 120) };
+        const d = this.db.get(key);
+        if (!d || d.total < 5) return null;
+        return { prob: Math.max(0.08, Math.min(0.92, d.T / d.total)), conf: Math.min(0.95, d.total / 120) };
     }
 }
 
-class GeometricAnalyzer {
-    constructor() { this.geoDB = new Map(); this.trained = false; }
+class FractalGeometryEngine {
+    constructor() { this.db = new Map(); this.trained = false; }
     
-    calcFractalDim(seq) {
-        const scales = [2, 3, 4, 6, 8, 12];
+    calcDimension(seq) {
+        const scales = [2, 3, 4, 6, 8, 12, 16];
         const points = [];
         for (const sc of scales) {
             if (seq.length < sc) break;
@@ -194,31 +184,30 @@ class GeometricAnalyzer {
     train(data) {
         for (let i = 45; i < data.length; i++) {
             const window = data.slice(i - 45, i);
-            const dim = Math.round(this.calcFractalDim(window) * 20);
+            const dim = Math.round(this.calcDimension(window) * 20);
             const key = String(dim);
-            if (!this.geoDB.has(key)) this.geoDB.set(key, { T: 0, X: 0, total: 0 });
-            const db = this.geoDB.get(key);
-            db[data[i]] = (db[data[i]] || 0) + 1;
-            db.total++;
+            if (!this.db.has(key)) this.db.set(key, { T: 0, X: 0, total: 0 });
+            const d = this.db.get(key);
+            d[data[i]] = (d[data[i]] || 0) + 1;
+            d.total++;
         }
         this.trained = true;
     }
     
     predict(seq) {
         if (seq.length < 45 || !this.trained) return null;
-        const dim = Math.round(this.calcFractalDim(seq.slice(-45)) * 20);
-        const db = this.geoDB.get(String(dim));
-        if (!db || db.total < 5) return null;
-        const prob = db.T / db.total;
-        return { prob: Math.max(0.1, Math.min(0.9, prob)), confidence: Math.min(0.9, db.total / 90) };
+        const dim = Math.round(this.calcDimension(seq.slice(-45)) * 20);
+        const d = this.db.get(String(dim));
+        if (!d || d.total < 5) return null;
+        return { prob: Math.max(0.08, Math.min(0.92, d.T / d.total)), conf: Math.min(0.9, d.total / 90) };
     }
 }
 
-class FlowAnalyzer {
-    constructor() { this.flowDB = new Map(); this.trained = false; }
+class EntropyFlowEngine {
+    constructor() { this.db = new Map(); this.trained = false; }
     
-    calcFlow(seq) {
-        const wins = [3, 5, 8, 13];
+    calcEntropy(seq) {
+        const wins = [3, 5, 8, 13, 21];
         const entropies = [];
         for (const w of wins) {
             if (seq.length >= w) {
@@ -237,25 +226,95 @@ class FlowAnalyzer {
     train(data) {
         for (let i = 45; i < data.length; i++) {
             const window = data.slice(i - 45, i);
-            const flow = this.calcFlow(window);
-            const key = `${Math.round(flow.entropy * 10)}|${Math.round(flow.stability * 10)}`;
-            if (!this.flowDB.has(key)) this.flowDB.set(key, { T: 0, X: 0, total: 0 });
-            const db = this.flowDB.get(key);
-            db[data[i]] = (db[data[i]] || 0) + 1;
-            db.total++;
+            const ent = this.calcEntropy(window);
+            const key = `${Math.round(ent.entropy * 10)}|${Math.round(ent.stability * 10)}`;
+            if (!this.db.has(key)) this.db.set(key, { T: 0, X: 0, total: 0 });
+            const d = this.db.get(key);
+            d[data[i]] = (d[data[i]] || 0) + 1;
+            d.total++;
         }
         this.trained = true;
     }
     
     predict(seq) {
         if (seq.length < 45 || !this.trained) return null;
-        const flow = this.calcFlow(seq.slice(-45));
-        const key = `${Math.round(flow.entropy * 10)}|${Math.round(flow.stability * 10)}`;
-        const db = this.flowDB.get(key);
-        if (!db || db.total < 5) return null;
-        const prob = db.T / db.total;
-        const adjusted = prob * 0.7 + (flow.stability > 0.5 ? 0.3 : 0);
-        return { prob: Math.max(0.1, Math.min(0.9, adjusted)), confidence: Math.min(0.9, db.total / 80) };
+        const ent = this.calcEntropy(seq.slice(-45));
+        const key = `${Math.round(ent.entropy * 10)}|${Math.round(ent.stability * 10)}`;
+        const d = this.db.get(key);
+        if (!d || d.total < 5) return null;
+        const prob = d.T / d.total;
+        return { prob: Math.max(0.08, Math.min(0.92, prob * 0.7 + (ent.stability > 0.5 ? 0.3 : 0))), conf: Math.min(0.9, d.total / 80) };
+    }
+}
+
+class MomentumTrendEngine {
+    constructor() { this.db = new Map(); this.trained = false; }
+    
+    calcMomentum(seq) {
+        const r3 = seq.slice(-3).filter(s => s === 'T').length / 3;
+        const r8 = seq.slice(-8).filter(s => s === 'T').length / 8;
+        const r21 = seq.slice(-21).filter(s => s === 'T').length / 21;
+        return { short: r3 - 0.5, medium: r8 - 0.5, long: r21 - 0.5 };
+    }
+    
+    train(data) {
+        for (let i = 40; i < data.length; i++) {
+            const window = data.slice(i - 40, i);
+            const mom = this.calcMomentum(window);
+            const key = `${Math.round(mom.short * 10)}|${Math.round(mom.medium * 10)}`;
+            if (!this.db.has(key)) this.db.set(key, { T: 0, X: 0, total: 0 });
+            const d = this.db.get(key);
+            d[data[i]] = (d[data[i]] || 0) + 1;
+            d.total++;
+        }
+        this.trained = true;
+    }
+    
+    predict(seq) {
+        if (seq.length < 40 || !this.trained) return null;
+        const mom = this.calcMomentum(seq.slice(-40));
+        const key = `${Math.round(mom.short * 10)}|${Math.round(mom.medium * 10)}`;
+        const d = this.db.get(key);
+        if (!d || d.total < 5) return null;
+        return { prob: Math.max(0.08, Math.min(0.92, d.T / d.total)), conf: Math.min(0.9, d.total / 70) };
+    }
+}
+
+class PatternRecognitionEngine {
+    constructor() { this.db = new Map(); this.trained = false; }
+    
+    train(data) {
+        for (let i = 20; i < data.length; i++) {
+            const window = data.slice(i - 20, i);
+            for (const len of [3, 5, 8, 13]) {
+                if (window.length >= len) {
+                    const pattern = window.slice(-len).join('');
+                    if (!this.db.has(pattern)) this.db.set(pattern, { T: 0, X: 0, total: 0 });
+                    const d = this.db.get(pattern);
+                    d[data[i]] = (d[data[i]] || 0) + 1;
+                    d.total++;
+                }
+            }
+        }
+        this.trained = true;
+    }
+    
+    predict(seq) {
+        if (!this.trained) return null;
+        let probSum = 0, weightSum = 0;
+        for (const len of [3, 5, 8, 13]) {
+            if (seq.length >= len) {
+                const pattern = seq.slice(-len).join('');
+                const d = this.db.get(pattern);
+                if (d && d.total >= 5) {
+                    const w = len / 13;
+                    probSum += (d.T / d.total) * w;
+                    weightSum += w;
+                }
+            }
+        }
+        if (weightSum === 0) return null;
+        return { prob: Math.max(0.08, Math.min(0.92, probSum / weightSum)), conf: Math.min(0.85, weightSum) };
     }
 }
 
@@ -270,43 +329,32 @@ class PredictionSystem {
         this.stats = { total: 0, dung: 0, sai: 0, tyle: 0, chuoi: 0, chuoi_dai: 0, homnay: { dung: 0, sai: 0, tong: 0 } };
         this.lastPhien = null;
         this.trained = false;
-        this.spectral = new SpectralAnalyzer();
-        this.geometric = new GeometricAnalyzer();
-        this.flow = new FlowAnalyzer();
-        this.memoryBank = new Map();
+        
+        this.engines = [
+            { name: 'QS', engine: new QuantumSpectralEngine(), weight: 3.5 },
+            { name: 'FG', engine: new FractalGeometryEngine(), weight: 2.8 },
+            { name: 'EF', engine: new EntropyFlowEngine(), weight: 2.5 },
+            { name: 'MT', engine: new MomentumTrendEngine(), weight: 2.2 },
+            { name: 'PR', engine: new PatternRecognitionEngine(), weight: 2.0 }
+        ];
+        
         this.streakBank = new Map();
     }
     
     train(data) {
         if (data.length < 60) return false;
         try {
-            this.spectral.train(data);
-            this.geometric.train(data);
-            this.flow.train(data);
-            this.memoryBank.clear();
+            for (const e of this.engines) e.engine.train(data);
             this.streakBank.clear();
-            
             for (let i = 20; i < data.length; i++) {
                 const window = data.slice(i - 20, i);
-                const target = data[i];
-                
-                for (const len of [3, 5, 8]) {
-                    if (window.length >= len) {
-                        const pattern = window.slice(-len).join('');
-                        if (!this.memoryBank.has(pattern)) this.memoryBank.set(pattern, { T: 0, X: 0, total: 0 });
-                        const mb = this.memoryBank.get(pattern);
-                        mb[target] = (mb[target] || 0) + 1;
-                        mb.total++;
-                    }
-                }
-                
                 const last = window[window.length - 1];
                 let streak = 1;
                 for (let j = window.length - 2; j >= 0 && window[j] === last; j--) streak++;
                 const sk = `${last}:${Math.min(streak, 15)}`;
                 if (!this.streakBank.has(sk)) this.streakBank.set(sk, { T: 0, X: 0, total: 0 });
                 const sb = this.streakBank.get(sk);
-                sb[target] = (sb[target] || 0) + 1;
+                sb[data[i]] = (sb[data[i]] || 0) + 1;
                 sb.total++;
             }
             this.trained = true;
@@ -320,20 +368,14 @@ class PredictionSystem {
         let sT = 0, sX = 0, sw = 0;
         const details = [];
         
-        const sp = this.spectral.predict(seq);
-        if (sp) { const w = 3.5 * sp.confidence; sT += sp.prob * w; sX += (1 - sp.prob) * w; sw += w; details.push(`SP:${Math.round(sp.prob * 100)}`); }
-        
-        const gm = this.geometric.predict(seq);
-        if (gm) { const w = 2.8 * gm.confidence; sT += gm.prob * w; sX += (1 - gm.prob) * w; sw += w; details.push(`GM:${Math.round(gm.prob * 100)}`); }
-        
-        const fl = this.flow.predict(seq);
-        if (fl) { const w = 2.5 * fl.confidence; sT += fl.prob * w; sX += (1 - fl.prob) * w; sw += w; details.push(`FL:${Math.round(fl.prob * 100)}`); }
-        
-        for (const len of [3, 5, 8]) {
-            if (seq.length >= len) {
-                const pattern = seq.slice(-len).join('');
-                const mb = this.memoryBank.get(pattern);
-                if (mb && mb.total >= 5) { const w = 1.5; sT += (mb.T / mb.total) * w; sX += (mb.X / mb.total) * w; sw += w; details.push(`M${len}`); }
+        for (const e of this.engines) {
+            const r = e.engine.predict(seq);
+            if (r) {
+                const w = e.weight * r.conf;
+                sT += r.prob * w;
+                sX += (1 - r.prob) * w;
+                sw += w;
+                details.push(`${e.name}:${Math.round(r.prob * 100)}`);
             }
         }
         
@@ -342,39 +384,44 @@ class PredictionSystem {
         for (let j = seq.length - 2; j >= 0 && seq[j] === last; j--) streak++;
         const sk = `${last}:${Math.min(streak, 15)}`;
         const sb = this.streakBank.get(sk);
-        if (sb && sb.total >= 5) { const w = 1.8; sT += (sb.T / sb.total) * w; sX += (sb.X / sb.total) * w; sw += w; details.push(`C${Math.min(streak, 15)}`); }
+        if (sb && sb.total >= 5) {
+            const w = 1.8;
+            sT += (sb.T / sb.total) * w;
+            sX += (sb.X / sb.total) * w;
+            sw += w;
+            details.push(`ST:${Math.min(streak, 15)}`);
+        }
         
         if (streak >= 8) {
-            if (last === 'T') { sX += 3.5; details.push('DC-T'); }
-            else { sT += 3.5; details.push('DC-X'); }
-            sw += 3.5;
+            if (last === 'T') { sX += 4.0; details.push('BREAK-T'); }
+            else { sT += 4.0; details.push('BREAK-X'); }
+            sw += 4.0;
         } else if (streak >= 5) {
-            if (last === 'T') { sX += 2.0; details.push('BT'); }
-            else { sT += 2.0; details.push('BX'); }
-            sw += 2.0;
+            if (last === 'T') { sX += 2.5; details.push('WEAK-T'); }
+            else { sT += 2.5; details.push('WEAK-X'); }
+            sw += 2.5;
         }
         
         const longT = seq.filter(s => s === 'T').length / seq.length;
-        if (longT > 0.65) { sX += 1.8; details.push('CBT'); sw += 1.8; }
-        else if (longT < 0.35) { sT += 1.8; details.push('CBX'); sw += 1.8; }
+        if (longT > 0.68) { sX += 2.5; details.push('BAL-T'); sw += 2.5; }
+        else if (longT < 0.32) { sT += 2.5; details.push('BAL-X'); sw += 2.5; }
         
         if (sw === 0) return this.fallback();
         const prob = sT / (sT + sX);
         const duDoan = prob > 0.5 ? 'TÀI' : 'XỈU';
         let doTinCay = Math.round(Math.max(prob, 1 - prob) * 100);
-        if (details.length >= 7) doTinCay = Math.min(99, doTinCay + 8);
-        else if (details.length >= 4) doTinCay = Math.min(99, doTinCay + 5);
+        if (details.length >= 8) doTinCay = Math.min(99, doTinCay + 10);
+        else if (details.length >= 5) doTinCay = Math.min(99, doTinCay + 6);
         doTinCay = Math.min(99, Math.max(55, doTinCay));
         
-        return { duDoan, doTinCay, chiTiet: details.slice(0, 5).join(' | '), soMau: details.length };
+        return { duDoan, doTinCay, chiTiet: details.slice(0, 6).join(' | '), soMau: details.length };
     }
     
     fallback() {
         if (this.stats.total > 50) {
-            const trend = this.stats.dung > this.stats.sai ? 'TÀI' : 'XỈU';
-            return { duDoan: trend, doTinCay: 52, chiTiet: 'XH', soMau: 0 };
+            return { duDoan: this.stats.dung > this.stats.sai ? 'TÀI' : 'XỈU', doTinCay: 52, chiTiet: 'TREND', soMau: 0 };
         }
-        return { duDoan: 'TÀI', doTinCay: 51, chiTiet: 'MD', soMau: 0 };
+        return { duDoan: 'TÀI', doTinCay: 51, chiTiet: 'DEFAULT', soMau: 0 };
     }
     
     updateResult(prediction, actual) {
@@ -398,44 +445,27 @@ class PredictionSystem {
     
     save() {
         try {
-            const bf = this.type === 'hu' ? BRAIN_FILE_HU : BRAIN_FILE_MD5;
-            const hf = this.type === 'hu' ? HISTORY_FILE_HU : HISTORY_FILE_MD5;
-            const bd = secureEncrypt(JSON.stringify({
-                memoryBank: Array.from(this.memoryBank.entries()).slice(-5000),
+            const data = secureEncrypt(JSON.stringify({
                 streakBank: Array.from(this.streakBank.entries()),
-                trained: this.trained, stats: this.stats, lastPhien: this.lastPhien
+                trained: this.trained, stats: this.stats, lastPhien: this.lastPhien,
+                history: this.history.slice(0, 1000)
             }));
-            const hd = secureEncrypt(JSON.stringify({
-                history: this.history.slice(0, 1000), stats: this.stats,
-                lastPhien: this.lastPhien, updated: new Date().toISOString()
-            }));
-            if (bd) fs.writeFileSync(bf, bd);
-            if (hd) fs.writeFileSync(hf, hd);
+            if (data) fs.writeFileSync(`.${this.type}_data`, data);
         } catch (e) {}
     }
     
     load() {
         try {
-            const bf = this.type === 'hu' ? BRAIN_FILE_HU : BRAIN_FILE_MD5;
-            const hf = this.type === 'hu' ? HISTORY_FILE_HU : HISTORY_FILE_MD5;
-            if (fs.existsSync(bf)) {
-                const dc = secureDecrypt(fs.readFileSync(bf, 'utf8'));
-                if (dc) {
-                    const d = JSON.parse(dc);
-                    if (d.memoryBank) this.memoryBank = new Map(d.memoryBank);
+            const file = `.${this.type}_data`;
+            if (fs.existsSync(file)) {
+                const decrypted = secureDecrypt(fs.readFileSync(file, 'utf8'));
+                if (decrypted) {
+                    const d = JSON.parse(decrypted);
                     if (d.streakBank) this.streakBank = new Map(d.streakBank);
                     if (d.trained) this.trained = d.trained;
                     if (d.stats) this.stats = d.stats;
                     if (d.lastPhien) this.lastPhien = d.lastPhien;
-                }
-            }
-            if (fs.existsSync(hf)) {
-                const dc = secureDecrypt(fs.readFileSync(hf, 'utf8'));
-                if (dc) {
-                    const d = JSON.parse(dc);
                     if (d.history) this.history = d.history;
-                    if (d.stats) this.stats = d.stats;
-                    if (d.lastPhien) this.lastPhien = d.lastPhien;
                 }
             }
         } catch (e) {}
@@ -469,7 +499,7 @@ async function fetchData(type) {
 }
 
 // ============================================================
-// ⚡ AUTO
+// ⚡ AUTO PROCESS
 // ============================================================
 async function processGame(brain, type) {
     try {
@@ -520,238 +550,377 @@ function startAuto() {
 }
 
 // ============================================================
-// 🎨 GIAO DIỆN
+// 🎨 GIAO DIỆN WEB CÔNG NGHỆ CAO
 // ============================================================
 
-function generateLoginHTML() {
+function getBaseHTML(title, content, extraHead = '') {
     return `<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1.0">
-    <title>CRYSTAL TX - Dang Nhap</title>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${title} | CRYSTAL TX</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg: #030712;
+            --bg2: #0a0f1e;
+            --bg3: #111827;
+            --bg4: #1a1f35;
+            --border: rgba(255,255,255,0.04);
+            --border-active: rgba(123,97,255,0.25);
+            --text: #e2e8f0;
+            --text2: #8899b8;
+            --text3: #4a5578;
+            --gradient: linear-gradient(135deg, #7b61ff 0%, #3b82f6 50%, #06b6d4 100%);
+            --gradient2: linear-gradient(135deg, #7b61ff, #8b5cf6, #6366f1);
+            --success: #22c55e;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --info: #06b6d4;
+            --purple: #7b61ff;
+            --glow: 0 0 40px rgba(123,97,255,0.1);
+        }
         *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:'Inter',sans-serif;background:#040410;color:#e8eaf2;min-height:100vh;display:flex;align-items:center;justify-content:center}
-        .bg{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;background:radial-gradient(ellipse 80% 60% at 30% 30%,rgba(123,97,255,0.06) 0%,transparent 60%),radial-gradient(ellipse 60% 80% at 70% 70%,rgba(6,182,212,0.05) 0%,transparent 60%)}
-        .box{position:relative;z-index:1;background:#0e102a;border:1px solid rgba(255,255,255,0.03);border-radius:16px;padding:32px 28px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,0.4)}
-        .logo{text-align:center;margin-bottom:24px}
-        .logo .ic{font-size:36px;animation:float 3s ease-in-out infinite}
-        @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
-        .logo h1{font-family:'Orbitron',sans-serif;font-size:20px;font-weight:800;background:linear-gradient(135deg,#7b61ff,#3b82f6,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-        .logo span{font-family:'JetBrains Mono',monospace;font-size:8px;color:#8890b8;letter-spacing:2px;text-transform:uppercase}
-        .grp{margin-bottom:14px}
-        .grp label{display:block;font-size:8px;color:#8890b8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;font-weight:600}
-        .grp input{width:100%;padding:10px 14px;background:#0a0c1c;border:1px solid rgba(255,255,255,0.03);border-radius:8px;color:#e8eaf2;font-size:13px;font-family:'JetBrains Mono',monospace;outline:none}
-        .grp input:focus{border-color:rgba(123,97,255,0.2);box-shadow:0 0 0 3px rgba(123,97,255,0.1)}
-        .btn{width:100%;padding:10px;background:linear-gradient(135deg,#7b61ff,#3b82f6);border:none;border-radius:8px;color:#fff;font-weight:700;font-size:12px;cursor:pointer;font-family:'Orbitron',monospace;text-transform:uppercase;letter-spacing:1px}
-        .btn:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(123,97,255,0.25)}
-        .tok{display:none;margin-top:20px;padding:14px;background:#0a0c1c;border:1px solid rgba(255,255,255,0.03);border-radius:8px}
-        .tok.show{display:block}
-        .tok .l{font-size:8px;color:#8890b8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px}
-        .tok .v{font-family:'JetBrains Mono',monospace;font-size:10px;color:#22c55e;word-break:break-all;background:#040410;padding:8px;border-radius:4px}
-        .tok .i{font-size:8px;color:#4a5080;margin-top:8px;line-height:1.6}
-        .err{color:#ef4444;font-size:10px;margin-top:8px;text-align:center;display:none}
-        .err.show{display:block}
-        .ft{text-align:center;font-size:7px;color:#4a5080;margin-top:20px;font-family:'JetBrains Mono',monospace}
-        .ft span{color:#7b61ff}
+        body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+        
+        .ambient-bg{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
+        .ambient-bg .orb{position:absolute;border-radius:50%;filter:blur(120px);opacity:0.4}
+        .ambient-bg .orb1{width:600px;height:600px;background:rgba(123,97,255,0.08);top:-200px;left:-100px;animation:float1 20s ease-in-out infinite}
+        .ambient-bg .orb2{width:500px;height:500px;background:rgba(6,182,212,0.06);bottom:-150px;right:-100px;animation:float2 25s ease-in-out infinite}
+        .ambient-bg .orb3{width:400px;height:400px;background:rgba(139,92,246,0.05);top:50%;left:50%;transform:translate(-50%,-50%);animation:float3 30s ease-in-out infinite}
+        @keyframes float1{0%,100%{transform:translate(0,0)}50%{transform:translate(100px,50px)}}
+        @keyframes float2{0%,100%{transform:translate(0,0)}50%{transform:translate(-80px,-40px)}}
+        @keyframes float3{0%,100%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-50%,-50%) scale(1.2)}}
+        
+        .grid-overlay{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,0.015) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.015) 1px,transparent 1px);background-size:50px 50px;mask-image:radial-gradient(ellipse 80% 80% at 50% 50%,black 15%,transparent 70%)}
+        
+        .app{position:relative;z-index:1;max-width:1200px;margin:0 auto;padding:16px 20px}
+        
+        .glass-card{background:rgba(17,24,39,0.7);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.3)}
+        
+        .btn-primary{display:inline-flex;align-items:center;gap:8px;padding:10px 24px;background:var(--gradient);border:none;border-radius:10px;color:#fff;font-weight:600;font-size:13px;cursor:pointer;letter-spacing:0.5px;transition:all 0.3s;font-family:'Space Grotesk',sans-serif}
+        .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(123,97,255,0.3)}
+        
+        .btn-outline{display:inline-flex;align-items:center;gap:8px;padding:10px 24px;background:transparent;border:1px solid var(--border-active);border-radius:10px;color:var(--purple);font-weight:600;font-size:13px;cursor:pointer;letter-spacing:0.5px;transition:all 0.3s;font-family:'Space Grotesk',sans-serif}
+        .btn-outline:hover{background:rgba(123,97,255,0.05);box-shadow:0 4px 20px rgba(123,97,255,0.1)}
+        
+        input[type="text"],input[type="password"]{width:100%;padding:12px 16px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;font-family:'JetBrains Mono',monospace;outline:none;transition:all 0.3s}
+        input:focus{border-color:var(--border-active);box-shadow:0 0 0 3px rgba(123,97,255,0.1)}
+        
+        .alert{padding:14px 18px;border-radius:10px;font-size:13px;font-weight:500;display:flex;align-items:center;gap:10px}
+        .alert-success{background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);color:var(--success)}
+        .alert-error{background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);color:var(--danger)}
+        .alert-info{background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.2);color:var(--info)}
+        
+        .badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px}
+        .badge-success{background:rgba(34,197,94,0.08);color:var(--success);border:1px solid rgba(34,197,94,0.15)}
+        .badge-info{background:rgba(6,182,212,0.08);color:var(--info);border:1px solid rgba(6,182,212,0.15)}
+        .badge-purple{background:rgba(123,97,255,0.08);color:var(--purple);border:1px solid rgba(123,97,255,0.15)}
+        
+        .pulse-dot{width:8px;height:8px;border-radius:50%;background:var(--success);animation:pulse 1.5s ease-in-out infinite;box-shadow:0 0 12px rgba(34,197,94,0.4);display:inline-block}
+        @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.7)}}
+        
+        .fade-in{animation:fadeIn 0.5s ease-out}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+        
+        .slide-up{animation:slideUp 0.5s ease-out}
+        @keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+        
+        ::-webkit-scrollbar{width:3px;height:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.06);border-radius:2px}
+        
+        .text-gradient{background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+        
+        ${extraHead}
     </style>
 </head>
 <body>
-<div class="bg"></div>
-<div class="box">
-    <div class="logo"><div class="ic">◆</div><h1>CRYSTAL TX</h1><span>Admin VIP • By Anh Khoi</span></div>
-    <div class="grp"><label>Username</label><input type="text" id="u" placeholder="admin"></div>
-    <div class="grp"><label>Password</label><input type="password" id="p" placeholder="••••"></div>
-    <button class="btn" onclick="doLogin()">◆ Dang Nhap</button>
-    <div class="err" id="e"></div>
-    <div class="tok" id="t">
-        <div class="l">Token Admin (24h)</div>
-        <div class="v" id="tv"></div>
-        <div class="i" id="ti"></div>
+    <div class="ambient-bg">
+        <div class="orb orb1"></div>
+        <div class="orb orb2"></div>
+        <div class="orb orb3"></div>
     </div>
-    <div class="ft">◆ <span>CRYSTAL TX</span> • By Anh Khoi</div>
-</div>
-<script>
-async function doLogin(){
-    var u = document.getElementById('u').value;
-    var p = document.getElementById('p').value;
-    var er = document.getElementById('e');
-    var tb = document.getElementById('t');
-    er.classList.remove('show');
-    tb.classList.remove('show');
-    
-    if(!u || !p) {
-        er.textContent = 'Vui long nhap day du thong tin';
-        er.classList.add('show');
-        return;
-    }
-    
-    try {
-        var r = await fetch('/_admin/login', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({username: u, password: p})
-        });
-        var d = await r.json();
-        
-        if(r.ok && d.token) {
-            document.getElementById('tv').textContent = d.token;
-            document.getElementById('ti').innerHTML = 
-                'Het han: ' + new Date(d.expires).toLocaleString('vi-VN') + '<br><br>' +
-                '<b>Dashboard:</b><br>' +
-                '/_hu?_admin=' + d.token + '<br>' +
-                '/_md5?_admin=' + d.token + '<br><br>' +
-                '<b>JSON API:</b><br>' +
-                '/_hu/json?_admin=' + d.token + '<br>' +
-                '/_md5/json?_admin=' + d.token;
-            tb.classList.add('show');
-        } else {
-            er.textContent = d.error || 'Sai thong tin dang nhap';
-            er.classList.add('show');
-        }
-    } catch(ex) {
-        er.textContent = 'Loi ket noi den may chu';
-        er.classList.add('show');
-    }
-}
-</script>
-</body></html>`;
+    <div class="grid-overlay"></div>
+    <div class="app">
+        ${content}
+    </div>
+</body>
+</html>`;
 }
 
-function generateDashboardHTML(brain, type) {
-    const s = brain.stats;
-    const h = brain.history || [];
-    const recent = h.slice(0, 50);
-    let td = 0, ts = 0, cht = 0, cdn = 0, ct = 0;
+function generateLoginPage(errorMsg = '') {
+    const errorHTML = errorMsg ? `<div class="alert alert-error fade-in"><span>⚠️</span> ${errorMsg}</div>` : '';
     
+    const content = `
+    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh">
+        <div class="glass-card slide-up" style="width:100%;max-width:440px;padding:40px 32px">
+            <div style="text-align:center;margin-bottom:32px">
+                <div style="font-size:48px;margin-bottom:12px;animation:float 3s ease-in-out infinite">💎</div>
+                <h1 style="font-family:'Orbitron',sans-serif;font-size:26px;font-weight:900;margin-bottom:4px"><span class="text-gradient">CRYSTAL TX</span></h1>
+                <p style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;letter-spacing:2px;text-transform:uppercase">Admin Console • By Anh Khôi</p>
+            </div>
+            
+            ${errorHTML}
+            
+            <form id="loginForm" onsubmit="handleLogin(event)" style="margin-top:20px">
+                <div style="margin-bottom:16px">
+                    <label style="display:block;font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;font-weight:600">👤 Username</label>
+                    <input type="text" id="username" placeholder="Nhập username admin" required autocomplete="off">
+                </div>
+                <div style="margin-bottom:20px">
+                    <label style="display:block;font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;font-weight:600">🔒 Password</label>
+                    <input type="password" id="password" placeholder="Nhập password admin" required autocomplete="off">
+                </div>
+                <button type="submit" class="btn-primary" style="width:100%;justify-content:center;font-size:14px;padding:14px">
+                    <span>🔐</span> Đăng Nhập Hệ Thống
+                </button>
+            </form>
+            
+            <div id="resultArea" style="margin-top:20px;display:none"></div>
+            
+            <div style="text-align:center;margin-top:24px;padding-top:20px;border-top:1px solid var(--border)">
+                <p style="font-size:9px;color:var(--text3);font-family:'JetBrains Mono',monospace">
+                    💎 <span style="color:var(--purple)">CRYSTAL TX</span> • Hệ Thống Dự Đoán Độc Quyền • v70.0
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    async function handleLogin(e) {
+        e.preventDefault();
+        const u = document.getElementById('username').value.trim();
+        const p = document.getElementById('password').value.trim();
+        const resultArea = document.getElementById('resultArea');
+        
+        if (!u || !p) {
+            resultArea.style.display = 'block';
+            resultArea.innerHTML = '<div class="alert alert-error fade-in"><span>⚠️</span> Vui lòng nhập đầy đủ username và password</div>';
+            return;
+        }
+        
+        resultArea.style.display = 'block';
+        resultArea.innerHTML = '<div class="alert alert-info fade-in"><span>⏳</span> Đang xác thực...</div>';
+        
+        try {
+            const r = await fetch('/_api/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: u, password: p})
+            });
+            const d = await r.json();
+            
+            if (r.ok && d.token) {
+                const expireDate = new Date(d.expires).toLocaleString('vi-VN');
+                resultArea.innerHTML = \`
+                    <div class="alert alert-success fade-in">
+                        <span>✅</span> Đăng nhập thành công!
+                    </div>
+                    <div class="glass-card" style="margin-top:16px;padding:20px">
+                        <p style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;font-weight:600">🔑 Token Admin (24h)</p>
+                        <div style="background:var(--bg3);padding:12px;border-radius:8px;margin-bottom:12px">
+                            <code style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--success);word-break:break-all">\${d.token}</code>
+                        </div>
+                        <p style="font-size:9px;color:var(--text3);margin-bottom:16px">⏰ Hết hạn: \${expireDate}</p>
+                        
+                        <p style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;font-weight:600">📡 Đường Dẫn Truy Cập</p>
+                        <div style="display:flex;flex-direction:column;gap:8px;font-family:'JetBrains Mono',monospace;font-size:10px">
+                            <a href="/_hu?_token=\${d.token}" style="color:var(--info);text-decoration:none;padding:8px 12px;background:var(--bg3);border-radius:6px;border:1px solid var(--border);transition:all 0.3s" onmouseover="this.style.borderColor='var(--border-active)'" onmouseout="this.style.borderColor='var(--border)'">📊 Dashboard HU →</a>
+                            <a href="/_md5?_token=\${d.token}" style="color:var(--info);text-decoration:none;padding:8px 12px;background:var(--bg3);border-radius:6px;border:1px solid var(--border);transition:all 0.3s" onmouseover="this.style.borderColor='var(--border-active)'" onmouseout="this.style.borderColor='var(--border)'">📊 Dashboard MD5 →</a>
+                            <a href="/_hu/json?_token=\${d.token}" style="color:var(--purple);text-decoration:none;padding:8px 12px;background:var(--bg3);border-radius:6px;border:1px solid var(--border);transition:all 0.3s" onmouseover="this.style.borderColor='var(--border-active)'" onmouseout="this.style.borderColor='var(--border)'">📡 JSON API HU →</a>
+                            <a href="/_md5/json?_token=\${d.token}" style="color:var(--purple);text-decoration:none;padding:8px 12px;background:var(--bg3);border-radius:6px;border:1px solid var(--border);transition:all 0.3s" onmouseover="this.style.borderColor='var(--border-active)'" onmouseout="this.style.borderColor='var(--border)'">📡 JSON API MD5 →</a>
+                        </div>
+                    </div>
+                \`;
+            } else {
+                resultArea.innerHTML = \`<div class="alert alert-error fade-in"><span>❌</span> \${d.error || 'Sai thông tin đăng nhập'}</div>\`;
+            }
+        } catch(ex) {
+            resultArea.innerHTML = '<div class="alert alert-error fade-in"><span>🔌</span> Lỗi kết nối đến máy chủ</div>';
+        }
+    }
+    </script>
+    <style>
+        @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+    </style>
+    `;
+    
+    return getBaseHTML('Đăng Nhập Admin', content);
+}
+
+function generateDashboardPage(brain, type) {
+    const s = brain.stats;
+    const recent = (brain.history || []).slice(0, 50);
+    
+    let td = 0, ts = 0, cht = 0, cdn = 0, ct = 0;
     for (const r of recent) {
         if (r.status === '✅') { td++; ct++; if (ct > cdn) cdn = ct; }
         else if (r.status === '❌') { ts++; ct = 0; }
     }
     cht = ct;
     const wr = s.tyle;
-    const wc = wr >= 70 ? '#22c55e' : wr >= 60 ? '#f59e0b' : '#ef4444';
+    const wc = wr >= 70 ? 'var(--success)' : wr >= 60 ? 'var(--warning)' : 'var(--danger)';
+    const wrLabel = wr >= 70 ? 'Xuất sắc' : wr >= 60 ? 'Tốt' : 'Đang cải thiện';
     
     let rows = '';
-    for (const r of recent.slice(0, 50)) {
+    for (const r of recent) {
         const st = r.status || '⏳';
-        const cls = st === '✅' ? 'w' : st === '❌' ? 'l' : 'p';
+        const cls = st === '✅' ? 's' : st === '❌' ? 'd' : 'w';
         const txt = st === '✅' ? 'WIN' : st === '❌' ? 'LOSE' : 'WAIT';
-        rows += `<tr class="r-${cls}"><td class="sid">#${r.phien_hien_tai || '-'}</td><td><span class="pr pr-${r.prediction === 'TÀI' ? 't' : 'x'}">${r.prediction || '-'}</span></td><td><div class="cb"><div class="cf" style="width:${r.confidence || 0}%"></div></div><span class="ct">${r.confidence || 0}%</span></td><td><span class="st st-${cls}">${txt}</span></td><td>${r.actual || '-'}</td><td class="dt">${(r.detail || '-').substring(0, 25)}</td></tr>`;
+        rows += `<tr class="row-${cls}">
+            <td class="mono">#${r.phien_hien_tai || '-'}</td>
+            <td><span class="pred pred-${r.prediction === 'TÀI' ? 't' : 'x'}">${r.prediction || '-'}</span></td>
+            <td><div class="conf-bar"><div class="conf-fill" style="width:${r.confidence || 0}%"></div></div><span class="conf-text">${r.confidence || 0}%</span></td>
+            <td><span class="status status-${cls}">${txt}</span></td>
+            <td>${r.actual || '-'}</td>
+            <td class="detail">${(r.detail || '-').substring(0, 30)}</td>
+        </tr>`;
     }
     
-    return `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>◆ ${type.toUpperCase()}</title>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Inter',sans-serif;background:#040410;color:#e8eaf2;min-height:100vh;overflow-x:hidden}
-.bg1{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;background:radial-gradient(ellipse 80% 60% at 20% 30%,rgba(123,97,255,0.05) 0%,transparent 60%),radial-gradient(ellipse 60% 80% at 80% 70%,rgba(6,182,212,0.04) 0%,transparent 60%)}
-.bg2{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,0.012) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.012) 1px,transparent 1px);background-size:40px 40px;mask-image:radial-gradient(ellipse 80% 80% at 50% 50%,black 10%,transparent 70%)}
-.app{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:10px 14px}
-.tb{display:flex;justify-content:space-between;align-items:center;padding:10px 0;flex-wrap:wrap;gap:8px}
-.brd{display:flex;align-items:center;gap:8px}
-.brd .ic{font-size:22px;animation:float 3s ease-in-out infinite}
-@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
-.brd h1{font-family:'Orbitron',sans-serif;font-size:16px;font-weight:800;background:linear-gradient(135deg,#7b61ff,#3b82f6,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.brd span{font-size:8px;color:#8890b8;font-family:'JetBrains Mono',monospace;letter-spacing:1px}
-.wr{display:flex;align-items:center;gap:8px}
-.wr svg{transform:rotate(-90deg)}
-.wr .bc{fill:none;stroke:rgba(255,255,255,0.04);stroke-width:4}
-.wr .fc{fill:none;stroke:${wc};stroke-width:4;stroke-linecap:round;stroke-dasharray:138.2;stroke-dashoffset:${138.2 - (138.2 * wr / 100)};transition:stroke-dashoffset 1s ease}
-.wr .tx{font-family:'Orbitron',monospace;font-size:10px;font-weight:700;fill:${wc};text-anchor:middle;dominant-baseline:central}
-.wr .lb{font-size:8px;color:#4a5080}
-.cards{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:10px}
-@media(max-width:800px){.cards{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:500px){.cards{grid-template-columns:repeat(2,1fr)}}
-.card{background:#0e102a;border:1px solid rgba(255,255,255,0.03);border-radius:10px;padding:8px 10px;text-align:center;transition:all 0.3s}
-.card:hover{background:#121538;border-color:rgba(123,97,255,0.2)}
-.card .v{font-family:'Orbitron',monospace;font-size:15px;font-weight:700}
-.card .l{font-size:7px;color:#4a5080;text-transform:uppercase;letter-spacing:1px;margin-top:2px}
-.g{color:#22c55e}.r{color:#ef4444}.y{color:#f59e0b}.c{color:#06b6d4}.p{color:#7b61ff}.w{color:#e8eaf2}
-.tbl{background:#0e102a;border:1px solid rgba(255,255,255,0.03);border-radius:12px;overflow:hidden}
-.tbl-h{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:1px solid rgba(255,255,255,0.03)}
-.tbl-h h3{font-family:'Orbitron',monospace;font-size:11px;font-weight:600}
-.tbl-h .cnt{font-size:7px;color:#4a5080;font-family:'JetBrains Mono',monospace}
-.tag{font-size:7px;color:#7b61ff;background:rgba(123,97,255,0.05);padding:2px 8px;border-radius:10px;border:1px solid rgba(123,97,255,0.08)}
-.tw{overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-size:9px}
-th{background:rgba(255,255,255,0.01);padding:6px 8px;text-align:left;font-weight:600;font-size:7px;text-transform:uppercase;letter-spacing:1px;color:#4a5080;border-bottom:1px solid rgba(255,255,255,0.03)}
-td{padding:5px 8px;border-bottom:1px solid rgba(255,255,255,0.01)}
-tr:hover td{background:rgba(255,255,255,0.006)}
-.r-w{border-left:1px solid transparent}.r-w:hover{border-left-color:rgba(34,197,94,0.2)}
-.r-l{border-left:1px solid transparent}.r-l:hover{border-left-color:rgba(239,68,68,0.2)}
-.r-p{border-left:1px solid transparent}.r-p:hover{border-left-color:rgba(245,158,11,0.2)}
-.sid{font-family:'Orbitron',monospace;font-size:8px;color:#8890b8}
-.pr{display:inline-block;padding:2px 6px;border-radius:4px;font-weight:700;font-size:7px}
-.pr-t{background:rgba(34,197,94,0.07);color:#22c55e}
-.pr-x{background:rgba(239,68,68,0.07);color:#ef4444}
-.cb{display:inline-block;width:32px;height:2px;background:rgba(255,255,255,0.04);border-radius:1px;vertical-align:middle;margin-right:3px}
-.cf{height:100%;border-radius:1px;background:linear-gradient(90deg,#7b61ff,#06b6d4)}
-.ct{font-weight:600;color:#06b6d4;font-size:7px}
-.st-w{display:inline-block;padding:1px 5px;border-radius:3px;font-weight:700;font-size:6px;text-transform:uppercase;letter-spacing:1px;background:rgba(34,197,94,0.07);color:#22c55e}
-.st-l{display:inline-block;padding:1px 5px;border-radius:3px;font-weight:700;font-size:6px;text-transform:uppercase;letter-spacing:1px;background:rgba(239,68,68,0.07);color:#ef4444}
-.st-p{display:inline-block;padding:1px 5px;border-radius:3px;font-weight:700;font-size:6px;text-transform:uppercase;letter-spacing:1px;background:rgba(245,158,11,0.07);color:#f59e0b}
-.dt{font-size:7px;color:#4a5080;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ftr{text-align:center;padding:8px;font-size:7px;color:#4a5080;font-family:'JetBrains Mono',monospace}
-.ftr span{color:#7b61ff}
-::-webkit-scrollbar{width:2px;height:2px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.03)}
-@keyframes scan{0%{transform:translateY(-100%)}100%{transform:translateY(100%)}}
-.scan{position:fixed;top:0;left:0;width:100%;height:1px;background:linear-gradient(90deg,transparent,rgba(123,97,255,0.1),transparent);z-index:2;pointer-events:none;animation:scan 5s linear infinite}
-</style></head><body>
-<div class="bg1"></div><div class="bg2"></div><div class="scan"></div>
-<div class="app">
-<div class="tb">
-<div class="brd"><div class="ic">◆</div><div><h1>CRYSTAL TX</h1><span>${type.toUpperCase()} • By Anh Khoi</span></div></div>
-<div class="wr"><div class="lb">Ty le</div><svg width="48" height="48" viewBox="0 0 48 48"><circle class="bc" cx="24" cy="24" r="22"/><circle class="fc" cx="24" cy="24" r="22"/><text class="tx" x="24" y="24">${wr}%</text></svg></div>
-</div>
-<div class="cards">
-<div class="card"><div class="v w">${s.total}</div><div class="l">Tong</div></div>
-<div class="card"><div class="v g">${s.dung}</div><div class="l">Dung</div></div>
-<div class="card"><div class="v r">${s.sai}</div><div class="l">Sai</div></div>
-<div class="card"><div class="v ${s.chuoi>0?'g':s.chuoi<0?'r':'y'}">${s.chuoi>0?'+'+s.chuoi:s.chuoi<0?''+s.chuoi:'0'}</div><div class="l">Chuoi</div></div>
-<div class="card"><div class="v p">${s.chuoi_dai}</div><div class="l">Ky Luc</div></div>
-<div class="card"><div class="v ${wr>=70?'g':wr>=60?'y':'r'}">${wr}%</div><div class="l">Ty Le</div></div>
-</div>
-<div class="tbl">
-<div class="tbl-h"><h3>◆ Lich Su 50 Phien</h3><span class="cnt">${recent.length} phien</span><span class="tag">◆ Anh Khoi</span></div>
-<div class="tw"><table><thead><tr><th>Phien</th><th>Du Doan</th><th>Do Tin</th><th>KQ</th><th>Thuc Te</th><th>Engine</th></tr></thead>
-<tbody>${rows || '<tr><td colspan="6" style="text-align:center;padding:15px;">Dang tai...</td></tr>'}</tbody></table></div>
-</div>
-<div class="ftr">◆ <span>CRYSTAL TX</span> • Spectral • Geometric • Flow • By Anh Khoi • ${new Date().toLocaleString('vi-VN')}</div>
-</div>
-<script>setTimeout(()=>location.reload(),5000);</script>
-</body></html>`;
+    const content = `
+    <div style="margin-bottom:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px">
+            <div style="display:flex;align-items:center;gap:12px">
+                <div style="font-size:32px">💎</div>
+                <div>
+                    <h1 style="font-family:'Orbitron',sans-serif;font-size:22px;font-weight:800"><span class="text-gradient">CRYSTAL TX</span></h1>
+                    <p style="font-size:9px;color:var(--text3);font-family:'JetBrains Mono',monospace;letter-spacing:2px">${type.toUpperCase()} • By Anh Khôi • v70.0</p>
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:16px">
+                <div class="badge badge-success"><span class="pulse-dot"></span> LIVE</div>
+                <div style="text-align:right">
+                    <div style="font-family:'Orbitron',monospace;font-size:28px;font-weight:800;color:${wc}">${wr}%</div>
+                    <div style="font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:1px">Tỷ lệ thắng</div>
+                </div>
+                <svg width="52" height="52" viewBox="0 0 52 52" style="transform:rotate(-90deg)">
+                    <circle cx="26" cy="26" r="23" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="4"/>
+                    <circle cx="26" cy="26" r="23" fill="none" stroke="${wc}" stroke-width="4" stroke-linecap="round" 
+                        stroke-dasharray="144.5" stroke-dashoffset="${144.5 - (144.5 * wr / 100)}" style="transition:stroke-dashoffset 1s ease"/>
+                </svg>
+            </div>
+        </div>
+    </div>
+    
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:20px">
+        <div class="glass-card" style="padding:14px;text-align:center">
+            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Tổng</div>
+            <div style="font-family:'Orbitron',monospace;font-size:20px;font-weight:700">${s.total}</div>
+        </div>
+        <div class="glass-card" style="padding:14px;text-align:center">
+            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Đúng</div>
+            <div style="font-family:'Orbitron',monospace;font-size:20px;font-weight:700;color:var(--success)">${s.dung}</div>
+        </div>
+        <div class="glass-card" style="padding:14px;text-align:center">
+            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Sai</div>
+            <div style="font-family:'Orbitron',monospace;font-size:20px;font-weight:700;color:var(--danger)">${s.sai}</div>
+        </div>
+        <div class="glass-card" style="padding:14px;text-align:center">
+            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Chuỗi</div>
+            <div style="font-family:'Orbitron',monospace;font-size:20px;font-weight:700;color:${s.chuoi>0?'var(--success)':s.chuoi<0?'var(--danger)':'var(--warning)'}">${s.chuoi>0?'+'+s.chuoi:s.chuoi}</div>
+        </div>
+        <div class="glass-card" style="padding:14px;text-align:center">
+            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Kỷ Lục</div>
+            <div style="font-family:'Orbitron',monospace;font-size:20px;font-weight:700;color:var(--purple)">${s.chuoi_dai}</div>
+        </div>
+        <div class="glass-card" style="padding:14px;text-align:center">
+            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Đánh Giá</div>
+            <div style="font-family:'Orbitron',monospace;font-size:20px;font-weight:700;color:${wc}">${wrLabel}</div>
+        </div>
+    </div>
+    
+    <div class="glass-card" style="overflow:hidden">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border)">
+            <h3 style="font-family:'Orbitron',monospace;font-size:12px;font-weight:600">📊 Lịch Sử 50 Phiên</h3>
+            <div style="display:flex;gap:8px;align-items:center">
+                <span style="font-size:9px;color:var(--text3);font-family:'JetBrains Mono',monospace">${recent.length} phiên</span>
+                <span class="badge badge-purple">5 Engines</span>
+            </div>
+        </div>
+        <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:10px">
+                <thead>
+                    <tr style="background:rgba(255,255,255,0.01)">
+                        <th style="padding:8px 12px;text-align:left;font-size:8px;text-transform:uppercase;letter-spacing:1px;color:var(--text3)">Phiên</th>
+                        <th style="padding:8px 12px;text-align:left;font-size:8px;text-transform:uppercase;letter-spacing:1px;color:var(--text3)">Dự Đoán</th>
+                        <th style="padding:8px 12px;text-align:left;font-size:8px;text-transform:uppercase;letter-spacing:1px;color:var(--text3)">Độ Tin</th>
+                        <th style="padding:8px 12px;text-align:left;font-size:8px;text-transform:uppercase;letter-spacing:1px;color:var(--text3)">KQ</th>
+                        <th style="padding:8px 12px;text-align:left;font-size:8px;text-transform:uppercase;letter-spacing:1px;color:var(--text3)">Thực Tế</th>
+                        <th style="padding:8px 12px;text-align:left;font-size:8px;text-transform:uppercase;letter-spacing:1px;color:var(--text3)">Engines</th>
+                    </tr>
+                </thead>
+                <tbody>${rows || '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text3)">Đang tải dữ liệu...</td></tr>'}</tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div style="text-align:center;margin-top:16px;padding:12px;font-size:8px;color:var(--text3);font-family:'JetBrains Mono',monospace">
+        💎 <span style="color:var(--purple)">CRYSTAL TX</span> • QS • FG • EF • MT • PR • By Anh Khôi • ${new Date().toLocaleString('vi-VN')}
+    </div>
+    
+    <style>
+        .mono{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text2)}
+        .pred{display:inline-block;padding:3px 10px;border-radius:6px;font-weight:700;font-size:9px}
+        .pred-t{background:rgba(34,197,94,0.08);color:var(--success)}
+        .pred-x{background:rgba(239,68,68,0.08);color:var(--danger)}
+        .conf-bar{display:inline-block;width:40px;height:3px;background:rgba(255,255,255,0.05);border-radius:2px;vertical-align:middle;margin-right:6px}
+        .conf-fill{height:100%;border-radius:2px;background:var(--gradient)}
+        .conf-text{font-weight:600;color:var(--info);font-size:9px}
+        .status{display:inline-block;padding:2px 8px;border-radius:4px;font-weight:700;font-size:7px;text-transform:uppercase;letter-spacing:1px}
+        .status-s{background:rgba(34,197,94,0.08);color:var(--success)}
+        .status-d{background:rgba(239,68,68,0.08);color:var(--danger)}
+        .status-w{background:rgba(245,158,11,0.08);color:var(--warning)}
+        .detail{font-size:8px;color:var(--text3);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        tr:hover td{background:rgba(255,255,255,0.01)}
+        .row-s{border-left:2px solid transparent}.row-s:hover{border-left-color:rgba(34,197,94,0.25)}
+        .row-d{border-left:2px solid transparent}.row-d:hover{border-left-color:rgba(239,68,68,0.25)}
+        .row-w{border-left:2px solid transparent}.row-w:hover{border-left-color:rgba(245,158,11,0.25)}
+        @media(max-width:768px){.pred,.status{font-size:7px}.conf-text{font-size:7px}}
+    </style>
+    <script>setTimeout(()=>location.reload(),5000);</script>
+    `;
+    
+    return getBaseHTML(`${type.toUpperCase()} Dashboard`, content);
 }
 
 // ============================================================
 // 🔌 API ENDPOINTS
 // ============================================================
 
-// LOGIN - Đây là endpoint quan trọng nhất để lấy token
-app.post('/_admin/login', (req, res) => {
-    console.log('Login attempt:', req.body);
+// Trang login - QUAN TRỌNG: set Content-Type để trình duyệt hiển thị
+app.get('/_login', (req, res) => {
+    const error = req.query.error === 'unauthorized' ? 'Bạn cần đăng nhập để truy cập' :
+                  req.query.error === 'expired' ? 'Token đã hết hạn, vui lòng đăng nhập lại' : '';
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(generateLoginPage(error));
+});
+
+// Redirect root đến login
+app.get('/', (req, res) => {
+    res.redirect('/_login');
+});
+
+// API Login
+app.post('/_api/login', (req, res) => {
     const { username, password } = req.body || {};
     
     if (!username || !password) {
-        return res.status(400).json({ error: 'Thieu username hoac password' });
+        return res.status(400).json({ error: 'Thiếu username hoặc password' });
     }
     
     if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
         const token = generateAdminToken();
-        console.log('Login successful, token generated');
         return res.json({ 
             token: token, 
             expires: Date.now() + 86400000,
-            message: 'Dang nhap thanh cong' 
+            message: 'Đăng nhập thành công' 
         });
     }
     
-    return res.status(401).json({ error: 'Sai username hoac password' });
+    return res.status(401).json({ error: 'Sai username hoặc password' });
 });
 
-// Dashboard
+// Dashboard + JSON API
 app.get('/_hu', adminAuth, async (req, res) => {
     const data = await fetchData('hu');
     if (data) {
@@ -763,7 +932,7 @@ app.get('/_hu', adminAuth, async (req, res) => {
         brainHU.save();
     }
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.send(generateDashboardHTML(brainHU, 'hu'));
+    res.send(generateDashboardPage(brainHU, 'hu'));
 });
 
 app.get('/_md5', adminAuth, async (req, res) => {
@@ -777,10 +946,9 @@ app.get('/_md5', adminAuth, async (req, res) => {
         brainMD5.save();
     }
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.send(generateDashboardHTML(brainMD5, 'md5'));
+    res.send(generateDashboardPage(brainMD5, 'md5'));
 });
 
-// JSON API
 app.get('/_hu/json', adminAuth, async (req, res) => {
     try {
         const data = await fetchData('hu');
@@ -795,7 +963,7 @@ app.get('/_hu/json', adminAuth, async (req, res) => {
         if (brainHU.history.length > 1000) brainHU.history = brainHU.history.slice(0, 1000);
         brainHU.save();
         res.json(rec);
-    } catch (e) { res.status(500).json({ error: 'Loi' }); }
+    } catch (e) { res.status(500).json({ error: 'Lỗi hệ thống' }); }
 });
 
 app.get('/_md5/json', adminAuth, async (req, res) => {
@@ -812,7 +980,7 @@ app.get('/_md5/json', adminAuth, async (req, res) => {
         if (brainMD5.history.length > 1000) brainMD5.history = brainMD5.history.slice(0, 1000);
         brainMD5.save();
         res.json(rec);
-    } catch (e) { res.status(500).json({ error: 'Loi' }); }
+    } catch (e) { res.status(500).json({ error: 'Lỗi hệ thống' }); }
 });
 
 app.get('/_stats', adminAuth, (req, res) => {
@@ -829,23 +997,17 @@ app.get('/_reset', adminAuth, (req, res) => {
         brain.lastPhien = null;
         brain.save();
     });
-    res.json({ message: 'Da reset' });
+    res.json({ message: 'Đã reset toàn bộ hệ thống' });
 });
 
-// 404 handler
-app.use((req, res) => res.status(404).end());
-
-// Error handler
-app.use((err, req, res, next) => {
-    console.error('Server error:', err.message);
-    res.status(500).end();
-});
+app.use((req, res) => res.status(404).send('Not Found'));
+app.use((err, req, res, next) => { console.error(err); res.status(500).send('Server Error'); });
 
 // ============================================================
 // 🚀 START
 // ============================================================
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`\n◆ CRYSTAL TX running on port ${PORT}`);
-    console.log(`◆ Login: POST /_admin/login with JSON body {username, password}\n`);
+    console.log(`\n✅ CRYSTAL TX v70.0 đã khởi động trên cổng ${PORT}`);
+    console.log(`🌐 Truy cập: http://localhost:${PORT}/_login\n`);
     startAuto();
 });
