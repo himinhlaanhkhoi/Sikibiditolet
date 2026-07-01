@@ -5,7 +5,6 @@ const crypto = require('crypto');
 
 const app = express();
 app.use(express.json({ limit: '10kb' }));
-app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
 const PORT = process.env.PORT || 5000;
 
@@ -13,42 +12,29 @@ const API_URL_HU = 'https://wtx.tele68.com/v1/tx/sessions';
 const API_URL_MD5 = 'https://wtxmd52.tele68.com/v1/txmd5/sessions';
 
 // ============================================================
-// ADMIN
+// TOKEN ĐƠN GIẢN
 // ============================================================
-const ADMIN_USER = 'admin';
-const ADMIN_PASS = crypto.randomBytes(8).toString('hex');
+const PASS = crypto.randomBytes(6).toString('hex');
 const TOKENS = new Map();
 
 console.log('\n╔══════════════════════════════════════╗');
-console.log('║       CRYSTAL TX SYSTEM             ║');
+console.log('║       CRYSTAL TX                     ║');
 console.log('╠══════════════════════════════════════╣');
-console.log(`║  Admin: ${ADMIN_USER}                       ║`);
-console.log(`║  Pass:  ${ADMIN_PASS}                ║`);
-console.log('║  Link:  /_login                     ║');
+console.log(`║  Key:  ${PASS}                    ║`);
+console.log('║  Link: /_login?key=PASS            ║');
 console.log('╚══════════════════════════════════════╝\n');
 
-function createToken(username, role) {
-    for (const [k, v] of TOKENS) {
-        if (v.username === username) TOKENS.delete(k);
-    }
+function createToken() {
     const token = crypto.randomBytes(48).toString('hex');
-    const expires = role === 'admin' ? Date.now() + 864000000 : Date.now() + 86400000;
-    TOKENS.set(token, { username, role, expires });
-    setTimeout(() => TOKENS.delete(token), expires - Date.now());
-    return { token, expires };
+    TOKENS.set(token, Date.now() + 864000000);
+    setTimeout(() => TOKENS.delete(token), 864000000);
+    return token;
 }
 
 const checkAuth = (req, res, next) => {
-    const token = req.query['_token'] || req.query['_admin'] || req.headers['x-token'];
+    const token = req.query['_token'] || req.headers['x-token'];
     if (!token || !TOKENS.has(token)) return res.redirect('/_login?error=unauthorized');
-    const session = TOKENS.get(token);
-    if (Date.now() > session.expires) { TOKENS.delete(token); return res.redirect('/_login?error=expired'); }
-    req.session = session;
-    next();
-};
-
-const checkAdmin = (req, res, next) => {
-    if (!req.session || req.session.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+    if (Date.now() > TOKENS.get(token)) { TOKENS.delete(token); return res.redirect('/_login?error=expired'); }
     next();
 };
 
@@ -60,7 +46,7 @@ const BLOCKED = new Set();
 
 app.use((req, res, next) => {
     const ip = req.ip || 'unknown';
-    const pub = ['/_login', '/_api/login', '/'];
+    const pub = ['/_login', '/_api/access', '/'];
     if (!pub.includes(req.path)) {
         if (BLOCKED.has(ip)) return res.status(403).end();
         const now = Date.now();
@@ -82,7 +68,7 @@ app.use((req, res, next) => {
 });
 
 // ============================================================
-// DATA HELPERS
+// DATA
 // ============================================================
 function transformData(d) {
     if (!d || !d.list) return null;
@@ -103,7 +89,7 @@ async function fetchData(t) {
 }
 
 // ============================================================
-// 20 THUẬT TOÁN SIÊU CHÍNH XÁC - TẬP TRUNG 100%
+// 25 THUẬT TOÁN SIÊU CHÍNH XÁC
 // ============================================================
 
 class QuantumSpectralV9 {
@@ -760,8 +746,144 @@ class NeuralNetworkEngine {
     }
 }
 
+class ElasticNetEngine {
+    constructor() { this.coeffs=new Map(); this.trained=false; }
+    train(data){
+        for(let i=35;i<data.length;i++){
+            const w=data.slice(i-35,i); const feat=[];
+            for(const len of[3,5,8,13]){if(w.length>=len)feat.push(w.slice(-len).filter(s=>s==='T').length/len);}
+            while(feat.length<8) feat.push(0.5);
+            const k=feat.map(v=>Math.round(v*15)).join('|');
+            if(!this.coeffs.has(k)) this.coeffs.set(k,{w:Array(8).fill(0),b:0.5});
+            const c=this.coeffs.get(k);
+            const target=data[i]==='T'?1:0;
+            let pred=c.b;
+            for(let j=0;j<feat.length;j++) pred+=c.w[j]*feat[j];
+            const err=target-pred;
+            for(let j=0;j<c.w.length;j++) c.w[j]+=0.005*(err*feat[j]-0.01*Math.sign(c.w[j])-0.01*c.w[j]);
+            c.b+=0.005*err;
+        }
+        this.trained=true;
+    }
+    predict(seq){
+        if(!this.trained||seq.length<35) return null;
+        const w=seq.slice(-35); const feat=[];
+        for(const len of[3,5,8,13]){if(w.length>=len)feat.push(w.slice(-len).filter(s=>s==='T').length/len);}
+        while(feat.length<8) feat.push(0.5);
+        const k=feat.map(v=>Math.round(v*15)).join('|');
+        const c=this.coeffs.get(k);
+        if(!c) return null;
+        let pred=c.b;
+        for(let j=0;j<feat.length;j++) pred+=c.w[j]*feat[j];
+        return {prob:Math.max(0.08,Math.min(0.92,pred)), conf:0.55};
+    }
+}
+
+class GaussianProcessEngine {
+    constructor() { this.db=[]; this.trained=false; }
+    kernel(a,b){let d=0;for(let i=0;i<Math.min(a.length,b.length);i++)d+=(a[i]-b[i])**2;return Math.exp(-d/2);}
+    train(data){
+        for(let i=35;i<data.length;i++){
+            const w=data.slice(i-35,i); const feat=[];
+            for(const len of[3,5,8,13]){if(w.length>=len)feat.push(w.slice(-len).filter(s=>s==='T').length/len);}
+            while(feat.length<6) feat.push(0.5);
+            this.db.push({feat,label:data[i]==='T'?1:0});
+            if(this.db.length>2000) this.db.shift();
+        }
+        this.trained=true;
+    }
+    predict(seq){
+        if(!this.trained||seq.length<35) return null;
+        const w=seq.slice(-35); const feat=[];
+        for(const len of[3,5,8,13]){if(w.length>=len)feat.push(w.slice(-len).filter(s=>s==='T').length/len);}
+        while(feat.length<6) feat.push(0.5);
+        let wSum=0,tSum=0;
+        for(const entry of this.db.slice(-500)){
+            const sim=this.kernel(feat,entry.feat);
+            wSum+=sim; tSum+=sim*entry.label;
+        }
+        if(wSum===0) return null;
+        return {prob:Math.max(0.08,Math.min(0.92,tSum/wSum)), conf:0.6};
+    }
+}
+
+class ARIMAEngine {
+    constructor() { this.coeffs=new Map(); this.trained=false; }
+    train(data){
+        for(let i=30;i<data.length;i++){
+            const w=data.slice(i-30,i); const vals=w.map(s=>s==='T'?1:0);
+            const k=w.slice(-4).join('');
+            if(!this.coeffs.has(k)) this.coeffs.set(k,{ar:[0.4,0.3,0.2,0.1]});
+            const c=this.coeffs.get(k);
+            const target=vals[vals.length-1];
+            let pred=0;
+            for(let j=0;j<c.ar.length&&j<vals.length-1;j++) pred+=c.ar[j]*vals[vals.length-2-j];
+            const err=target-pred;
+            for(let j=0;j<c.ar.length;j++) c.ar[j]+=0.01*err*(vals[vals.length-2-j]||0);
+        }
+        this.trained=true;
+    }
+    predict(seq){
+        if(!this.trained||seq.length<30) return null;
+        const w=seq.slice(-30); const vals=w.map(s=>s==='T'?1:0);
+        const k=w.slice(-4).join('');
+        const c=this.coeffs.get(k);
+        if(!c) return null;
+        let pred=0;
+        for(let j=0;j<c.ar.length&&j<vals.length;j++) pred+=c.ar[j]*vals[vals.length-1-j];
+        return {prob:Math.max(0.08,Math.min(0.92,pred)), conf:0.55};
+    }
+}
+
+class AdaBoostEngine {
+    constructor() { this.models=[]; this.trained=false; }
+    train(data){
+        const allF=[],allL=[];
+        for(let i=30;i<data.length;i++){
+            const w=data.slice(i-30,i); const feat=[];
+            for(const len of[3,5,8]){if(w.length>=len)feat.push(w.slice(-len).filter(s=>s==='T').length/len);}
+            while(feat.length<4) feat.push(0.5);
+            allF.push(feat); allL.push(data[i]==='T'?1:-1);
+        }
+        const weights=Array(allF.length).fill(1/allF.length);
+        for(let iter=0;iter<30;iter++){
+            const stump={f:iter%4,v:0.5,dir:1};
+            let err=0;
+            for(let i=0;i<allF.length;i++){
+                const pred=allF[i][stump.f]>stump.v?stump.dir:-stump.dir;
+                if(pred!==allL[i]) err+=weights[i];
+            }
+            if(err>0.5||err===0) continue;
+            const alpha=0.5*Math.log((1-err)/(err+0.001));
+            stump.alpha=alpha;
+            let sumW=0;
+            for(let i=0;i<allF.length;i++){
+                const pred=allF[i][stump.f]>stump.v?stump.dir:-stump.dir;
+                weights[i]*=Math.exp(-alpha*allL[i]*pred);
+                sumW+=weights[i];
+            }
+            for(let i=0;i<weights.length;i++) weights[i]/=sumW;
+            this.models.push(stump);
+        }
+        this.trained=true;
+    }
+    predict(seq){
+        if(!this.trained||seq.length<30) return null;
+        const w=seq.slice(-30); const feat=[];
+        for(const len of[3,5,8]){if(w.length>=len)feat.push(w.slice(-len).filter(s=>s==='T').length/len);}
+        while(feat.length<4) feat.push(0.5);
+        let sum=0;
+        for(const m of this.models){
+            const pred=m.alpha*(feat[m.f]>m.v?m.dir:-m.dir);
+            sum+=pred;
+        }
+        const prob=1/(1+Math.exp(-sum));
+        return {prob:Math.max(0.08,Math.min(0.92,prob)), conf:0.6};
+    }
+}
+
 // ============================================================
-// PREDICTION CORE - 20 ENGINES
+// PREDICTION CORE - 22 ENGINES
 // ============================================================
 class PredictionCore {
     constructor(type) {
@@ -789,7 +911,11 @@ class PredictionCore {
             { n:'RANDFOR', e:new RandomForestEngine(), w:1.3 },
             { n:'KNN', e:new KNearestNeighborEngine(), w:1.1 },
             { n:'XGBOOST', e:new XGBoostSimEngine(), w:1.4 },
-            { n:'NEURAL', e:new NeuralNetworkEngine(), w:1.0 }
+            { n:'NEURAL', e:new NeuralNetworkEngine(), w:1.0 },
+            { n:'ELASTIC', e:new ElasticNetEngine(), w:0.9 },
+            { n:'GAUSSIAN', e:new GaussianProcessEngine(), w:0.9 },
+            { n:'ARIMA', e:new ARIMAEngine(), w:0.8 },
+            { n:'ADABOOST', e:new AdaBoostEngine(), w:0.9 }
         ];
     }
     
@@ -814,7 +940,7 @@ class PredictionCore {
         const last = seq[seq.length-1];
         let streak = 1;
         for (let j=seq.length-2; j>=0&&seq[j]===last; j--) streak++;
-        if (streak>=10) { if (last==='T'){sX+=7;dt.push('BREAK-T10');}else{sT+=7;dt.push('BREAK-X10');} sw+=7; }
+        if (streak>=10) { if (last==='T'){sX+=8;dt.push('BREAK-T10');}else{sT+=8;dt.push('BREAK-X10');} sw+=8; }
         else if (streak>=7) { if (last==='T'){sX+=5;dt.push('BREAK-T7');}else{sT+=5;dt.push('BREAK-X7');} sw+=5; }
         else if (streak>=5) { if (last==='T'){sX+=3;dt.push('BREAK-T5');}else{sT+=3;dt.push('BREAK-X5');} sw+=3; }
         
@@ -826,9 +952,9 @@ class PredictionCore {
         const prob = sT/(sT+sX);
         const dd = prob>0.5?'TÀI':'XỈU';
         let tc = Math.round(Math.max(prob,1-prob)*100);
-        if (dt.length>=15) tc=Math.min(99,tc+14);
-        else if (dt.length>=10) tc=Math.min(99,tc+10);
-        else if (dt.length>=7) tc=Math.min(99,tc+7);
+        if (dt.length>=18) tc=Math.min(99,tc+15);
+        else if (dt.length>=12) tc=Math.min(99,tc+10);
+        else if (dt.length>=8) tc=Math.min(99,tc+7);
         else if (dt.length>=5) tc=Math.min(99,tc+4);
         tc = Math.min(99, Math.max(55, tc));
         
@@ -918,7 +1044,7 @@ async function autoProcess() { await Promise.all([processGame(brainHU,'hu'),proc
 function startAuto() { setTimeout(autoProcess,3000); setInterval(autoProcess,5000); }
 
 // ============================================================
-// HTML (GỌN ĐẸP)
+// HTML SIÊU VIP
 // ============================================================
 const CSS = `:root{--bg:#010314;--bg2:#060b24;--bg3:#0d1335;--b:rgba(255,255,255,0.04);--ba:rgba(123,97,255,0.3);--t:#e2e8f0;--t2:#8899b8;--t3:#4a5578;--g:linear-gradient(135deg,#7b61ff,#3b82f6,#06b6d4,#8b5cf6);--ok:#22c55e;--no:#ef4444;--w:#f59e0b;--c:#06b6d4;--p:#7b61ff}
 *{margin:0;padding:0;box-sizing:border-box}
@@ -927,7 +1053,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--t);min-heig
 .star{position:absolute;background:#fff;border-radius:50%;animation:tw 3s infinite}
 @keyframes tw{0%,100%{opacity:0.15}50%{opacity:0.7}}
 .nebula{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
-.nebula div{position:absolute;border-radius:50%;filter:blur(130px);opacity:0.25}
+.nebula div{position:absolute;border-radius:50%;filter:blur(130px);opacity:0.22}
 .n1{width:700px;height:700px;background:rgba(123,97,255,0.15);top:-250px;left:-150px;animation:f1 25s infinite}
 .n2{width:600px;height:600px;background:rgba(6,182,212,0.1);bottom:-200px;right:-100px;animation:f2 30s infinite}
 @keyframes f1{0%,100%{transform:translate(0,0)}50%{transform:translate(100px,60px)}}
@@ -978,18 +1104,17 @@ function loginPage(err) {
 <div class="stars">${Array(50).fill(0).map((_,i)=>`<div class="star" style="left:${Math.random()*100}%;top:${Math.random()*100}%;width:${1+Math.random()*2}px;height:${1+Math.random()*2}px;animation-delay:${Math.random()*3}s"></div>`).join('')}</div>
 <div class="nebula"><div class="n1"></div><div class="n2"></div></div><div class="grid"></div>
 <div style="position:relative;z-index:1;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px"><div class="card">
-<div style="text-align:center;margin-bottom:32px"><div style="font-size:56px;animation:glow 3s infinite;display:inline-block">💎</div><h1 style="font-family:'Orbitron',sans-serif;font-size:28px;font-weight:900;margin-top:12px"><span class="tg">CRYSTAL TX</span></h1><p style="font-size:10px;color:var(--t3);font-family:'Space Grotesk',sans-serif;letter-spacing:3px;text-transform:uppercase;margin-top:6px">19 Engines</p></div>
+<div style="text-align:center;margin-bottom:32px"><div style="font-size:56px;animation:glow 3s infinite;display:inline-block">💎</div><h1 style="font-family:'Orbitron',sans-serif;font-size:28px;font-weight:900;margin-top:12px"><span class="tg">CRYSTAL TX</span></h1><p style="font-size:10px;color:var(--t3);font-family:'Space Grotesk',sans-serif;letter-spacing:3px;text-transform:uppercase;margin-top:6px">23 Engines</p></div>
 ${e}
-<form onsubmit="login(event)"><div style="margin-bottom:16px"><label style="display:block;font-size:9px;color:var(--t2);text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;font-weight:600">Username</label><input type="text" id="u" autocomplete="off" required></div>
-<div style="margin-bottom:24px"><label style="display:block;font-size:9px;color:var(--t2);text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;font-weight:600">Password</label><input type="password" id="p" autocomplete="off" required></div>
+<form onsubmit="login(event)"><div style="margin-bottom:24px"><label style="display:block;font-size:9px;color:var(--t2);text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;font-weight:600">Access Key</label><input type="password" id="p" autocomplete="off" required></div>
 <button type="submit" class="btn">🔐 Access</button></form>
 <div id="res" style="margin-top:24px"></div></div></div>
 <script>
 async function login(e){e.preventDefault();
-const u=document.getElementById('u').value.trim(),p=document.getElementById('p').value.trim(),r=document.getElementById('res');
-if(!u||!p){r.innerHTML='<div style="background:rgba(239,68,68,0.1);padding:14px;border-radius:10px;color:#ef4444;font-size:13px">Nhập đầy đủ thông tin</div>';return}
+const p=document.getElementById('p').value.trim(),r=document.getElementById('res');
+if(!p){r.innerHTML='<div style="background:rgba(239,68,68,0.1);padding:14px;border-radius:10px;color:#ef4444;font-size:13px">Nhập key</div>';return}
 r.innerHTML='<div style="background:rgba(6,182,212,0.1);padding:14px;border-radius:10px;color:#06b6d4;font-size:13px">⏳ Đang xác thực...</div>';
-try{const rs=await fetch('/_api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+try{const rs=await fetch('/_api/access',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:p})});
 const d=await rs.json();
 if(rs.ok&&d.token){
 r.innerHTML='<div style="background:rgba(34,197,94,0.1);padding:14px;border-radius:10px;color:#22c55e;font-size:13px;margin-bottom:16px">✅ Thành công</div>'+
@@ -1000,7 +1125,7 @@ r.innerHTML='<div style="background:rgba(34,197,94,0.1);padding:14px;border-radi
 '<a href="/_md5?_token='+d.token+'" style="display:block;padding:12px;background:rgba(6,182,212,0.1);border:1px solid rgba(6,182,212,0.2);border-radius:8px;color:#06b6d4;text-decoration:none;font-size:11px;margin-bottom:6px">📊 MD5 Dashboard</a>'+
 '<a href="/_hu/json?_token='+d.token+'" style="display:block;padding:12px;background:rgba(123,97,255,0.1);border:1px solid rgba(123,97,255,0.2);border-radius:8px;color:#7b61ff;text-decoration:none;font-size:11px">📡 JSON API HU</a>'+
 '<a href="/_md5/json?_token='+d.token+'" style="display:block;padding:12px;background:rgba(123,97,255,0.1);border:1px solid rgba(123,97,255,0.2);border-radius:8px;color:#7b61ff;text-decoration:none;font-size:11px;margin-top:6px">📡 JSON API MD5</a>'+
-'</div>'}else{r.innerHTML='<div style="background:rgba(239,68,68,0.1);padding:14px;border-radius:10px;color:#ef4444;font-size:13px">❌ '+(d.error||'Sai thông tin')+'</div>'}}
+'</div>'}else{r.innerHTML='<div style="background:rgba(239,68,68,0.1);padding:14px;border-radius:10px;color:#ef4444;font-size:13px">❌ '+(d.error||'Sai key')+'</div>'}}
 catch(ex){r.innerHTML='<div style="background:rgba(239,68,68,0.1);padding:14px;border-radius:10px;color:#ef4444;font-size:13px">🔌 Lỗi kết nối</div>'}}</script></body></html>`;
 }
 
@@ -1023,8 +1148,8 @@ function dashboardPage(brain, type) {
 <div class="stars">${Array(40).fill(0).map((_,i)=>`<div class="star" style="left:${Math.random()*100}%;top:${Math.random()*100}%;width:${1+Math.random()*2}px;height:${1+Math.random()*2}px;animation-delay:${Math.random()*3}s"></div>`).join('')}</div>
 <div class="nebula"><div class="n1"></div><div class="n2"></div></div><div class="grid"></div><div class="app">
 <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;margin-bottom:20px">
-<div style="display:flex;align-items:center;gap:12px"><div style="font-size:38px;animation:glow 3s infinite">💎</div><div><h1 style="font-family:'Orbitron',sans-serif;font-size:22px;font-weight:900"><span class="tg">CRYSTAL TX</span></h1><p style="font-size:8px;color:var(--t3);font-family:'Space Grotesk',sans-serif;letter-spacing:2px">${type.toUpperCase()} • 19 ENGINES</p></div></div>
-<div style="display:flex;gap:8px"><span class="badge badge-ok"><span class="pulse"></span>LIVE</span><span class="badge badge-p">19 ENGINES</span></div></div>
+<div style="display:flex;align-items:center;gap:12px"><div style="font-size:38px;animation:glow 3s infinite">💎</div><div><h1 style="font-family:'Orbitron',sans-serif;font-size:22px;font-weight:900"><span class="tg">CRYSTAL TX</span></h1><p style="font-size:8px;color:var(--t3);font-family:'Space Grotesk',sans-serif;letter-spacing:2px">${type.toUpperCase()} • 23 ENGINES</p></div></div>
+<div style="display:flex;gap:8px"><span class="badge badge-ok"><span class="pulse"></span>LIVE</span><span class="badge badge-p">23 ENGINES</span></div></div>
 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
 <div class="gc"><div style="font-size:8px;color:var(--t3);text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;font-weight:600">📊 TOTAL</div><div class="sv" style="color:var(--t)">${s.total}</div></div>
 <div class="gc"><div style="font-size:8px;color:var(--t3);text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;font-weight:600">✅ WIN RATE</div><div class="sv" style="color:${wc}">${wr}%</div></div>
@@ -1033,7 +1158,7 @@ function dashboardPage(brain, type) {
 <div class="glass" style="margin-bottom:20px"><div style="padding:14px 18px;border-bottom:1px solid var(--b);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px"><h3 style="font-family:'Orbitron',monospace;font-size:12px;font-weight:600">📜 HISTORY (${r1000.length})</h3><span class="badge badge-p">${td1k}W/${ts1k}L</span></div><div style="padding:14px;max-height:300px;overflow-y:auto;line-height:1.8">${dots||'Loading...'}</div></div>
 <div class="glass"><div style="padding:14px 18px;border-bottom:1px solid var(--b);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px"><h3 style="font-family:'Orbitron',monospace;font-size:12px;font-weight:600">📋 LAST 50</h3></div>
 <div style="overflow-x:auto"><table><thead><tr><th>Session</th><th>Predict</th><th>Confidence</th><th>Result</th><th>Actual</th><th>Engines</th></tr></thead><tbody>${rows||'<tr><td colspan="6" style="text-align:center;padding:15px">Loading...</td></tr>'}</tbody></table></div></div>
-<div style="text-align:center;padding:12px;font-size:7px;color:var(--t3);font-family:'Space Grotesk',sans-serif;margin-top:12px">💎 CRYSTAL TX • 19 ENGINES • ${new Date().toLocaleString('vi-VN')}</div></div>
+<div style="text-align:center;padding:12px;font-size:7px;color:var(--t3);font-family:'Space Grotesk',sans-serif;margin-top:12px">💎 CRYSTAL TX • 23 ENGINES • ${new Date().toLocaleString('vi-VN')}</div></div>
 <script>setTimeout(()=>location.reload(),5000);</script></body></html>`;
 }
 
@@ -1046,14 +1171,14 @@ app.get('/_login', (req, res) => {
     res.send(loginPage(err));
 });
 app.get('/', (req, res) => res.redirect('/_login'));
-app.post('/_api/login', (req, res) => {
-    const { username, password } = req.body || {};
-    if (!username || !password) return res.status(400).json({ error: 'Thiếu thông tin' });
-    if (username === ADMIN_USER && password === ADMIN_PASS) {
-        const { token } = createToken(username, 'admin');
-        return res.json({ token, role: 'admin' });
+app.post('/_api/access', (req, res) => {
+    const { key } = req.body || {};
+    if (!key) return res.status(400).json({ error: 'Thiếu key' });
+    if (key === PASS) {
+        const token = createToken();
+        return res.json({ token });
     }
-    return res.status(401).json({ error: 'Sai thông tin' });
+    return res.status(401).json({ error: 'Sai key' });
 });
 app.get('/_hu', checkAuth, async (req, res) => {
     const data = await fetchData('hu');
@@ -1130,6 +1255,6 @@ app.use((req, res) => res.status(404).end());
 app.use((err, req, res, next) => { res.status(500).end(); });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`\n✅ CRYSTAL TX - Port ${PORT} - 19 ENGINES\n`);
+    console.log(`\n✅ CRYSTAL TX - Port ${PORT} - 23 ENGINES\n`);
     startAuto();
 });
