@@ -126,59 +126,13 @@ class PredictionCore {
         this.lastPhien = null;
         this.trained = false;
         this.engines = [
-            { n:'QUANTUM', e:new QuantumSpectralV9(), w:3.8 },
-            { n:'BAYESIAN', e:new BayesianMetaEngine(), w:3.2 },
-            { n:'PATTERN', e:new PatternFingerprintEngine(), w:3.0 },
-            { n:'WEIBULL', e:new WeibullSurvivalEngine(), w:2.8 },
-            { n:'JSD', e:new JSDUncertaintyEngine(), w:2.5 },
-            { n:'MARKOV', e:new MarkovChainEngine(), w:2.2 },
-            { n:'ENTROPY', e:new EntropyFlowEngine(), w:2.0 },
-            { n:'MOMENTUM', e:new MomentumTrendEngine(), w:1.8 },
-            { n:'FRACTAL', e:new FractalGeometryEngine(), w:1.7 },
-            { n:'STREAK', e:new AdaptiveStreakEngine(), w:1.6 },
-            { n:'WAVE', e:new WaveResonanceEngine(), w:1.5 },
-            { n:'MEANREV', e:new MeanReversionEngine(), w:1.4 },
-            { n:'LSTM', e:new LSTMSimEngine(), w:1.3 },
-            { n:'GBOOST', e:new GradientBoostEngine(), w:1.4 },
-            { n:'SVM', e:new SupportVectorEngine(), w:1.2 },
-            { n:'RANDFOR', e:new RandomForestEngine(), w:1.3 },
-            { n:'KNN', e:new KNearestNeighborEngine(), w:1.1 },
-            { n:'XGBOOST', e:new XGBoostSimEngine(), w:1.4 },
-            { n:'NEURAL', e:new NeuralNetworkEngine(), w:1.0 },
-            { n:'ELASTIC', e:new ElasticNetEngine(), w:0.9 },
-            { n:'GAUSSIAN', e:new GaussianProcessEngine(), w:0.9 },
-            { n:'ARIMA', e:new ARIMAEngine(), w:0.8 },
-            { n:'ADABOOST', e:new AdaBoostEngine(), w:0.9 }
+            { n:'QUANTUM', e:new QuantumSpectralV9(), w:3.8 },{ n:'BAYESIAN', e:new BayesianMetaEngine(), w:3.2 },{ n:'PATTERN', e:new PatternFingerprintEngine(), w:3.0 },{ n:'WEIBULL', e:new WeibullSurvivalEngine(), w:2.8 },{ n:'JSD', e:new JSDUncertaintyEngine(), w:2.5 },{ n:'MARKOV', e:new MarkovChainEngine(), w:2.2 },{ n:'ENTROPY', e:new EntropyFlowEngine(), w:2.0 },{ n:'MOMENTUM', e:new MomentumTrendEngine(), w:1.8 },{ n:'FRACTAL', e:new FractalGeometryEngine(), w:1.7 },{ n:'STREAK', e:new AdaptiveStreakEngine(), w:1.6 },{ n:'WAVE', e:new WaveResonanceEngine(), w:1.5 },{ n:'MEANREV', e:new MeanReversionEngine(), w:1.4 },{ n:'LSTM', e:new LSTMSimEngine(), w:1.3 },{ n:'GBOOST', e:new GradientBoostEngine(), w:1.4 },{ n:'SVM', e:new SupportVectorEngine(), w:1.2 },{ n:'RANDFOR', e:new RandomForestEngine(), w:1.3 },{ n:'KNN', e:new KNearestNeighborEngine(), w:1.1 },{ n:'XGBOOST', e:new XGBoostSimEngine(), w:1.4 },{ n:'NEURAL', e:new NeuralNetworkEngine(), w:1.0 },{ n:'ELASTIC', e:new ElasticNetEngine(), w:0.9 },{ n:'GAUSSIAN', e:new GaussianProcessEngine(), w:0.9 },{ n:'ARIMA', e:new ARIMAEngine(), w:0.8 },{ n:'ADABOOST', e:new AdaBoostEngine(), w:0.9 }
         ];
     }
     train(data) { if (data.length < 50) return false; try { for (const eng of this.engines) eng.e.train(data); this.trained = true; return true; } catch(e) { return false; } }
-    predict(data) {
-        if (!data || data.length < 10) return this.fb();
-        const seq = data.map(d => d==='T'?'T':'X');
-        let sT=0,sX=0,sw=0; const dt=[];
-        for (const eng of this.engines) { try { const r = eng.e.predict(seq); if (r) { const w = eng.w*r.conf; sT += r.prob*w; sX += (1-r.prob)*w; sw += w; dt.push(`${eng.n}:${Math.round(r.prob*100)}`); } } catch(e) {} }
-        const last = seq[seq.length-1]; let streak = 1;
-        for (let j=seq.length-2; j>=0&&seq[j]===last; j--) streak++;
-        if (streak>=10) { if (last==='T'){sX+=8;dt.push('BREAK-T10');}else{sT+=8;dt.push('BREAK-X10');} sw+=8; }
-        else if (streak>=7) { if (last==='T'){sX+=5;dt.push('BREAK-T7');}else{sT+=5;dt.push('BREAK-X7');} sw+=5; }
-        else if (streak>=5) { if (last==='T'){sX+=3;dt.push('BREAK-T5');}else{sT+=3;dt.push('BREAK-X5');} sw+=3; }
-        const lt = seq.filter(s=>s==='T').length/seq.length;
-        if (lt>0.75) { sX+=5; dt.push('BAL+'); sw+=5; } else if (lt<0.25) { sT+=5; dt.push('BAL-'); sw+=5; }
-        if (sw===0) return this.fb();
-        const prob = sT/(sT+sX); const dd = prob>0.5?'TÀI':'XỈU';
-        let tc = Math.round(Math.max(prob,1-prob)*100);
-        if (dt.length>=18) tc=Math.min(99,tc+15); else if (dt.length>=12) tc=Math.min(99,tc+10); else if (dt.length>=8) tc=Math.min(99,tc+7); else if (dt.length>=5) tc=Math.min(99,tc+4);
-        tc = Math.min(99, Math.max(55, tc));
-        return {duDoan:dd,doTinCay:tc,chiTiet:dt.slice(0,7).join(' | '),soMau:dt.length};
-    }
+    predict(data) { if (!data || data.length < 10) return this.fb(); const seq = data.map(d => d==='T'?'T':'X'); let sT=0,sX=0,sw=0; const dt=[]; for (const eng of this.engines) { try { const r = eng.e.predict(seq); if (r) { const w = eng.w*r.conf; sT += r.prob*w; sX += (1-r.prob)*w; sw += w; dt.push(`${eng.n}:${Math.round(r.prob*100)}`); } } catch(e) {} } const last = seq[seq.length-1]; let streak = 1; for (let j=seq.length-2; j>=0&&seq[j]===last; j--) streak++; if (streak>=10) { if (last==='T'){sX+=8;dt.push('BREAK-T10');}else{sT+=8;dt.push('BREAK-X10');} sw+=8; } else if (streak>=7) { if (last==='T'){sX+=5;dt.push('BREAK-T7');}else{sT+=5;dt.push('BREAK-X7');} sw+=5; } else if (streak>=5) { if (last==='T'){sX+=3;dt.push('BREAK-T5');}else{sT+=3;dt.push('BREAK-X5');} sw+=3; } const lt = seq.filter(s=>s==='T').length/seq.length; if (lt>0.75) { sX+=5; dt.push('BAL+'); sw+=5; } else if (lt<0.25) { sT+=5; dt.push('BAL-'); sw+=5; } if (sw===0) return this.fb(); const prob = sT/(sT+sX); const dd = prob>0.5?'TÀI':'XỈU'; let tc = Math.round(Math.max(prob,1-prob)*100); if (dt.length>=18) tc=Math.min(99,tc+15); else if (dt.length>=12) tc=Math.min(99,tc+10); else if (dt.length>=8) tc=Math.min(99,tc+7); else if (dt.length>=5) tc=Math.min(99,tc+4); tc = Math.min(99, Math.max(55, tc)); return {duDoan:dd,doTinCay:tc,chiTiet:dt.slice(0,7).join(' | '),soMau:dt.length}; }
     fb() { if (this.stats.total>50) return {duDoan:this.stats.dung>this.stats.sai?'TÀI':'XỈU',doTinCay:52,chiTiet:'TREND',soMau:0}; return {duDoan:'TÀI',doTinCay:51,chiTiet:'INIT',soMau:0}; }
-    update(prediction, actual) {
-        const pr = prediction==='TÀI'?'T':'X'; const ac = actual==='TÀI'?'T':'X'; const ok = pr===ac;
-        this.stats.total++;
-        if (ok) { this.stats.dung++; this.stats.chuoi = this.stats.chuoi>=0?this.stats.chuoi+1:1; if (this.stats.chuoi>this.stats.chuoi_dai) this.stats.chuoi_dai=this.stats.chuoi; this.stats.chuoi_thang_hientai++; this.stats.chuoi_thua_hientai=0; this.stats.homnay.dung++; }
-        else { this.stats.sai++; this.stats.chuoi = this.stats.chuoi<=0?this.stats.chuoi-1:-1; if (Math.abs(this.stats.chuoi)>this.stats.chuoi_thua_dai) this.stats.chuoi_thua_dai=Math.abs(this.stats.chuoi); this.stats.chuoi_thua_hientai++; this.stats.chuoi_thang_hientai=0; this.stats.homnay.sai++; }
-        this.stats.homnay.tong++; this.stats.tyle = this.stats.total>0?Math.round((this.stats.dung/this.stats.total)*100):0;
-    }
+    update(prediction, actual) { const pr = prediction==='TÀI'?'T':'X'; const ac = actual==='TÀI'?'T':'X'; const ok = pr===ac; this.stats.total++; if (ok) { this.stats.dung++; this.stats.chuoi = this.stats.chuoi>=0?this.stats.chuoi+1:1; if (this.stats.chuoi>this.stats.chuoi_dai) this.stats.chuoi_dai=this.stats.chuoi; this.stats.chuoi_thang_hientai++; this.stats.chuoi_thua_hientai=0; this.stats.homnay.dung++; } else { this.stats.sai++; this.stats.chuoi = this.stats.chuoi<=0?this.stats.chuoi-1:-1; if (Math.abs(this.stats.chuoi)>this.stats.chuoi_thua_dai) this.stats.chuoi_thua_dai=Math.abs(this.stats.chuoi); this.stats.chuoi_thua_hientai++; this.stats.chuoi_thang_hientai=0; this.stats.homnay.sai++; } this.stats.homnay.tong++; this.stats.tyle = this.stats.total>0?Math.round((this.stats.dung/this.stats.total)*100):0; }
     save() { try { fs.writeFileSync(`.${this.type}_data`, JSON.stringify({history:this.history.slice(0,2000),stats:this.stats,lastPhien:this.lastPhien,trained:this.trained}), 'utf8'); } catch(e) {} }
     load() { try { const f = `.${this.type}_data`; if (fs.existsSync(f)) { const d = JSON.parse(fs.readFileSync(f,'utf8')); if (d.history) this.history = d.history; if (d.stats) this.stats = d.stats; if (d.lastPhien) this.lastPhien = d.lastPhien; if (d.trained) this.trained = d.trained; } } catch(e) {} }
 }
@@ -191,129 +145,148 @@ brainMD5.load();
 // ============================================================
 // AUTO
 // ============================================================
-async function processGame(brain, type) {
-    try {
-        const data = await fetchData(type);
-        if (!data||data.length===0) return;
-        const cur = data[0].phien;
-        if (brain.lastPhien===cur) return;
-        for (const r of brain.history) { if (r.status&&r.status!=='') continue; const a = data.find(d=>d.phien.toString()===r.phien_hien_tai); if (a) { r.status=(r.prediction===a.result)?'✅':'❌'; r.actual=a.result; brain.update(r.prediction,a.result); } }
-        const ex = brain.history.find(h=>h.phien_hien_tai===(cur+1).toString()); if (ex) return;
-        const hd = data.map(d=>d.result==='TÀI'?'T':'X'); if (hd.length>=50) brain.train(hd);
-        const result = brain.predict(hd);
-        const rec = {phien:data[0].phien,phien_hien_tai:(data[0].phien+1).toString(),dice:`${data[0].dice1}-${data[0].dice2}-${data[0].dice3}`,total:data[0].total,actual:data[0].result,prediction:result.duDoan,confidence:result.doTinCay,detail:result.chiTiet,status:'',timestamp:new Date().toISOString(),soMau:result.soMau||0};
-        brain.history.unshift(rec); if (brain.history.length>2000) brain.history = brain.history.slice(0,2000);
-        brain.lastPhien = cur; brain.save();
-    } catch(e) {}
-}
+async function processGame(brain, type) { try { const data = await fetchData(type); if (!data||data.length===0) return; const cur = data[0].phien; if (brain.lastPhien===cur) return; for (const r of brain.history) { if (r.status&&r.status!=='') continue; const a = data.find(d=>d.phien.toString()===r.phien_hien_tai); if (a) { r.status=(r.prediction===a.result)?'✅':'❌'; r.actual=a.result; brain.update(r.prediction,a.result); } } const ex = brain.history.find(h=>h.phien_hien_tai===(cur+1).toString()); if (ex) return; const hd = data.map(d=>d.result==='TÀI'?'T':'X'); if (hd.length>=50) brain.train(hd); const result = brain.predict(hd); const rec = {phien:data[0].phien,phien_hien_tai:(data[0].phien+1).toString(),dice:`${data[0].dice1}-${data[0].dice2}-${data[0].dice3}`,total:data[0].total,actual:data[0].result,prediction:result.duDoan,confidence:result.doTinCay,detail:result.chiTiet,status:'',timestamp:new Date().toISOString(),soMau:result.soMau||0}; brain.history.unshift(rec); if (brain.history.length>2000) brain.history = brain.history.slice(0,2000); brain.lastPhien = cur; brain.save(); } catch(e) {} }
 async function autoProcess() { await Promise.all([processGame(brainHU,'hu'),processGame(brainMD5,'md5')]); }
 function startAuto() { setTimeout(autoProcess,3000); setInterval(autoProcess,5000); }
 
 // ============================================================
-// HTML
+// HTML TRANG CHỦ + DASHBOARD
 // ============================================================
-const CSS = `:root{--bg:#010314;--bg2:#060b24;--bg3:#0d1335;--b:rgba(255,255,255,0.04);--ba:rgba(123,97,255,0.3);--t:#e2e8f0;--t2:#8899b8;--t3:#4a5578;--g:linear-gradient(135deg,#7b61ff,#3b82f6,#06b6d4,#8b5cf6);--ok:#22c55e;--no:#ef4444;--w:#f59e0b;--c:#06b6d4;--p:#7b61ff}
+function homePage(token) {
+    return `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>CRYSTAL TX</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#010314;--bg2:#060b24;--bg3:#0d1335;--b:rgba(255,255,255,0.06);--t:#e2e8f0;--t2:#8899b8;--t3:#4a5578;--g:linear-gradient(135deg,#7b61ff,#3b82f6,#06b6d4);--ok:#22c55e;--no:#ef4444;--w:#f59e0b;--c:#06b6d4;--p:#7b61ff}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--t);min-height:100vh;overflow-x:hidden}
 .stars{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
 .star{position:absolute;background:#fff;border-radius:50%;animation:tw 3s infinite}
 @keyframes tw{0%,100%{opacity:0.15}50%{opacity:0.7}}
 .nebula{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
-.nebula div{position:absolute;border-radius:50%;filter:blur(130px);opacity:0.22}
-.n1{width:700px;height:700px;background:rgba(123,97,255,0.15);top:-250px;left:-150px;animation:f1 25s infinite}
-.n2{width:600px;height:600px;background:rgba(6,182,212,0.1);bottom:-200px;right:-100px;animation:f2 30s infinite}
+.n1{position:absolute;width:700px;height:700px;background:rgba(123,97,255,0.12);border-radius:50%;filter:blur(130px);top:-250px;left:-150px;animation:f1 25s infinite}
+.n2{position:absolute;width:600px;height:600px;background:rgba(6,182,212,0.08);border-radius:50%;filter:blur(130px);bottom:-200px;right:-100px;animation:f2 30s infinite}
 @keyframes f1{0%,100%{transform:translate(0,0)}50%{transform:translate(100px,60px)}}
 @keyframes f2{0%,100%{transform:translate(0,0)}50%{transform:translate(-80px,-40px)}}
 .grid{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.02) 1px,transparent 1px);background-size:60px 60px}
-.app{position:relative;z-index:1;max-width:1400px;margin:0 auto;padding:16px}
-.glass{background:rgba(13,19,53,0.5);backdrop-filter:blur(30px);border:1px solid var(--b);border-radius:16px}
-.gc{background:rgba(13,19,53,0.4);backdrop-filter:blur(20px);border:1px solid var(--b);border-radius:14px;padding:18px;transition:all 0.3s}
-.gc:hover{border-color:var(--ba);transform:translateY(-3px)}
-.tg{background:var(--g);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-@keyframes glow{0%,100%{filter:drop-shadow(0 0 8px rgba(123,97,255,0.3))}50%{filter:drop-shadow(0 0 25px rgba(123,97,255,0.7))}}
-@keyframes slideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
-input{width:100%;padding:12px 16px;background:var(--bg2);border:1px solid var(--b);border-radius:10px;color:var(--t);font-size:13px;font-family:'JetBrains Mono',monospace;outline:none}
-input:focus{border-color:var(--ba);box-shadow:0 0 0 3px rgba(123,97,255,0.1)}
-.btn{width:100%;padding:14px;background:var(--g);border:none;border-radius:10px;color:#fff;font-weight:700;font-size:14px;cursor:pointer;transition:all 0.3s}
-.btn:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(123,97,255,0.4)}
-.sv{font-family:'Orbitron',monospace;font-size:26px;font-weight:800}
-.mono{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--t2)}
-.pred{display:inline-block;padding:3px 10px;border-radius:6px;font-weight:700;font-size:9px}
-.pred-t{background:rgba(34,197,94,0.08);color:var(--ok)}.pred-x{background:rgba(239,68,68,0.08);color:var(--no)}
-.cb{display:inline-block;width:45px;height:3px;background:rgba(255,255,255,0.05);border-radius:2px;vertical-align:middle;margin-right:6px}
-.cf{height:100%;border-radius:2px;background:var(--g)}.ct{font-weight:600;color:var(--c);font-size:9px}
-.st{display:inline-block;padding:2px 8px;border-radius:4px;font-weight:700;font-size:7px;text-transform:uppercase;letter-spacing:1px}
-.st-s{background:rgba(34,197,94,0.08);color:var(--ok)}.st-d{background:rgba(239,68,68,0.08);color:var(--no)}.st-w{background:rgba(245,158,11,0.08);color:var(--w)}
-.dt{font-size:8px;color:var(--t3);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.dot{width:18px;height:18px;border-radius:3px;font-size:7px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;margin:1px;font-family:'JetBrains Mono',monospace}
-.dot-s{background:rgba(34,197,94,0.15);color:var(--ok);border:1px solid rgba(34,197,94,0.2)}.dot-s:hover{transform:scale(1.3)}
-.dot-d{background:rgba(239,68,68,0.15);color:var(--no);border:1px solid rgba(239,68,68,0.2)}.dot-d:hover{transform:scale(1.3)}
-.dot-w{background:rgba(245,158,11,0.15);color:var(--w);border:1px solid rgba(245,158,11,0.2)}
-table{width:100%;border-collapse:collapse;font-size:10px}
-th{background:rgba(255,255,255,0.015);padding:9px 12px;text-align:left;font-weight:600;font-size:8px;text-transform:uppercase;letter-spacing:1.5px;color:var(--t3);border-bottom:1px solid var(--b)}
-td{padding:7px 12px;border-bottom:1px solid rgba(255,255,255,0.012)}tr:hover td{background:rgba(255,255,255,0.008)}
-.r-s{border-left:2px solid transparent}.r-s:hover{border-left-color:rgba(34,197,94,0.3)}
-.r-d{border-left:2px solid transparent}.r-d:hover{border-left-color:rgba(239,68,68,0.3)}
-.badge{display:inline-flex;align-items:center;gap:5px;padding:5px 14px;border-radius:16px;font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px}
-.badge-ok{background:rgba(34,197,94,0.08);color:var(--ok);border:1px solid rgba(34,197,94,0.15)}
-.badge-p{background:rgba(123,97,255,0.08);color:var(--p);border:1px solid rgba(123,97,255,0.15)}
-.pulse{width:7px;height:7px;border-radius:50%;background:var(--ok);display:inline-block;animation:pulse 1.5s infinite}
-@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(34,197,94,0.4)}50%{opacity:0.4;box-shadow:0 0 0 10px rgba(34,197,94,0)}}
-::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.06)}`;
-
-function loginPage(err) {
-    const e = err ? `<div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);padding:14px;border-radius:10px;color:#ef4444;font-size:13px;text-align:center;margin-bottom:20px">⚠️ ${err}</div>` : '';
-    return `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>CRYSTAL TX</title>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"><style>${CSS}
-.card{background:rgba(13,19,53,0.7);backdrop-filter:blur(40px);border:1px solid var(--b);border-radius:24px;padding:44px 36px;width:100%;max-width:460px;box-shadow:0 50px 120px rgba(0,0,0,0.6);animation:slideUp 0.6s ease-out}
+.app{position:relative;z-index:1;max-width:800px;margin:0 auto;padding:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:24px}
+.hero{text-align:center;animation:fadeIn 0.8s}
+@keyframes fadeIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.hero .icon{font-size:72px;animation:glow 3s infinite;display:inline-block}
+@keyframes glow{0%,100%{filter:drop-shadow(0 0 10px rgba(123,97,255,0.4))}50%{filter:drop-shadow(0 0 30px rgba(123,97,255,0.8))}}
+.hero h1{font-family:'Orbitron',sans-serif;font-size:32px;font-weight:900;margin-top:12px;background:var(--g);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero p{font-size:12px;color:var(--t2);margin-top:8px;letter-spacing:2px;text-transform:uppercase;font-family:'JetBrains Mono',monospace}
+.cards{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;width:100%;max-width:600px}
+@media(max-width:500px){.cards{grid-template-columns:1fr}}
+.card{background:rgba(13,19,53,0.6);backdrop-filter:blur(20px);border:1px solid var(--b);border-radius:20px;padding:32px 24px;text-align:center;cursor:pointer;transition:all 0.4s;text-decoration:none;color:var(--t);animation:fadeIn 0.8s}
+.card:hover{transform:translateY(-6px);border-color:rgba(123,97,255,0.4);box-shadow:0 20px 60px rgba(0,0,0,0.5)}
+.card .ci{font-size:48px;margin-bottom:12px}
+.card h2{font-family:'Orbitron',sans-serif;font-size:18px;font-weight:700;margin-bottom:6px}
+.card .sub{font-size:10px;color:var(--t3);font-family:'JetBrains Mono',monospace;letter-spacing:1px}
+.card-hu:hover{background:rgba(123,97,255,0.08)}
+.card-md5:hover{background:rgba(6,182,212,0.08)}
+.footer{text-align:center;font-size:8px;color:var(--t3);font-family:'JetBrains Mono',monospace;margin-top:8px;animation:fadeIn 1s}
 </style></head><body>
 <div class="stars">${Array(50).fill(0).map((_,i)=>`<div class="star" style="left:${Math.random()*100}%;top:${Math.random()*100}%;width:${1+Math.random()*2}px;height:${1+Math.random()*2}px;animation-delay:${Math.random()*3}s"></div>`).join('')}</div>
 <div class="nebula"><div class="n1"></div><div class="n2"></div></div><div class="grid"></div>
-<div style="position:relative;z-index:1;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px"><div class="card">
-<div style="text-align:center;margin-bottom:32px"><div style="font-size:56px;animation:glow 3s infinite;display:inline-block">💎</div><h1 style="font-family:'Orbitron',sans-serif;font-size:28px;font-weight:900;margin-top:12px"><span class="tg">CRYSTAL TX</span></h1><p style="font-size:10px;color:var(--t3);font-family:'Space Grotesk',sans-serif;letter-spacing:3px;text-transform:uppercase;margin-top:6px">23 Engines</p></div>
-${e}
-<form onsubmit="login(event)"><div style="margin-bottom:24px"><label style="display:block;font-size:9px;color:var(--t2);text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;font-weight:600">Access Key</label><input type="password" id="p" autocomplete="off" required></div>
-<button type="submit" class="btn">🔐 Access</button></form>
-<div id="res" style="margin-top:24px"></div></div></div>
-<script>
-async function login(e){e.preventDefault();
-const p=document.getElementById('p').value.trim(),r=document.getElementById('res');
-if(!p){r.innerHTML='<div style="background:rgba(239,68,68,0.1);padding:14px;border-radius:10px;color:#ef4444;font-size:13px">Nhập key</div>';return}
-r.innerHTML='<div style="background:rgba(6,182,212,0.1);padding:14px;border-radius:10px;color:#06b6d4;font-size:13px">⏳ Đang xác thực...</div>';
-try{const rs=await fetch('/_api/access',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:p})});
-const d=await rs.json();
-if(rs.ok&&d.token){window.location.href='/_hu?_token='+d.token}
-else{r.innerHTML='<div style="background:rgba(239,68,68,0.1);padding:14px;border-radius:10px;color:#ef4444;font-size:13px">❌ '+(d.error||'Sai key')+'</div>'}}
-catch(ex){r.innerHTML='<div style="background:rgba(239,68,68,0.1);padding:14px;border-radius:10px;color:#ef4444;font-size:13px">🔌 Lỗi kết nối</div>'}}</script></body></html>`;
+<div class="app">
+<div class="hero"><div class="icon">💎</div><h1>CRYSTAL TX</h1><p>Hệ Thống Dự Đoán • 23 Engines</p></div>
+<div class="cards">
+<a href="/_hu?_token=${token}" class="card card-hu"><div class="ci">🎰</div><h2>TÀI XỈU HŨ</h2><div class="sub">Live Prediction • Auto 5s</div></a>
+<a href="/_md5?_token=${token}" class="card card-md5"><div class="ci">🔮</div><h2>TÀI XỈU MD5</h2><div class="sub">Live Prediction • Auto 5s</div></a></div>
+<div class="footer">💎 CRYSTAL TX • QUANTUM • BAYESIAN • PATTERN • WEIBULL • JSD • MARKOV • ENTROPY • MOMENTUM • FRACTAL • STREAK • WAVE • MEANREV • LSTM • GBOOST • SVM • RANDFOR • KNN • XGBOOST • NEURAL • ELASTIC • GAUSSIAN • ARIMA • ADABOOST</div></div></body></html>`;
 }
 
-function dashboardPage(brain, type) {
-    const s = brain.stats; const all = (brain.history||[]); const r50 = all.slice(0,50); const r1000 = all.slice(0,1000);
-    let td50=0,ts50=0,td1k=0,ts1k=0;
-    for(const r of r50){if(r.status==='✅')td50++;else if(r.status==='❌')ts50++;}
-    for(const r of r1000){if(r.status==='✅')td1k++;else if(r.status==='❌')ts1k++;}
-    let rows='';
-    for(const r of r50){const st=r.status||'⏳',c=st==='✅'?'s':st==='❌'?'d':'w',t=st==='✅'?'WIN':st==='❌'?'LOSE':'WAIT';rows+=`<tr class="r-${c}"><td class="mono">#${r.phien_hien_tai||'-'}</td><td><span class="pred pred-${r.prediction==='TÀI'?'t':'x'}">${r.prediction||'-'}</span></td><td><div class="cb"><div class="cf" style="width:${r.confidence||0}%"></div></div><span class="ct">${r.confidence||0}%</span></td><td><span class="st st-${c}">${t}</span></td><td>${r.actual||'-'}</td><td class="dt">${(r.detail||'-').substring(0,30)}</td></tr>`;}
-    let dots='';
-    for(const r of r1000){const st=r.status||'⏳',c=st==='✅'?'s':st==='❌'?'d':'w',t=st==='✅'?'W':st==='❌'?'L':'?';dots+=`<span class="dot dot-${c}" title="#${r.phien_hien_tai}: ${r.prediction} → ${r.actual||'?'}">${t}</span>`;}
-    const wr=s.tyle;const wc=wr>=70?'#22c55e':wr>=60?'#f59e0b':'#ef4444';
+function dashboardPage(brain, type, token) {
+    const s = brain.stats; const all = (brain.history||[]); const recent = all.slice(0,15);
+    let td=0,ts=0; for(const r of recent){if(r.status==='✅')td++;else if(r.status==='❌')ts++;}
+    let histHTML = '';
+    for(const r of recent.slice(0,12)){
+        const st=r.status||'⏳'; const cls=st==='✅'?'tai-text':st==='❌'?'xiu-text':'';
+        const pred=r.prediction||'--'; const conf=r.confidence||0;
+        histHTML += `<div class="hl-item"><span class="hl-phien">#${r.phien_hien_tai||'-'}</span><span class="${cls}" style="font-weight:700;font-size:14px">${pred}</span><span class="hl-conf">${conf}%</span><span class="hl-time">${(r.timestamp||'').substring(11,16)||'--:--'}</span></div>`;
+    }
+    const phien = recent[0]?.phien_hien_tai || '---';
+    const pred = recent[0]?.prediction || '...';
+    const conf = recent[0]?.confidence || 0;
+    const cls = pred==='TÀI'?'tai':pred==='XỈU'?'xiu':'loading';
+    const confBarCls = pred==='TÀI'?'tai-bar':pred==='XỈU'?'xiu-bar':'def-bar';
+    const gameName = type==='hu'?'Tài Xỉu Hũ':'Tài Xỉu MD5';
     
-    return `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>${type.toUpperCase()} | CRYSTAL TX</title>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"><style>${CSS}</style></head><body>
-<div class="stars">${Array(40).fill(0).map((_,i)=>`<div class="star" style="left:${Math.random()*100}%;top:${Math.random()*100}%;width:${1+Math.random()*2}px;height:${1+Math.random()*2}px;animation-delay:${Math.random()*3}s"></div>`).join('')}</div>
-<div class="nebula"><div class="n1"></div><div class="n2"></div></div><div class="grid"></div><div class="app">
-<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;margin-bottom:20px">
-<div style="display:flex;align-items:center;gap:12px"><div style="font-size:38px;animation:glow 3s infinite">💎</div><div><h1 style="font-family:'Orbitron',sans-serif;font-size:22px;font-weight:900"><span class="tg">CRYSTAL TX</span></h1><p style="font-size:8px;color:var(--t3);font-family:'Space Grotesk',sans-serif;letter-spacing:2px">${type.toUpperCase()} • 23 ENGINES</p></div></div>
-<div style="display:flex;gap:8px"><span class="badge badge-ok"><span class="pulse"></span>LIVE</span><span class="badge badge-p">23 ENGINES</span></div></div>
-<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
-<div class="gc"><div style="font-size:8px;color:var(--t3);text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;font-weight:600">📊 TOTAL</div><div class="sv" style="color:var(--t)">${s.total}</div></div>
-<div class="gc"><div style="font-size:8px;color:var(--t3);text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;font-weight:600">✅ WIN RATE</div><div class="sv" style="color:${wc}">${wr}%</div></div>
-<div class="gc"><div style="font-size:8px;color:var(--t3);text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;font-weight:600">🏆 BEST</div><div class="sv" style="color:#22c55e">${s.chuoi_dai}</div></div>
-<div class="gc"><div style="font-size:8px;color:var(--t3);text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;font-weight:600">⚠️ WORST</div><div class="sv" style="color:#ef4444">${s.chuoi_thua_dai||0}</div></div></div>
-<div class="glass" style="margin-bottom:20px"><div style="padding:14px 18px;border-bottom:1px solid var(--b);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px"><h3 style="font-family:'Orbitron',monospace;font-size:12px;font-weight:600">📜 HISTORY (${r1000.length})</h3><span class="badge badge-p">${td1k}W/${ts1k}L</span></div><div style="padding:14px;max-height:300px;overflow-y:auto;line-height:1.8">${dots||'Loading...'}</div></div>
-<div class="glass"><div style="padding:14px 18px;border-bottom:1px solid var(--b);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px"><h3 style="font-family:'Orbitron',monospace;font-size:12px;font-weight:600">📋 LAST 50</h3></div>
-<div style="overflow-x:auto"><table><thead><tr><th>Session</th><th>Predict</th><th>Confidence</th><th>Result</th><th>Actual</th><th>Engines</th></tr></thead><tbody>${rows||'<tr><td colspan="6" style="text-align:center;padding:15px">Loading...</td></tr>'}</tbody></table></div></div>
-<div style="text-align:center;padding:12px;font-size:7px;color:var(--t3);font-family:'Space Grotesk',sans-serif;margin-top:12px">💎 CRYSTAL TX • 23 ENGINES • ${new Date().toLocaleString('vi-VN')}</div></div>
+    return `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=yes"><title>${gameName} | CRYSTAL TX</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0b0e14;color:#eef2f6;font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;min-height:100vh;display:flex;flex-direction:column}
+:root{--bg:#0b0e14;--bg2:#131a24;--card:#0f1620;--border:#1e2a3a;--border2:#2d3d52;--text:#f0f4fa;--sub:#b8cce0;--muted:#7a8fa3;--primary:#5b9aff;--accent:#b084f7;--gold:#facc15;--green:#2dd4a8;--red:#f87171;--r:24px;--r-sm:14px;--shadow:0 20px 60px rgba(0,0,0,0.7)}
+.game-page{max-width:640px;margin:0 auto;padding:24px 16px 40px;width:100%;flex:1}
+.robot-card{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow);backdrop-filter:blur(4px);transition:0.3s}
+.rc-header{padding:18px 22px;background:linear-gradient(145deg,rgba(91,154,255,0.07),rgba(176,132,247,0.04));border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.rc-icon-fb{width:48px;height:48px;border-radius:16px;background:linear-gradient(135deg,var(--primary),var(--accent));display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;font-weight:700;font-family:'Inter',sans-serif;flex-shrink:0;box-shadow:0 6px 16px rgba(91,154,255,0.25)}
+.rc-name{font-size:18px;font-weight:700;color:var(--text);letter-spacing:-0.3px;background:linear-gradient(135deg,#fff,#b8cce0);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.rc-type{font-size:10px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:0.8px;display:flex;align-items:center;gap:6px}
+.rc-live{margin-left:auto;display:inline-flex;align-items:center;gap:6px;background:rgba(45,212,168,0.12);color:var(--green);border:1px solid rgba(45,212,168,0.2);padding:4px 14px;border-radius:40px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.6px;flex-shrink:0}
+.rc-live i{font-size:7px;animation:blink 1.4s infinite}
+@keyframes blink{0%,100%{opacity:0.3}50%{opacity:1}}
+.pred-display{padding:32px 20px 20px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px}
+.pd-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:2px;background:var(--bg2);padding:2px 14px;border-radius:40px;border:1px solid var(--border)}
+.pd-phien{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--sub);background:var(--bg2);padding:4px 18px;border-radius:40px;border:1px solid var(--border);display:inline-block;margin-top:2px}
+.pd-result{font-family:'Inter',sans-serif;font-size:clamp(56px,16vw,86px);font-weight:800;line-height:1.1;letter-spacing:1px;transition:all 0.3s ease;margin:8px 0 4px}
+.pd-result.tai{color:#2dd4a8;text-shadow:0 0 60px rgba(45,212,168,0.5)}
+.pd-result.xiu{color:#f87171;text-shadow:0 0 60px rgba(248,113,113,0.5)}
+.pd-result.loading{color:var(--muted);animation:pulse 1.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:0.3}50%{opacity:1}}
+.conf-track{width:100%;max-width:320px;background:var(--bg2);border:1px solid var(--border);border-radius:40px;height:8px;overflow:hidden;margin:6px 0 2px}
+.conf-fill{height:100%;border-radius:40px;transition:width 0.6s cubic-bezier(0.34,1.56,0.64,1);width:0%}
+.conf-fill.tai-bar{background:linear-gradient(90deg,#2dd4a8,#38bdf8);width:${conf}%}
+.conf-fill.xiu-bar{background:linear-gradient(90deg,#f87171,#fb923c);width:${conf}%}
+.conf-fill.def-bar{background:linear-gradient(90deg,var(--primary),var(--accent));width:${conf}%}
+.conf-pct{font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:700;color:var(--gold);letter-spacing:0.5px}
+.conf-lbl{font-size:10px;color:var(--muted);letter-spacing:1.2px;font-weight:600}
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:0 20px 20px}
+.stat-item{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-sm);padding:14px 6px;text-align:center;transition:0.2s;backdrop-filter:blur(2px)}
+.stat-item:hover{border-color:var(--border2)}
+.si-val{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:var(--text)}
+.si-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;margin-top:4px;font-weight:600}
+.rc-footer{padding:12px 20px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--muted);flex-wrap:wrap;gap:6px;background:rgba(0,0,0,0.15)}
+.hist-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);margin-top:18px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.3)}
+.hist-head{padding:14px 20px;border-bottom:1px solid var(--border);font-size:13px;font-weight:700;color:var(--sub);display:flex;align-items:center;gap:10px;background:rgba(255,255,255,0.02)}
+.hist-body{padding:12px 14px 14px}
+.hl-item{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--bg2);border-radius:var(--r-sm);border:1px solid var(--border);margin-bottom:7px;font-size:12px;transition:0.15s}
+.hl-item:hover{border-color:var(--border2)}
+.hl-phien{font-family:'JetBrains Mono',monospace;color:var(--muted);font-size:11px;font-weight:600}
+.hl-conf{font-size:10px;color:var(--gold);font-family:'JetBrains Mono',monospace;font-weight:700}
+.hl-time{font-size:10px;color:var(--muted)}
+.tai-text{color:#2dd4a8;font-weight:700}
+.xiu-text{color:#f87171;font-weight:700}
+.back-btn{display:inline-flex;align-items:center;gap:6px;color:var(--primary);text-decoration:none;font-size:11px;font-weight:600;padding:8px 16px;background:rgba(91,154,255,0.08);border:1px solid rgba(91,154,255,0.2);border-radius:40px;transition:all 0.3s}
+.back-btn:hover{background:rgba(91,154,255,0.15)}
+@media(max-width:480px){.game-page{padding:16px 12px 30px}.rc-header{padding:14px 16px;gap:10px}.rc-name{font-size:15px}.stats-row{gap:8px;padding:0 14px 14px}.stat-item{padding:10px 4px}.si-val{font-size:15px}.pred-display{padding:22px 12px 14px}}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:10px}
+</style></head><body>
+<div class="game-page">
+<div class="robot-card">
+<div class="rc-header">
+<div class="rc-icon-fb"><i class="fas fa-robot"></i></div>
+<div><div class="rc-name">${gameName}</div><div class="rc-type"><i class="fas fa-brain"></i> 23 Engines · Real-time</div></div>
+<div class="rc-live"><i class="fas fa-circle"></i> LIVE</div></div>
+<div class="pred-display">
+<div class="pd-label"><i class="fas fa-bullseye"></i> Dự đoán phiên tiếp theo</div>
+<div class="pd-phien">Phiên #${phien}</div>
+<div class="pd-result ${cls}">${pred}</div>
+<div class="conf-track"><div class="conf-fill ${confBarCls}"></div></div>
+<div class="conf-pct">${conf}%</div>
+<div class="conf-lbl">ĐỘ TIN CẬY</div></div>
+<div class="stats-row">
+<div class="stat-item"><div class="si-val">${phien}</div><div class="si-lbl">Phiên hiện tại</div></div>
+<div class="stat-item"><div class="si-val">${conf}%</div><div class="si-lbl">Tỷ lệ tin cậy</div></div>
+<div class="stat-item"><div class="si-val">${s.tyle}%</div><div class="si-lbl">Tỷ lệ thắng</div></div></div>
+<div class="rc-footer">
+<a href="/_home?_token=${token}" class="back-btn"><i class="fas fa-arrow-left"></i> Trang chủ</a>
+<span><i class="fas fa-sync-alt fa-fw"></i> Tự động 5s</span>
+<span style="color:var(--green)"><i class="fas fa-check-circle"></i> Online</span></div></div>
+<div class="hist-card">
+<div class="hist-head"><i class="fas fa-clock-rotate-left"></i> Lịch sử dự đoán</div>
+<div class="hist-body">${histHTML||'<div style="color:var(--muted);font-size:12px;text-align:center;padding:6px 0">Đang tải...</div>'}</div></div></div>
 <script>setTimeout(()=>location.reload(),5000);</script></body></html>`;
 }
 
@@ -321,10 +294,49 @@ function dashboardPage(brain, type) {
 // API
 // ============================================================
 app.get('/_login', (req, res) => {
-    const err = req.query.error === 'unauthorized' ? 'Vui lòng đăng nhập' : req.query.error === 'expired' ? 'Token hết hạn' : '';
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.send(loginPage(err));
+    res.send(`<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>CRYSTAL TX</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#010314;--bg2:#060b24;--bg3:#0d1335;--b:rgba(255,255,255,0.06);--t:#e2e8f0;--t2:#8899b8;--t3:#4a5578;--g:linear-gradient(135deg,#7b61ff,#3b82f6,#06b6d4)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--t);min-height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.stars{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.star{position:absolute;background:#fff;border-radius:50%;animation:tw 3s infinite}
+@keyframes tw{0%,100%{opacity:0.15}50%{opacity:0.7}}
+.nebula{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.n1{position:absolute;width:700px;height:700px;background:rgba(123,97,255,0.12);border-radius:50%;filter:blur(130px);top:-250px;left:-150px;animation:f1 25s infinite}
+.n2{position:absolute;width:600px;height:600px;background:rgba(6,182,212,0.08);border-radius:50%;filter:blur(130px);bottom:-200px;right:-100px;animation:f2 30s infinite}
+@keyframes f1{0%,100%{transform:translate(0,0)}50%{transform:translate(100px,60px)}}
+@keyframes f2{0%,100%{transform:translate(0,0)}50%{transform:translate(-80px,-40px)}}
+.card{position:relative;z-index:1;background:rgba(13,19,53,0.7);backdrop-filter:blur(40px);border:1px solid var(--b);border-radius:24px;padding:44px 36px;width:100%;max-width:460px;box-shadow:0 50px 120px rgba(0,0,0,0.6);animation:slideUp 0.6s ease-out}
+@keyframes slideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+@keyframes glow{0%,100%{filter:drop-shadow(0 0 10px rgba(123,97,255,0.4))}50%{filter:drop-shadow(0 0 30px rgba(123,97,255,0.8))}}
+input{width:100%;padding:12px 16px;background:var(--bg2);border:1px solid var(--b);border-radius:10px;color:var(--t);font-size:13px;font-family:'JetBrains Mono',monospace;outline:none}
+input:focus{border-color:rgba(123,97,255,0.3);box-shadow:0 0 0 3px rgba(123,97,255,0.1)}
+.btn{width:100%;padding:14px;background:var(--g);border:none;border-radius:10px;color:#fff;font-weight:700;font-size:14px;cursor:pointer;transition:all 0.3s}
+.btn:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(123,97,255,0.4)}
+</style></head><body>
+<div class="stars">${Array(50).fill(0).map((_,i)=>`<div class="star" style="left:${Math.random()*100}%;top:${Math.random()*100}%;width:${1+Math.random()*2}px;height:${1+Math.random()*2}px;animation-delay:${Math.random()*3}s"></div>`).join('')}</div>
+<div class="nebula"><div class="n1"></div><div class="n2"></div></div>
+<div class="card">
+<div style="text-align:center;margin-bottom:32px"><div style="font-size:56px;animation:glow 3s infinite;display:inline-block">💎</div><h1 style="font-family:'Orbitron',sans-serif;font-size:28px;font-weight:900;margin-top:12px"><span style="background:var(--g);-webkit-background-clip:text;-webkit-text-fill-color:transparent">CRYSTAL TX</span></h1><p style="font-size:10px;color:var(--t3);font-family:'JetBrains Mono',monospace;letter-spacing:3px;margin-top:6px">23 Engines</p></div>
+${req.query.error?`<div style="background:rgba(239,68,68,0.1);padding:14px;border-radius:10px;color:#ef4444;font-size:13px;text-align:center;margin-bottom:20px">⚠️ ${req.query.error==='unauthorized'?'Vui lòng đăng nhập':'Token hết hạn'}</div>`:''}
+<form onsubmit="login(event)"><div style="margin-bottom:24px"><label style="display:block;font-size:9px;color:var(--t2);text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;font-weight:600">Access Key</label><input type="password" id="p" autocomplete="off" required></div>
+<button type="submit" class="btn">🔐 Access</button></form>
+<div id="res" style="margin-top:24px"></div></div>
+<script>
+async function login(e){e.preventDefault();
+const p=document.getElementById('p').value.trim(),r=document.getElementById('res');
+if(!p){r.innerHTML='<div style="background:rgba(239,68,68,0.1);padding:14px;border-radius:10px;color:#ef4444;font-size:13px">Nhập key</div>';return}
+r.innerHTML='<div style="background:rgba(6,182,212,0.1);padding:14px;border-radius:10px;color:#06b6d4;font-size:13px">⏳ Đang xác thực...</div>';
+try{const rs=await fetch('/_api/access',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:p})});
+const d=await rs.json();
+if(rs.ok&&d.token){window.location.href='/_home?_token='+d.token}
+else{r.innerHTML='<div style="background:rgba(239,68,68,0.1);padding:14px;border-radius:10px;color:#ef4444;font-size:13px">❌ '+(d.error||'Sai key')+'</div>'}}
+catch(ex){r.innerHTML='<div style="background:rgba(239,68,68,0.1);padding:14px;border-radius:10px;color:#ef4444;font-size:13px">🔌 Lỗi kết nối</div>'}}</script></body></html>`);
 });
+
 app.get('/', (req, res) => res.redirect('/_login'));
 app.post('/_api/access', (req, res) => {
     const { key } = req.body || {};
@@ -332,55 +344,37 @@ app.post('/_api/access', (req, res) => {
     if (key === PASS) { const token = createToken(); return res.json({ token }); }
     return res.status(401).json({ error: 'Sai key' });
 });
+
+app.get('/_home', checkAuth, (req, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(homePage(req.query['_token']));
+});
+
 app.get('/_hu', checkAuth, async (req, res) => {
     const data = await fetchData('hu');
     if (data) { for (const r of brainHU.history) { if (r.status && r.status !== '') continue; const a = data.find(d => d.phien.toString() === r.phien_hien_tai); if (a) { r.status = (r.prediction === a.result) ? '✅' : '❌'; r.actual = a.result; brainHU.update(r.prediction, a.result); } } brainHU.save(); }
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.send(dashboardPage(brainHU, 'hu'));
+    res.send(dashboardPage(brainHU, 'hu', req.query['_token']));
 });
+
 app.get('/_md5', checkAuth, async (req, res) => {
     const data = await fetchData('md5');
     if (data) { for (const r of brainMD5.history) { if (r.status && r.status !== '') continue; const a = data.find(d => d.phien.toString() === r.phien_hien_tai); if (a) { r.status = (r.prediction === a.result) ? '✅' : '❌'; r.actual = a.result; brainMD5.update(r.prediction, a.result); } } brainMD5.save(); }
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.send(dashboardPage(brainMD5, 'md5'));
+    res.send(dashboardPage(brainMD5, 'md5', req.query['_token']));
 });
+
 app.get('/_hu/json', checkAuth, async (req, res) => {
-    try {
-        const data = await fetchData('hu');
-        if (!data || data.length === 0) { const r = brainHU.fb(); return res.json({ prediction: r.duDoan, confidence: r.doTinCay, detail: r.chiTiet }); }
-        const exist = brainHU.history.find(h => h.phien_hien_tai === (data[0].phien + 1).toString()); if (exist) return res.json(exist);
-        const hd = data.map(d => d.result === 'TÀI' ? 'T' : 'X'); if (hd.length >= 50) brainHU.train(hd);
-        const result = brainHU.predict(hd);
-        const rec = { phien: data[0].phien, phien_hien_tai: (data[0].phien + 1).toString(), dice: `${data[0].dice1}-${data[0].dice2}-${data[0].dice3}`, total: data[0].total, actual: data[0].result, prediction: result.duDoan, confidence: result.doTinCay, detail: result.chiTiet, status: '', timestamp: new Date().toISOString(), soMau: result.soMau || 0 };
-        brainHU.history.unshift(rec); if (brainHU.history.length > 2000) brainHU.history = brainHU.history.slice(0, 2000); brainHU.save();
-        res.json(rec);
-    } catch (e) { res.status(500).json({ error: 'Lỗi' }); }
+    try { const data = await fetchData('hu'); if (!data || data.length === 0) { const r = brainHU.fb(); return res.json({ prediction: r.duDoan, confidence: r.doTinCay, detail: r.chiTiet }); } const exist = brainHU.history.find(h => h.phien_hien_tai === (data[0].phien + 1).toString()); if (exist) return res.json(exist); const hd = data.map(d => d.result === 'TÀI' ? 'T' : 'X'); if (hd.length >= 50) brainHU.train(hd); const result = brainHU.predict(hd); const rec = { phien: data[0].phien, phien_hien_tai: (data[0].phien + 1).toString(), dice: `${data[0].dice1}-${data[0].dice2}-${data[0].dice3}`, total: data[0].total, actual: data[0].result, prediction: result.duDoan, confidence: result.doTinCay, detail: result.chiTiet, status: '', timestamp: new Date().toISOString(), soMau: result.soMau || 0 }; brainHU.history.unshift(rec); if (brainHU.history.length > 2000) brainHU.history = brainHU.history.slice(0, 2000); brainHU.save(); res.json(rec); } catch (e) { res.status(500).json({ error: 'Lỗi' }); }
 });
+
 app.get('/_md5/json', checkAuth, async (req, res) => {
-    try {
-        const data = await fetchData('md5');
-        if (!data || data.length === 0) { const r = brainMD5.fb(); return res.json({ prediction: r.duDoan, confidence: r.doTinCay, detail: r.chiTiet }); }
-        const exist = brainMD5.history.find(h => h.phien_hien_tai === (data[0].phien + 1).toString()); if (exist) return res.json(exist);
-        const hd = data.map(d => d.result === 'TÀI' ? 'T' : 'X'); if (hd.length >= 50) brainMD5.train(hd);
-        const result = brainMD5.predict(hd);
-        const rec = { phien: data[0].phien, phien_hien_tai: (data[0].phien + 1).toString(), dice: `${data[0].dice1}-${data[0].dice2}-${data[0].dice3}`, total: data[0].total, actual: data[0].result, prediction: result.duDoan, confidence: result.doTinCay, detail: result.chiTiet, status: '', timestamp: new Date().toISOString(), soMau: result.soMau || 0 };
-        brainMD5.history.unshift(rec); if (brainMD5.history.length > 2000) brainMD5.history = brainMD5.history.slice(0, 2000); brainMD5.save();
-        res.json(rec);
-    } catch (e) { res.status(500).json({ error: 'Lỗi' }); }
+    try { const data = await fetchData('md5'); if (!data || data.length === 0) { const r = brainMD5.fb(); return res.json({ prediction: r.duDoan, confidence: r.doTinCay, detail: r.chiTiet }); } const exist = brainMD5.history.find(h => h.phien_hien_tai === (data[0].phien + 1).toString()); if (exist) return res.json(exist); const hd = data.map(d => d.result === 'TÀI' ? 'T' : 'X'); if (hd.length >= 50) brainMD5.train(hd); const result = brainMD5.predict(hd); const rec = { phien: data[0].phien, phien_hien_tai: (data[0].phien + 1).toString(), dice: `${data[0].dice1}-${data[0].dice2}-${data[0].dice3}`, total: data[0].total, actual: data[0].result, prediction: result.duDoan, confidence: result.doTinCay, detail: result.chiTiet, status: '', timestamp: new Date().toISOString(), soMau: result.soMau || 0 }; brainMD5.history.unshift(rec); if (brainMD5.history.length > 2000) brainMD5.history = brainMD5.history.slice(0, 2000); brainMD5.save(); res.json(rec); } catch (e) { res.status(500).json({ error: 'Lỗi' }); }
 });
-app.get('/_stats', checkAuth, (req, res) => {
-    const total = brainHU.stats.total + brainMD5.stats.total;
-    const dung = brainHU.stats.dung + brainMD5.stats.dung;
-    res.json({ hu: brainHU.stats, md5: brainMD5.stats, combined: { total, dung, sai: total-dung, tyle: total>0?Math.round((dung/total)*100):0 } });
-});
-app.get('/_reset', checkAuth, (req, res) => {
-    ['hu','md5'].forEach(type => { const brain = type==='hu'?brainHU:brainMD5; brain.stats = { total:0,dung:0,sai:0,tyle:0,chuoi:0,chuoi_dai:0,chuoi_thua_dai:0,chuoi_thang_hientai:0,chuoi_thua_hientai:0,homnay:{dung:0,sai:0,tong:0} }; brain.history=[]; brain.lastPhien=null; brain.save(); });
-    res.json({ message: 'Done' });
-});
+
+app.get('/_stats', checkAuth, (req, res) => { const total = brainHU.stats.total + brainMD5.stats.total; const dung = brainHU.stats.dung + brainMD5.stats.dung; res.json({ hu: brainHU.stats, md5: brainMD5.stats, combined: { total, dung, sai: total-dung, tyle: total>0?Math.round((dung/total)*100):0 } }); });
+app.get('/_reset', checkAuth, (req, res) => { ['hu','md5'].forEach(type => { const brain = type==='hu'?brainHU:brainMD5; brain.stats = { total:0,dung:0,sai:0,tyle:0,chuoi:0,chuoi_dai:0,chuoi_thua_dai:0,chuoi_thang_hientai:0,chuoi_thua_hientai:0,homnay:{dung:0,sai:0,tong:0} }; brain.history=[]; brain.lastPhien=null; brain.save(); }); res.json({ message: 'Done' }); });
 app.use((req, res) => res.status(404).end());
 app.use((err, req, res, next) => { res.status(500).end(); });
 
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`\n✅ CRYSTAL TX - Port ${PORT} - 23 ENGINES\n`);
-    startAuto();
-});
+app.listen(PORT, '0.0.0.0', () => { console.log(`\n✅ CRYSTAL TX - Port ${PORT} - 23 ENGINES\n`); startAuto(); });
