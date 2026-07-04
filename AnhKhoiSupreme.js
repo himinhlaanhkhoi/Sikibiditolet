@@ -13,25 +13,26 @@ const API_URL_MD5 = 'https://wtxmd52.tele68.com/v1/txmd5/sessions';
 const MASTER_KEY = crypto.randomBytes(6).toString('hex');
 const TOKENS = new Map();
 
-console.log('\n╔══════════════════════════════════════╗');
-console.log('║    BẢO LONG PREDICT - VIP PRO        ║');
-console.log('╠══════════════════════════════════════╣');
-console.log(`║  Mã: ${MASTER_KEY}                       ║');
-console.log('╚══════════════════════════════════════╝\n');
+console.log('\n========================================');
+console.log('  BAO LONG PREDICT - HE THONG DU DOAN');
+console.log('========================================');
+console.log(`  Ma truy cap: ${MASTER_KEY}`);
+console.log('========================================\n');
 
 function createToken() {
     const token = crypto.randomBytes(48).toString('hex');
     TOKENS.set(token, Date.now() + 864000000);
+    setTimeout(() => TOKENS.delete(token), 864000000);
     return token;
 }
 
 const checkAuth = (req, res, next) => {
     const token = req.query['_token'] || req.headers['x-token'];
     if (!token || !TOKENS.has(token)) return res.redirect('/_login');
+    if (Date.now() > TOKENS.get(token)) { TOKENS.delete(token); return res.redirect('/_login?expired=1'); }
     next();
 };
 
-// Security
 const ipMap = new Map();
 app.use((req, res, next) => {
     const ip = req.ip || 'unknown';
@@ -58,27 +59,64 @@ function transformData(d) {
         total: i.point
     }));
 }
+
 async function fetchData(t) {
     try {
         const u = t === 'hu' ? API_URL_HU : API_URL_MD5;
-        const r = await axios.get(u, { timeout: 8000, headers: { 'User-Agent': 'BaoLong/1.0' } });
+        const r = await axios.get(u, { timeout: 10000, headers: { 'User-Agent': 'BaoLong/1.0' } });
         return transformData(r.data);
     } catch(e) { return null; }
 }
 
 // ============================================================
-// 10 THUẬT TOÁN SIÊU CHÍNH XÁC - TỐI ƯU CHO TÀI XỈU
+// 12 THUẬT TOÁN SIÊU CHÍNH XÁC
 // ============================================================
-class QuantumSpectral { constructor() { this.db = new Map(); this.t = false; } ex(seq) { const s = seq.map(v => v === 'T' ? 1 : -1); const f = []; for (const p of [2,3,5,8,13,21,34,55]) { if (s.length >= p) { let si=0, co=0; for (let i=0; i<p; i++) { const a = 2*Math.PI*i/p; si += s[s.length-p+i]*Math.sin(a); co += s[s.length-p+i]*Math.cos(a); } f.push(Math.sqrt(si*si+co*co)/p); f.push(Math.atan2(si,co)/Math.PI); } } while(f.length<16) f.push(0); return f; } tr(data) { for (let i=50; i<data.length; i++) { const w = data.slice(i-50,i); const f = this.ex(w); const k = f.map(v=>Math.round(v*25)).join(','); if(!this.db.has(k)) this.db.set(k,{T:0,X:0,t:0}); const d = this.db.get(k); d[data[i]] = (d[data[i]]||0)+1; d.t++; } this.t = true; } pr(seq) { if(!this.t||seq.length<50) return null; const f = this.ex(seq.slice(-50)); const k = f.map(v=>Math.round(v*25)).join(','); const d = this.db.get(k); if(!d||d.t<5) { let best=null, bd=Infinity; for(const[key,val] of this.db){ if(val.t<10) continue; const parts = key.split(',').map(Number); const fp = f.map(v=>Math.round(v*25)); let dist = 0; for(let i=0;i<Math.min(parts.length,fp.length);i++) dist += Math.abs(parts[i]-fp[i]); if(dist<bd){bd=dist;best=val;} } if(best) return {prob:best.T/best.t, conf:0.5}; return null; } return {prob:Math.max(0.08,Math.min(0.92,d.T/d.t)), conf:Math.min(0.95,d.t/120)}; } }
-class BayesianEngine { constructor() { this.db = new Map(); this.t = false; } tr(data) { for (let i=40; i<data.length; i++) { const w = data.slice(i-40,i); const k = w.slice(-6).join(''); if(!this.db.has(k)) this.db.set(k,{T:1,X:1,t:2}); const d = this.db.get(k); d[data[i]] = (d[data[i]]||0)+1; d.t++; } this.t = true; } pr(seq) { if(!this.t||seq.length<40) return null; const k = seq.slice(-6).join(''); const d = this.db.get(k); if(!d||d.t<5) return null; return {prob:Math.max(0.08,Math.min(0.92,d.T/d.t)), conf:Math.min(0.9,d.t/60)}; } }
-class MarkovEngine { constructor() { this.db = new Map(); this.t = false; } tr(data) { for(let order=1;order<=4;order++){ for(let i=order;i<data.length;i++){ const ctx=data.slice(i-order,i).join(''); const k=`O${order}|${ctx}`; if(!this.db.has(k)) this.db.set(k,{T:0,X:0,t:0}); const d=this.db.get(k); d[data[i]]=(d[data[i]]||0)+1; d.t++; } } this.t=true; } pr(seq) { if(!this.t) return null; let ps=0,ws=0; for(let order=1;order<=4;order++){ if(seq.length>=order){ const ctx=seq.slice(-order).join(''); const k=`O${order}|${ctx}`; const d=this.db.get(k); if(d&&d.t>=5){const w=order; ps+=(d.T/d.t)*w; ws+=w;} } } if(ws===0) return null; return {prob:Math.max(0.08,Math.min(0.92,ps/ws)), conf:Math.min(0.85,ws/10)}; } }
-class StreakEngine { constructor() { this.db = new Map(); this.t = false; } tr(data) { for(let i=20;i<data.length;i++){ const w=data.slice(i-20,i); const last=w[w.length-1]; let st=1; for(let j=w.length-2;j>=0&&w[j]===last;j--) st++; const k=`${last}:${Math.min(st,20)}`; if(!this.db.has(k)) this.db.set(k,{T:0,X:0,t:0}); const d=this.db.get(k); d[data[i]]=(d[data[i]]||0)+1; d.t++; } this.t=true; } pr(seq) { if(!this.t) return null; const last=seq[seq.length-1]; let st=1; for(let j=seq.length-2;j>=0&&seq[j]===last;j--) st++; const k=`${last}:${Math.min(st,20)}`; const d=this.db.get(k); if(!d||d.t<5) return null; let prob=d.T/d.t; if(st>=10) prob=last==='T'?0.08:0.92; else if(st>=7) prob=last==='T'?0.18:0.82; else if(st>=5) prob=last==='T'?0.28:0.72; return {prob:Math.max(0.08,Math.min(0.92,prob)), conf:Math.min(0.95,d.t/50+st*0.02)}; } }
-class EntropyEngine { constructor() { this.db = new Map(); this.t = false; } calc(seq){ const wins=[3,5,8,13,21,34]; const ents=[]; for(const w of wins){ if(seq.length>=w){ const sl=seq.slice(-w); const p=sl.filter(s=>s==='T').length/w; let e=0; if(p>0&&p<1) e=-p*Math.log2(p)-(1-p)*Math.log2(1-p); ents.push(e); } } return {avg:ents.reduce((a,b)=>a+b,0)/(ents.length||1), vr:ents.length>1?Math.max(...ents)-Math.min(...ents):0}; } tr(data) { for(let i=40;i<data.length;i++){ const w=data.slice(i-40,i); const e=this.calc(w); const k=`${Math.round(e.avg*10)}|${Math.round(e.vr*10)}`; if(!this.db.has(k)) this.db.set(k,{T:0,X:0,t:0}); const d=this.db.get(k); d[data[i]]=(d[data[i]]||0)+1; d.t++; } this.t=true; } pr(seq) { if(!this.t||seq.length<40) return null; const e=this.calc(seq.slice(-40)); const k=`${Math.round(e.avg*10)}|${Math.round(e.vr*10)}`; const d=this.db.get(k); if(!d||d.t<5) return null; return {prob:Math.max(0.08,Math.min(0.92,d.T/d.t)), conf:Math.min(0.9,d.t/70)}; } }
-class MomentumEngine { constructor() { this.db = new Map(); this.t = false; } calc(seq){ const r3=seq.slice(-3).filter(s=>s==='T').length/3; const r8=seq.slice(-8).filter(s=>s==='T').length/8; const r21=seq.slice(-21).filter(s=>s==='T').length/21; return {sh:r3-r8, md:r8-r21}; } tr(data) { for(let i=40;i<data.length;i++){ const w=data.slice(i-40,i); const m=this.calc(w); const k=`${Math.round(m.sh*10)}|${Math.round(m.md*10)}`; if(!this.db.has(k)) this.db.set(k,{T:0,X:0,t:0}); const d=this.db.get(k); d[data[i]]=(d[data[i]]||0)+1; d.t++; } this.t=true; } pr(seq) { if(!this.t||seq.length<40) return null; const m=this.calc(seq.slice(-40)); const k=`${Math.round(m.sh*10)}|${Math.round(m.md*10)}`; const d=this.db.get(k); if(!d||d.t<5) return null; return {prob:Math.max(0.08,Math.min(0.92,d.T/d.t)), conf:Math.min(0.9,d.t/70)}; } }
-class NeuralEngine { constructor() { this.w = Array(10).fill(0).map(() => Math.random() * 0.1); this.b = 0; this.t = false; } sig(x) { return 1 / (1 + Math.exp(-x)); } fw(f) { let s = this.b; for (let i = 0; i < Math.min(f.length, this.w.length); i++) s += f[i] * this.w[i]; return this.sig(s); } tr(data) { for (let ep = 0; ep < 8; ep++) { for (let i = 35; i < data.length; i++) { const w = data.slice(i - 35, i); const ft = []; for (const len of [3, 5, 8, 13, 21, 34]) { if (w.length >= len) ft.push(w.slice(-len).filter(s => s === 'T').length / len); } while (ft.length < 10) ft.push(0.5); const tg = data[i] === 'T' ? 1 : 0; const pr = this.fw(ft); const er = tg - pr; for (let j = 0; j < this.w.length; j++) this.w[j] += 0.003 * er * ft[j]; this.b += 0.003 * er; } } this.t = true; } pr(seq) { if (!this.t || seq.length < 35) return null; const w = seq.slice(-35); const ft = []; for (const len of [3, 5, 8, 13, 21, 34]) { if (w.length >= len) ft.push(w.slice(-len).filter(s => s === 'T').length / len); } while (ft.length < 10) ft.push(0.5); return { prob: Math.max(0.08, Math.min(0.92, this.fw(ft))), conf: 0.65 }; } }
-class FractalEngine { constructor() { this.db = new Map(); this.t = false; } cd(seq){ const scales=[2,3,4,6,8,12,16]; const pts=[]; for(const sc of scales){ if(seq.length<sc) break; const s=new Set(); for(let i=0;i<=seq.length-sc;i++) s.add(seq.slice(i,i+sc).join('')); pts.push({sc,ct:s.size}); } if(pts.length<2) return 1; const n=pts.length; let sx=0,sy=0,sxy=0,sx2=0; for(const p of pts){const x=Math.log(1/p.sc),y=Math.log(p.ct);sx+=x;sy+=y;sxy+=x*y;sx2+=x*x;} return (n*sxy-sx*sy)/(n*sx2-sx*sx+0.001); } tr(data) { for(let i=40;i<data.length;i++){ const w=data.slice(i-40,i); const dim=Math.round(this.cd(w)*20); const k=String(dim); if(!this.db.has(k)) this.db.set(k,{T:0,X:0,t:0}); const d=this.db.get(k); d[data[i]]=(d[data[i]]||0)+1; d.t++; } this.t=true; } pr(seq) { if(!this.t||seq.length<40) return null; const dim=Math.round(this.cd(seq.slice(-40))*20); const d=this.db.get(String(dim)); if(!d||d.t<5) return null; return {prob:Math.max(0.08,Math.min(0.92,d.T/d.t)), conf:Math.min(0.9,d.t/80)}; } }
-class GradientBoostEngine { constructor() { this.trees=[]; this.t=false; this.lr=0.08; } bt(features,labels,residuals,depth){ if(depth>4||features.length<5){return{pred:residuals.reduce((a,b)=>a+b,0)/(residuals.length||1)};} let bestGain=-1,bestF=0,bestV=0; for(let f=0;f<Math.min(features[0]?.length||0,8);f++){ const vals=features.map(feat=>feat[f]).sort((a,b)=>a-b); for(let i=0;i<vals.length-1;i++){ const split=(vals[i]+vals[i+1])/2; let lS=0,rS=0,lC=0,rC=0; for(let j=0;j<features.length;j++){ if(features[j][f]<split){lS+=residuals[j];lC++;} else{rS+=residuals[j];rC++;} } const gain=(lS*lS)/(lC+0.001)+(rS*rS)/(rC+0.001); if(gain>bestGain){bestGain=gain;bestF=f;bestV=split;} } } if(bestGain===-1) return{pred:residuals.reduce((a,b)=>a+b,0)/(residuals.length||1)}; const lF=[],lR=[],rF=[],rR=[]; for(let j=0;j<features.length;j++){ if(features[j][bestF]<bestV){lF.push(features[j]);lR.push(residuals[j]);} else{rF.push(features[j]);rR.push(residuals[j]);} } return{f:bestF,v:bestV,l:this.bt(lF,labels,lR,depth+1),r:this.bt(rF,labels,rR,depth+1)}; } pt(tree,f){if(tree.pred!==undefined)return tree.pred;return f[tree.f]<tree.v?this.pt(tree.l,f):this.pt(tree.r,f);} tr(data){ const allF=[],allL=[]; for(let i=30;i<data.length;i++){ const w=data.slice(i-30,i); const feat=[]; for(const len of[3,5,8,13]){ if(w.length>=len){ const sl=w.slice(-len); feat.push(sl.filter(s=>s==='T').length/len); feat.push(sl.filter((s,i,a)=>i>0&&s!==a[i-1]).length/Math.max(1,len-1)); } } while(feat.length<8) feat.push(0.5); allF.push(feat); allL.push(data[i]==='T'?1:0); } let residuals=[...allL]; for(let iter=0;iter<70;iter++){ this.trees.push(this.bt(allF,allL,residuals,0)); for(let j=0;j<allF.length;j++) residuals[j]-=this.lr*this.pt(this.trees[this.trees.length-1],allF[j]); } this.t=true; } pr(seq){ if(!this.t||seq.length<30) return null; const w=seq.slice(-30); const feat=[]; for(const len of[3,5,8,13]){ if(w.length>=len){ const sl=w.slice(-len); feat.push(sl.filter(s=>s==='T').length/len); feat.push(sl.filter((s,i,a)=>i>0&&s!==a[i-1]).length/Math.max(1,len-1)); } } while(feat.length<8) feat.push(0.5); let sum=0; for(const t of this.trees) sum+=this.lr*this.pt(t,feat); return {prob:Math.max(0.08,Math.min(0.92,sum)), conf:0.78}; } }
-class WaveEngine { constructor() { this.db = new Map(); this.t = false; } ex(seq){ const s=seq.map(v=>v==='T'?1:-1); const f=[]; for(const p of[5,8,13,21]){ if(s.length>=p*2){let corr=0;for(let i=0;i<p;i++) corr+=s[s.length-p+i]*s[s.length-p*2+i];f.push(corr/p);} } while(f.length<8) f.push(0); return f; } tr(data) { for(let i=40;i<data.length;i++){ const w=data.slice(i-40,i); const f=this.ex(w); const k=f.map(v=>Math.round(v*10)).join(','); if(!this.db.has(k)) this.db.set(k,{T:0,X:0,t:0}); const d=this.db.get(k); d[data[i]]=(d[data[i]]||0)+1; d.t++; } this.t=true; } pr(seq) { if(!this.t||seq.length<40) return null; const f=this.ex(seq.slice(-40)); const k=f.map(v=>Math.round(v*10)).join(','); const d=this.db.get(k); if(!d||d.t<5) return null; return {prob:Math.max(0.08,Math.min(0.92,d.T/d.t)), conf:Math.min(0.85,d.t/60)}; } }
+class QS { constructor() { this.db = new Map(); this.t = false; }
+  ex(seq) { const s = seq.map(v => v === 'T' ? 1 : -1); const f = []; for (const p of [2,3,5,8,13,21,34,55]) { if (s.length >= p) { let si=0, co=0; for (let i=0; i<p; i++) { const a = 2*Math.PI*i/p; si += s[s.length-p+i]*Math.sin(a); co += s[s.length-p+i]*Math.cos(a); } f.push(Math.sqrt(si*si+co*co)/p); f.push(Math.atan2(si,co)/Math.PI); } } while(f.length<16) f.push(0); return f; }
+  tr(data) { for (let i=50; i<data.length; i++) { const w = data.slice(i-50,i); const f = this.ex(w); const k = f.map(v=>Math.round(v*25)).join(','); if(!this.db.has(k)) this.db.set(k,{T:0,X:0,t:0}); const d = this.db.get(k); d[data[i]] = (d[data[i]]||0)+1; d.t++; } this.t = true; }
+  pr(seq) { if(!this.t||seq.length<50) return null; const f = this.ex(seq.slice(-50)); const k = f.map(v=>Math.round(v*25)).join(','); const d = this.db.get(k); if(!d||d.t<5) { let best=null, bd=Infinity; for(const[key,val] of this.db){ if(val.t<10) continue; const parts = key.split(',').map(Number); const fp = f.map(v=>Math.round(v*25)); let dist = 0; for(let i=0;i<Math.min(parts.length,fp.length);i++) dist += Math.abs(parts[i]-fp[i]); if(dist<bd){bd=dist;best=val;} } if(best) return {prob:best.T/best.t, conf:0.5}; return null; } return {prob:Math.max(0.08,Math.min(0.92,d.T/d.t)), conf:Math.min(0.95,d.t/120)}; } }
+class BM { constructor() { this.db = new Map(); this.t = false; }
+  tr(data) { for (let i=40; i<data.length; i++) { const w = data.slice(i-40,i); const k = w.slice(-6).join(''); if(!this.db.has(k)) this.db.set(k,{T:1,X:1,t:2}); const d = this.db.get(k); d[data[i]] = (d[data[i]]||0)+1; d.t++; } this.t = true; }
+  pr(seq) { if(!this.t||seq.length<40) return null; const k = seq.slice(-6).join(''); const d = this.db.get(k); if(!d||d.t<5) return null; return {prob:Math.max(0.08,Math.min(0.92,d.T/d.t)), conf:Math.min(0.9,d.t/60)}; } }
+class MK { constructor() { this.db = new Map(); this.t = false; }
+  tr(data) { for(let order=1;order<=4;order++){ for(let i=order;i<data.length;i++){ const ctx=data.slice(i-order,i).join(''); const k=`O${order}|${ctx}`; if(!this.db.has(k)) this.db.set(k,{T:0,X:0,t:0}); const d=this.db.get(k); d[data[i]]=(d[data[i]]||0)+1; d.t++; } } this.t=true; }
+  pr(seq) { if(!this.t) return null; let ps=0,ws=0; for(let order=1;order<=4;order++){ if(seq.length>=order){ const ctx=seq.slice(-order).join(''); const k=`O${order}|${ctx}`; const d=this.db.get(k); if(d&&d.t>=5){const w=order; ps+=(d.T/d.t)*w; ws+=w;} } } if(ws===0) return null; return {prob:Math.max(0.08,Math.min(0.92,ps/ws)), conf:Math.min(0.85,ws/10)}; } }
+class SK { constructor() { this.db = new Map(); this.t = false; }
+  tr(data) { for(let i=20;i<data.length;i++){ const w=data.slice(i-20,i); const last=w[w.length-1]; let st=1; for(let j=w.length-2;j>=0&&w[j]===last;j--) st++; const k=`${last}:${Math.min(st,20)}`; if(!this.db.has(k)) this.db.set(k,{T:0,X:0,t:0}); const d=this.db.get(k); d[data[i]]=(d[data[i]]||0)+1; d.t++; } this.t=true; }
+  pr(seq) { if(!this.t) return null; const last=seq[seq.length-1]; let st=1; for(let j=seq.length-2;j>=0&&seq[j]===last;j--) st++; const k=`${last}:${Math.min(st,20)}`; const d=this.db.get(k); if(!d||d.t<5) return null; let prob=d.T/d.t; if(st>=10) prob=last==='T'?0.08:0.92; else if(st>=7) prob=last==='T'?0.18:0.82; else if(st>=5) prob=last==='T'?0.28:0.72; return {prob:Math.max(0.08,Math.min(0.92,prob)), conf:Math.min(0.95,d.t/50+st*0.02)}; } }
+class EF { constructor() { this.db = new Map(); this.t = false; }
+  calc(seq){ const wins=[3,5,8,13,21,34]; const ents=[]; for(const w of wins){ if(seq.length>=w){ const sl=seq.slice(-w); const p=sl.filter(s=>s==='T').length/w; let e=0; if(p>0&&p<1) e=-p*Math.log2(p)-(1-p)*Math.log2(1-p); ents.push(e); } } return {avg:ents.reduce((a,b)=>a+b,0)/(ents.length||1), vr:ents.length>1?Math.max(...ents)-Math.min(...ents):0}; }
+  tr(data) { for(let i=40;i<data.length;i++){ const w=data.slice(i-40,i); const e=this.calc(w); const k=`${Math.round(e.avg*10)}|${Math.round(e.vr*10)}`; if(!this.db.has(k)) this.db.set(k,{T:0,X:0,t:0}); const d=this.db.get(k); d[data[i]]=(d[data[i]]||0)+1; d.t++; } this.t=true; }
+  pr(seq) { if(!this.t||seq.length<40) return null; const e=this.calc(seq.slice(-40)); const k=`${Math.round(e.avg*10)}|${Math.round(e.vr*10)}`; const d=this.db.get(k); if(!d||d.t<5) return null; return {prob:Math.max(0.08,Math.min(0.92,d.T/d.t)), conf:Math.min(0.9,d.t/70)}; } }
+class MT { constructor() { this.db = new Map(); this.t = false; }
+  calc(seq){ const r3=seq.slice(-3).filter(s=>s==='T').length/3; const r8=seq.slice(-8).filter(s=>s==='T').length/8; const r21=seq.slice(-21).filter(s=>s==='T').length/21; return {sh:r3-r8, md:r8-r21}; }
+  tr(data) { for(let i=40;i<data.length;i++){ const w=data.slice(i-40,i); const m=this.calc(w); const k=`${Math.round(m.sh*10)}|${Math.round(m.md*10)}`; if(!this.db.has(k)) this.db.set(k,{T:0,X:0,t:0}); const d=this.db.get(k); d[data[i]]=(d[data[i]]||0)+1; d.t++; } this.t=true; }
+  pr(seq) { if(!this.t||seq.length<40) return null; const m=this.calc(seq.slice(-40)); const k=`${Math.round(m.sh*10)}|${Math.round(m.md*10)}`; const d=this.db.get(k); if(!d||d.t<5) return null; return {prob:Math.max(0.08,Math.min(0.92,d.T/d.t)), conf:Math.min(0.9,d.t/70)}; } }
+class NN { constructor() { this.w = Array(12).fill(0).map(() => Math.random() * 0.1); this.b = 0; this.t = false; }
+  sig(x) { return 1 / (1 + Math.exp(-x)); }
+  fw(f) { let s = this.b; for (let i = 0; i < Math.min(f.length, this.w.length); i++) s += f[i] * this.w[i]; return this.sig(s); }
+  tr(data) { for (let ep = 0; ep < 10; ep++) { for (let i = 40; i < data.length; i++) { const w = data.slice(i - 40, i); const ft = []; for (const len of [3, 5, 8, 13, 21, 34]) { if (w.length >= len) ft.push(w.slice(-len).filter(s => s === 'T').length / len); } while (ft.length < 12) ft.push(0.5); const tg = data[i] === 'T' ? 1 : 0; const pr = this.fw(ft); const er = tg - pr; for (let j = 0; j < this.w.length; j++) this.w[j] += 0.002 * er * ft[j]; this.b += 0.002 * er; } } this.t = true; }
+  pr(seq) { if (!this.t || seq.length < 40) return null; const w = seq.slice(-40); const ft = []; for (const len of [3, 5, 8, 13, 21, 34]) { if (w.length >= len) ft.push(w.slice(-len).filter(s => s === 'T').length / len); } while (ft.length < 12) ft.push(0.5); return { prob: Math.max(0.08, Math.min(0.92, this.fw(ft))), conf: 0.7 }; } }
+class FG { constructor() { this.db = new Map(); this.t = false; }
+  cd(seq){ const scales=[2,3,4,6,8,12,16]; const pts=[]; for(const sc of scales){ if(seq.length<sc) break; const s=new Set(); for(let i=0;i<=seq.length-sc;i++) s.add(seq.slice(i,i+sc).join('')); pts.push({sc,ct:s.size}); } if(pts.length<2) return 1; const n=pts.length; let sx=0,sy=0,sxy=0,sx2=0; for(const p of pts){const x=Math.log(1/p.sc),y=Math.log(p.ct);sx+=x;sy+=y;sxy+=x*y;sx2+=x*x;} return (n*sxy-sx*sy)/(n*sx2-sx*sx+0.001); }
+  tr(data) { for(let i=40;i<data.length;i++){ const w=data.slice(i-40,i); const dim=Math.round(this.cd(w)*20); const k=String(dim); if(!this.db.has(k)) this.db.set(k,{T:0,X:0,t:0}); const d=this.db.get(k); d[data[i]]=(d[data[i]]||0)+1; d.t++; } this.t=true; }
+  pr(seq) { if(!this.t||seq.length<40) return null; const dim=Math.round(this.cd(seq.slice(-40))*20); const d=this.db.get(String(dim)); if(!d||d.t<5) return null; return {prob:Math.max(0.08,Math.min(0.92,d.T/d.t)), conf:Math.min(0.9,d.t/80)}; } }
+class GB { constructor() { this.trees=[]; this.t=false; this.lr=0.06; }
+  bt(features,labels,residuals,depth){ if(depth>5||features.length<5){return{pred:residuals.reduce((a,b)=>a+b,0)/(residuals.length||1)};} let bestGain=-1,bestF=0,bestV=0; for(let f=0;f<Math.min(features[0]?.length||0,8);f++){ const vals=features.map(feat=>feat[f]).sort((a,b)=>a-b); for(let i=0;i<vals.length-1;i++){ const split=(vals[i]+vals[i+1])/2; let lS=0,rS=0,lC=0,rC=0; for(let j=0;j<features.length;j++){ if(features[j][f]<split){lS+=residuals[j];lC++;} else{rS+=residuals[j];rC++;} } const gain=(lS*lS)/(lC+0.001)+(rS*rS)/(rC+0.001); if(gain>bestGain){bestGain=gain;bestF=f;bestV=split;} } } if(bestGain===-1) return{pred:residuals.reduce((a,b)=>a+b,0)/(residuals.length||1)}; const lF=[],lR=[],rF=[],rR=[]; for(let j=0;j<features.length;j++){ if(features[j][bestF]<bestV){lF.push(features[j]);lR.push(residuals[j]);} else{rF.push(features[j]);rR.push(residuals[j]);} } return{f:bestF,v:bestV,l:this.bt(lF,labels,lR,depth+1),r:this.bt(rF,labels,rR,depth+1)}; }
+  pt(tree,f){if(tree.pred!==undefined)return tree.pred;return f[tree.f]<tree.v?this.pt(tree.l,f):this.pt(tree.r,f);}
+  tr(data){ const allF=[],allL=[]; for(let i=30;i<data.length;i++){ const w=data.slice(i-30,i); const feat=[]; for(const len of[3,5,8,13]){ if(w.length>=len){ const sl=w.slice(-len); feat.push(sl.filter(s=>s==='T').length/len); feat.push(sl.filter((s,i,a)=>i>0&&s!==a[i-1]).length/Math.max(1,len-1)); } } while(feat.length<8) feat.push(0.5); allF.push(feat); allL.push(data[i]==='T'?1:0); } let residuals=[...allL]; for(let iter=0;iter<80;iter++){ this.trees.push(this.bt(allF,allL,residuals,0)); for(let j=0;j<allF.length;j++) residuals[j]-=this.lr*this.pt(this.trees[this.trees.length-1],allF[j]); } this.t=true; }
+  pr(seq){ if(!this.t||seq.length<30) return null; const w=seq.slice(-30); const feat=[]; for(const len of[3,5,8,13]){ if(w.length>=len){ const sl=w.slice(-len); feat.push(sl.filter(s=>s==='T').length/len); feat.push(sl.filter((s,i,a)=>i>0&&s!==a[i-1]).length/Math.max(1,len-1)); } } while(feat.length<8) feat.push(0.5); let sum=0; for(const t of this.trees) sum+=this.lr*this.pt(t,feat); return {prob:Math.max(0.08,Math.min(0.92,sum)), conf:0.8}; } }
+class WV { constructor() { this.db = new Map(); this.t = false; }
+  ex(seq){ const s=seq.map(v=>v==='T'?1:-1); const f=[]; for(const p of[5,8,13,21]){ if(s.length>=p*2){let corr=0;for(let i=0;i<p;i++) corr+=s[s.length-p+i]*s[s.length-p*2+i];f.push(corr/p);} } while(f.length<8) f.push(0); return f; }
+  tr(data) { for(let i=40;i<data.length;i++){ const w=data.slice(i-40,i); const f=this.ex(w); const k=f.map(v=>Math.round(v*10)).join(','); if(!this.db.has(k)) this.db.set(k,{T:0,X:0,t:0}); const d=this.db.get(k); d[data[i]]=(d[data[i]]||0)+1; d.t++; } this.t=true; }
+  pr(seq) { if(!this.t||seq.length<40) return null; const f=this.ex(seq.slice(-40)); const k=f.map(v=>Math.round(v*10)).join(','); const d=this.db.get(k); if(!d||d.t<5) return null; return {prob:Math.max(0.08,Math.min(0.92,d.T/d.t)), conf:Math.min(0.85,d.t/60)}; } }
+class MR { constructor() { this.db = new Map(); this.t = false; }
+  tr(data) { for(let i=50;i<data.length;i++){ const w=data.slice(i-50,i); const t=w.filter(s=>s==='T').length; const k=`${Math.round(t/50*10)}`; if(!this.db.has(k)) this.db.set(k,{T:0,X:0,t:0}); const d=this.db.get(k); d[data[i]]=(d[data[i]]||0)+1; d.t++; } this.t=true; }
+  pr(seq) { if(!this.t||seq.length<50) return null; const t=seq.slice(-50).filter(s=>s==='T').length; const ratio=t/50; const k=`${Math.round(ratio*10)}`; const d=this.db.get(k); if(!d||d.t<5) return null; let prob=d.T/d.t; if(ratio>0.7) prob*=0.5; else if(ratio<0.3) prob=Math.min(0.92,prob*1.6); return {prob:Math.max(0.08,Math.min(0.92,prob)), conf:Math.min(0.85,d.t/80)}; } }
+class SV { constructor() { this.sv=[]; this.alphas=[]; this.b=0; this.t=false; }
+  kernel(a,b){let dot=0;for(let i=0;i<Math.min(a.length,b.length);i++)dot+=a[i]*b[i];return Math.exp(-0.5*(2-2*dot));}
+  tr(data){ const allF=[],allL=[]; for(let i=25;i<data.length;i++){ const w=data.slice(i-25,i); const feat=[]; for(const len of[3,5,8]){if(w.length>=len){const sl=w.slice(-len);feat.push(sl.filter(s=>s==='T').length/len);}} while(feat.length<5) feat.push(0.5); allF.push(feat); allL.push(data[i]==='T'?1:-1); } for(let i=0;i<Math.min(allF.length,150);i++){ let sum=this.b; for(let j=0;j<this.sv.length;j++) sum+=this.alphas[j]*allL[j]*this.kernel(allF[i],this.sv[j]); if(allL[i]*sum<1){this.sv.push(allF[i]);this.alphas.push(1);} } this.t=true; }
+  pr(seq){ if(!this.t||seq.length<25) return null; const w=seq.slice(-25); const feat=[]; for(const len of[3,5,8]){if(w.length>=len){const sl=w.slice(-len);feat.push(sl.filter(s=>s==='T').length/len);}} while(feat.length<5) feat.push(0.5); let sum=this.b; for(let j=0;j<this.sv.length;j++) sum+=this.alphas[j]*this.kernel(feat,this.sv[j]); const prob=1/(1+Math.exp(-sum)); return {prob:Math.max(0.08,Math.min(0.92,prob)), conf:0.68}; } }
 
 // ============================================================
 // PREDICTION CORE
@@ -91,16 +129,7 @@ class PredictionCore {
         this.lastPhien = null;
         this.trained = false;
         this.engines = [
-            { n:'LƯỢNG TỬ', e:new QuantumSpectral(), w:3.8 },
-            { n:'BAYES', e:new BayesianEngine(), w:3.2 },
-            { n:'MARKOV', e:new MarkovEngine(), w:2.5 },
-            { n:'CHUỖI', e:new StreakEngine(), w:2.2 },
-            { n:'ENTROPY', e:new EntropyEngine(), w:2.0 },
-            { n:'ĐỘNG LƯỢNG', e:new MomentumEngine(), w:1.8 },
-            { n:'HỌC SÂU', e:new NeuralEngine(), w:2.8 },
-            { n:'PHÂN MẢNH', e:new FractalEngine(), w:1.7 },
-            { n:'BOOST', e:new GradientBoostEngine(), w:2.5 },
-            { n:'SÓNG', e:new WaveEngine(), w:1.6 }
+            { n:'LUONG TU', e:new QS(), w:4.0 },{ n:'BAYES', e:new BM(), w:3.5 },{ n:'MARKOV', e:new MK(), w:2.8 },{ n:'CHUOI', e:new SK(), w:2.5 },{ n:'ENTROPY', e:new EF(), w:2.2 },{ n:'DONG LUC', e:new MT(), w:2.0 },{ n:'HOC SAU', e:new NN(), w:3.0 },{ n:'PHAN MANH', e:new FG(), w:1.9 },{ n:'BOOST', e:new GB(), w:2.8 },{ n:'SONG', e:new WV(), w:1.8 },{ n:'HOI QUY', e:new MR(), w:1.6 },{ n:'SVM', e:new SV(), w:1.5 }
         ];
         this.mem = new Map(); this.stk = new Map();
     }
@@ -125,19 +154,19 @@ class PredictionCore {
         for (const eng of this.engines) { try { const r = eng.e.pr(seq); if (r) { const w = eng.w*r.conf; sT += r.prob*w; sX += (1-r.prob)*w; sw += w; dt.push(`${eng.n}:${Math.round(r.prob*100)}`); } } catch(e) {} }
         for (const len of[3,5,8,13]){ if(seq.length>=len){ const p=seq.slice(-len).join(''); const d=this.mem.get(p); if(d&&d.t>=5){ const w=len/13; sT+=(d.T/d.t)*w; sX+=(d.X/d.t)*w; sw+=w; } } }
         const last=seq[seq.length-1]; let streak=1; for(let j=seq.length-2;j>=0&&seq[j]===last;j--) streak++;
-        if (streak>=10){ if(last==='T'){sX+=8;dt.push('GÃY-T10');}else{sT+=8;dt.push('GÃY-X10');} sw+=8; }
-        else if (streak>=7){ if(last==='T'){sX+=5;dt.push('GÃY-T7');}else{sT+=5;dt.push('GÃY-X7');} sw+=5; }
-        else if (streak>=5){ if(last==='T'){sX+=3;dt.push('GÃY-T5');}else{sT+=3;dt.push('GÃY-X5');} sw+=3; }
+        if (streak>=10){ if(last==='T'){sX+=9;dt.push('GAY-T10');}else{sT+=9;dt.push('GAY-X10');} sw+=9; }
+        else if (streak>=7){ if(last==='T'){sX+=6;dt.push('GAY-T7');}else{sT+=6;dt.push('GAY-X7');} sw+=6; }
+        else if (streak>=5){ if(last==='T'){sX+=4;dt.push('GAY-T5');}else{sT+=4;dt.push('GAY-X5');} sw+=4; }
         const lt=seq.filter(s=>s==='T').length/seq.length;
-        if (lt>0.75){ sX+=5;dt.push('CÂN BẰNG+'); sw+=5; } else if (lt<0.25){ sT+=5;dt.push('CÂN BẰNG-'); sw+=5; }
+        if (lt>0.75){ sX+=6;dt.push('CAN BANG+'); sw+=6; } else if (lt<0.25){ sT+=6;dt.push('CAN BANG-'); sw+=6; }
         if (sw===0) return this.fb();
         const prob=sT/(sT+sX); const dd=prob>0.5?'TÀI':'XỈU';
         let tc=Math.round(Math.max(prob,1-prob)*100);
-        if (dt.length>=7) tc=Math.min(99,tc+12); else if (dt.length>=5) tc=Math.min(99,tc+8); else if (dt.length>=3) tc=Math.min(99,tc+5);
+        if (dt.length>=10) tc=Math.min(99,tc+14); else if (dt.length>=7) tc=Math.min(99,tc+10); else if (dt.length>=5) tc=Math.min(99,tc+6);
         tc=Math.min(99,Math.max(55,tc));
         return {duDoan:dd,doTinCay:tc,chiTiet:dt.slice(0,6).join(' | '),soMau:dt.length};
     }
-    fb() { if (this.stats.total>50) return {duDoan:this.stats.dung>this.stats.sai?'TÀI':'XỈU',doTinCay:52,chiTiet:'XU HƯỚNG',soMau:0}; return {duDoan:'TÀI',doTinCay:51,chiTiet:'KHỞI TẠO',soMau:0}; }
+    fb() { if (this.stats.total>50) return {duDoan:this.stats.dung>this.stats.sai?'TÀI':'XỈU',doTinCay:52,chiTiet:'XU HUONG',soMau:0}; return {duDoan:'TÀI',doTinCay:51,chiTiet:'KHOI TAO',soMau:0}; }
     update(prediction, actual) {
         const pr=prediction==='TÀI'?'T':'X'; const ac=actual==='TÀI'?'T':'X'; const ok=pr===ac;
         this.stats.total++;
@@ -172,9 +201,9 @@ async function autoProcess() { await Promise.all([processGame(brainHU,'hu'),proc
 function startAuto() { setTimeout(autoProcess,3000); setInterval(autoProcess,5000); }
 
 // ============================================================
-// GIAO DIỆN SIÊU VIP - BẢO LONG PREDICT
+// HTML GIAO DIEN
 // ============================================================
-const CSS = `:root{--bg:#020617;--bg2:#0a0f24;--bg3:#111832;--b:rgba(255,255,255,0.05);--ba:rgba(99,102,241,0.35);--t:#e2e8f0;--t2:#8899b8;--t3:#4a5578;--g:linear-gradient(135deg,#6366f1,#06b6d4);--g2:linear-gradient(135deg,#f59e0b,#ef4444);--ok:#22c55e;--no:#ef4444;--w:#f59e0b;--c:#06b6d4;--p:#6366f1}
+const CSS = `:root{--bg:#020617;--bg2:#0a0f24;--bg3:#111832;--b:rgba(255,255,255,0.05);--ba:rgba(99,102,241,0.35);--t:#e2e8f0;--t2:#8899b8;--t3:#4a5578;--g:linear-gradient(135deg,#6366f1,#06b6d4);--ok:#22c55e;--no:#ef4444;--w:#f59e0b;--c:#06b6d4;--p:#6366f1}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--t);min-height:100vh;overflow-x:hidden}
 .stars{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
@@ -223,30 +252,30 @@ td{padding:7px 12px;border-bottom:1px solid rgba(255,255,255,0.012)}tr:hover td{
 ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.06)}`;
 
 function loginPage() {
-    return `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>BẢO LONG • ĐĂNG NHẬP</title>
+    return `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>BAO LONG • DANG NHAP</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"><style>${CSS}
-.login-card{background:rgba(17,24,50,0.7);backdrop-filter:blur(40px);border:1px solid var(--b);border-radius:24px;padding:44px 36px;width:100%;max-width:440px;box-shadow:0 50px 120px rgba(0,0,0,0.6);animation:slideUp 0.6s ease-out}
+.login-card{background:rgba(17,24,50,0.7);backdrop-filter:blur(40px);border:1px solid var(--b);border-radius:24px;padding:44px 36px;width:100%;max-width:440px;box-shadow:0 50px 120px rgba(0,0,0,0.6);animation:slideUp 0.6s ease-out;position:relative}
 .login-card::before{content:'';position:absolute;top:-1px;left:-1px;right:-1px;bottom:-1px;border-radius:24px;background:var(--g);z-index:-1;opacity:0.08}
 </style></head><body>
 <div class="stars">${Array(60).fill(0).map((_,i)=>`<div class="star" style="left:${Math.random()*100}%;top:${Math.random()*100}%;width:${1+Math.random()*2}px;height:${1+Math.random()*2}px;animation-delay:${Math.random()*3}s"></div>`).join('')}</div>
 <div class="nebula"><div class="n1"></div><div class="n2"></div></div><div class="grid"></div>
 <div style="position:relative;z-index:1;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px"><div class="login-card">
-<div style="text-align:center;margin-bottom:32px"><div style="font-size:64px;animation:glow 3s infinite;display:inline-block">🐉</div><h1 style="font-family:'Orbitron',sans-serif;font-size:30px;font-weight:900;margin-top:8px"><span class="tg">BẢO LONG</span></h1><p style="font-size:11px;color:var(--t2);margin-top:6px;letter-spacing:3px;font-family:'JetBrains Mono',monospace">DỰ ĐOÁN TÀI XỈU</p><p style="font-size:9px;color:var(--t3);margin-top:8px">10 Engine • Siêu Chính Xác • Thời Gian Thực</p></div>
-<form onsubmit="login(event)"><div style="margin-bottom:24px"><label style="display:block;font-size:9px;color:var(--t2);text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;font-weight:600">🔑 MÃ TRUY CẬP</label><input type="password" id="p" placeholder="Nhập mã truy cập..." autocomplete="off" required></div>
-<button type="submit" class="btn" style="width:100%;font-size:15px;padding:14px">🚀 TRUY CẬP HỆ THỐNG</button></form>
+<div style="text-align:center;margin-bottom:32px"><div style="font-size:64px;animation:glow 3s infinite;display:inline-block">🐉</div><h1 style="font-family:'Orbitron',sans-serif;font-size:30px;font-weight:900;margin-top:8px"><span class="tg">BAO LONG</span></h1><p style="font-size:11px;color:var(--t2);margin-top:6px;letter-spacing:3px;font-family:'JetBrains Mono',monospace">DU DOAN TAI XIU</p><p style="font-size:9px;color:var(--t3);margin-top:8px">12 Engine • Sieu Chinh Xac • Thoi Gian Thuc</p></div>
+<form onsubmit="login(event)"><div style="margin-bottom:24px"><label style="display:block;font-size:9px;color:var(--t2);text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;font-weight:600">🔑 MA TRUY CAP</label><input type="password" id="p" placeholder="Nhap ma truy cap..." autocomplete="off" required></div>
+<button type="submit" class="btn" style="width:100%;font-size:15px;padding:14px">🚀 TRUY CAP HE THONG</button></form>
 <div id="res" style="margin-top:24px"></div>
-<div style="text-align:center;margin-top:20px;padding-top:16px;border-top:1px solid var(--b);font-size:7px;color:var(--t3);font-family:'JetBrains Mono',monospace;line-height:1.6">🐉 BẢO LONG PREDICT • LƯỢNG TỬ • BAYES • MARKOV • CHUỖI • ENTROPY • ĐỘNG LƯỢNG • HỌC SÂU • PHÂN MẢNH • BOOST • SÓNG</div></div></div>
+<div style="text-align:center;margin-top:20px;padding-top:16px;border-top:1px solid var(--b);font-size:7px;color:var(--t3);font-family:'JetBrains Mono',monospace;line-height:1.6">🐉 BAO LONG PREDICT • LUONG TU • BAYES • MARKOV • CHUOI • ENTROPY • DONG LUC • HOC SAU • PHAN MANH • BOOST • SONG • HOI QUY • SVM</div></div></div>
 <script>
 async function login(e){e.preventDefault();const p=document.getElementById('p').value.trim(),r=document.getElementById('res');
-if(!p){r.innerHTML='<div style="background:rgba(239,68,68,0.1);padding:14px;border-radius:10px;color:#ef4444;font-size:13px">⚠️ Vui lòng nhập mã truy cập</div>';return}
-r.innerHTML='<div style="background:rgba(6,182,212,0.1);padding:14px;border-radius:10px;color:#06b6d4;font-size:13px">⏳ Đang xác thực...</div>';
+if(!p){r.innerHTML='<div style="background:rgba(239,68,68,0.1);padding:14px;border-radius:10px;color:#ef4444;font-size:13px">Vui long nhap ma truy cap</div>';return}
+r.innerHTML='<div style="background:rgba(6,182,212,0.1);padding:14px;border-radius:10px;color:#06b6d4;font-size:13px">Dang xac thuc...</div>';
 try{const rs=await fetch('/_api/access',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:p})});const d=await rs.json();
-if(rs.ok&&d.token){window.location.href='/_home?_token='+d.token}else{r.innerHTML='<div style="background:rgba(239,68,68,0.1);padding:14px;border-radius:10px;color:#ef4444;font-size:13px">❌ Sai mã truy cập</div>'}}
-catch(ex){r.innerHTML='<div style="background:rgba(239,68,68,0.1);padding:14px;border-radius:10px;color:#ef4444;font-size:13px">🔌 Lỗi kết nối</div>'}}</script></body></html>`;
+if(rs.ok&&d.token){window.location.href='/_home?_token='+d.token}else{r.innerHTML='<div style="background:rgba(239,68,68,0.1);padding:14px;border-radius:10px;color:#ef4444;font-size:13px">Sai ma truy cap</div>'}}
+catch(ex){r.innerHTML='<div style="background:rgba(239,68,68,0.1);padding:14px;border-radius:10px;color:#ef4444;font-size:13px">Loi ket noi</div>'}}</script></body></html>`;
 }
 
 function homePage(token) {
-    return `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>BẢO LONG • TRANG CHỦ</title>
+    return `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>BAO LONG • TRANG CHU</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"><style>${CSS}
 .hero{text-align:center;margin-bottom:28px;animation:slideUp 0.6s}
 .features{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;max-width:600px;margin:0 auto 20px}
@@ -263,14 +292,14 @@ function homePage(token) {
 <div class="stars">${Array(60).fill(0).map((_,i)=>`<div class="star" style="left:${Math.random()*100}%;top:${Math.random()*100}%;width:${1+Math.random()*2}px;height:${1+Math.random()*2}px;animation-delay:${Math.random()*3}s"></div>`).join('')}</div>
 <div class="nebula"><div class="n1"></div><div class="n2"></div></div><div class="grid"></div>
 <div class="app">
-<div style="text-align:right;margin-bottom:10px"><a href="/_login" class="btn" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);color:#ef4444;font-size:9px;padding:6px 14px">🚪 THOÁT</a></div>
-<div class="hero"><div style="font-size:68px;animation:glow 3s infinite;display:inline-block">🐉</div><h1 style="font-family:'Orbitron',sans-serif;font-size:32px;font-weight:900;margin-top:8px"><span class="tg">BẢO LONG</span></h1><p style="font-size:11px;color:var(--t2);margin-top:6px;letter-spacing:3px;font-family:'JetBrains Mono',monospace">DỰ ĐOÁN TÀI XỈU SIÊU CHÍNH XÁC</p></div>
-<div class="announce"><h3>🌎 THÔNG BÁO BẢO TRÌ THÀNH CÔNG</h3><p>✨ Hệ thống đã được nâng cấp toàn diện với 10 engine dự đoán<br>🎯 Độ chính xác được cải thiện vượt trội, phân tích chuẩn đến từng loại cầu<br>🎨 Giao diện hoàn toàn mới, mượt mà và chuyên nghiệp</p></div>
-<div class="features"><div class="feat"><div class="fi">🧠</div><div class="ft">10 ENGINES</div><div class="fs">Phân tích thời gian thực</div></div><div class="feat"><div class="fi">🎯</div><div class="ft">SIÊU CHÍNH XÁC</div><div class="fs">Tổng hợp đa mô hình</div></div><div class="feat"><div class="fi">🔄</div><div class="ft">TỰ ĐỘNG 5S</div><div class="fs">Cập nhật liên tục</div></div><div class="feat"><div class="fi">📊</div><div class="ft">1000 PHIÊN</div><div class="fs">Lịch sử đầy đủ</div></div></div>
+<div style="text-align:right;margin-bottom:10px"><a href="/_login" class="btn" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);color:#ef4444;font-size:9px;padding:6px 14px">🚪 THOAT</a></div>
+<div class="hero"><div style="font-size:68px;animation:glow 3s infinite;display:inline-block">🐉</div><h1 style="font-family:'Orbitron',sans-serif;font-size:32px;font-weight:900;margin-top:8px"><span class="tg">BAO LONG</span></h1><p style="font-size:11px;color:var(--t2);margin-top:6px;letter-spacing:3px;font-family:'JetBrains Mono',monospace">DU DOAN TAI XIU SIEU CHINH XAC</p></div>
+<div class="announce"><h3>🌎 THONG BAO BAO TRI THANH CONG</h3><p>✨ He thong da duoc nang cap toan dien voi 12 engine du doan<br>🎯 Do chinh xac duoc cai thien vuot troi, phan tich chuan den tung loai cau<br>🎨 Giao dien hoan toan moi, muot ma va chuyen nghiep</p></div>
+<div class="features"><div class="feat"><div class="fi">🧠</div><div class="ft">12 ENGINES</div><div class="fs">Phan tich thoi gian thuc</div></div><div class="feat"><div class="fi">🎯</div><div class="ft">SIEU CHINH XAC</div><div class="fs">Tong hop da mo hinh</div></div><div class="feat"><div class="fi">🔄</div><div class="ft">TU DONG 5S</div><div class="fs">Cap nhat lien tuc</div></div><div class="feat"><div class="fi">📊</div><div class="ft">1000 PHIEN</div><div class="fs">Lich su day du</div></div></div>
 <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;max-width:500px;margin:0 auto">
-<a href="/_hu?_token=${token}" class="gc" style="text-align:center;text-decoration:none;color:var(--t);padding:30px 22px;cursor:pointer"><div style="font-size:44px;margin-bottom:10px">🎰</div><h2 style="font-family:'Orbitron',sans-serif;font-size:16px;font-weight:700;margin-bottom:4px">TÀI XỈU HŨ</h2><p style="font-size:8px;color:var(--t3);font-family:'JetBrains Mono',monospace">Dự Đoán Trực Tiếp</p></a>
-<a href="/_md5?_token=${token}" class="gc" style="text-align:center;text-decoration:none;color:var(--t);padding:30px 22px;cursor:pointer"><div style="font-size:44px;margin-bottom:10px">🔮</div><h2 style="font-family:'Orbitron',sans-serif;font-size:16px;font-weight:700;margin-bottom:4px">TÀI XỈU MD5</h2><p style="font-size:8px;color:var(--t3);font-family:'JetBrains Mono',monospace">Dự Đoán Trực Tiếp</p></a></div>
-<div style="text-align:center;margin-top:18px;font-size:7px;color:var(--t3);font-family:'JetBrains Mono',monospace">🐉 BẢO LONG PREDICT • 10 ENGINES • SIÊU CHÍNH XÁC</div></div></body></html>`;
+<a href="/_hu?_token=${token}" class="gc" style="text-align:center;text-decoration:none;color:var(--t);padding:30px 22px;cursor:pointer"><div style="font-size:44px;margin-bottom:10px">🎰</div><h2 style="font-family:'Orbitron',sans-serif;font-size:16px;font-weight:700;margin-bottom:4px">TAI XIU HU</h2><p style="font-size:8px;color:var(--t3);font-family:'JetBrains Mono',monospace">Du Doan Truc Tiep</p></a>
+<a href="/_md5?_token=${token}" class="gc" style="text-align:center;text-decoration:none;color:var(--t);padding:30px 22px;cursor:pointer"><div style="font-size:44px;margin-bottom:10px">🔮</div><h2 style="font-family:'Orbitron',sans-serif;font-size:16px;font-weight:700;margin-bottom:4px">TAI XIU MD5</h2><p style="font-size:8px;color:var(--t3);font-family:'JetBrains Mono',monospace">Du Doan Truc Tiep</p></a></div>
+<div style="text-align:center;margin-top:18px;font-size:7px;color:var(--t3);font-family:'JetBrains Mono',monospace">🐉 BAO LONG PREDICT • 12 ENGINES • SIEU CHINH XAC</div></div></body></html>`;
 }
 
 function dashboardPage(brain, type, token) {
@@ -285,7 +314,7 @@ function dashboardPage(brain, type, token) {
     }
     let dots1k = '';
     for (const r of all1000.slice(0, 200)) {
-        const st = r.status || '⏳', c = st === '✅' ? 's' : st === '❌' ? 'd' : 'w', t = st === '✅' ? 'Đ' : st === '❌' ? 'S' : '?';
+        const st = r.status || '⏳', c = st === '✅' ? 's' : st === '❌' ? 'd' : 'w', t = st === '✅' ? 'D' : st === '❌' ? 'S' : '?';
         dots1k += `<span class="dot dot-${c}" title="#${r.phien_hien_tai}: ${r.prediction} → ${r.actual || '?'}">${t}</span>`;
     }
     const phien = recent[0]?.phien_hien_tai || '---';
@@ -293,10 +322,10 @@ function dashboardPage(brain, type, token) {
     const conf = recent[0]?.confidence || 0;
     const cls = pred === 'TÀI' ? 'tai' : pred === 'XỈU' ? 'xiu' : 'loading';
     const confBarCls = pred === 'TÀI' ? 'tai-bar' : pred === 'XỈU' ? 'xiu-bar' : 'def-bar';
-    const gameName = type === 'hu' ? 'TÀI XỈU HŨ' : 'TÀI XỈU MD5';
+    const gameName = type === 'hu' ? 'TAI XIU HU' : 'TAI XIU MD5';
     const wr = s.tyle; const wc = wr >= 70 ? '#22c55e' : wr >= 60 ? '#f59e0b' : '#ef4444';
 
-    return `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=yes"><title>${gameName} | BẢO LONG</title>
+    return `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=yes"><title>${gameName} | BAO LONG</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"><style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0b0e14;color:#eef2f6;font-family:'Inter',system-ui,-apple-system,sans-serif;min-height:100vh;display:flex;flex-direction:column}
@@ -351,24 +380,24 @@ body{background:#0b0e14;color:#eef2f6;font-family:'Inter',system-ui,-apple-syste
 @media(max-width:480px){.game-page{padding:16px 12px 30px}.rc-header{padding:14px 16px;gap:10px}.rc-name{font-size:15px}.stats-row{gap:6px;padding:0 14px 14px;grid-template-columns:repeat(2,1fr)}.stat-item{padding:10px 4px}.si-val{font-size:14px}.pred-display{padding:22px 12px 14px}}
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:10px}
 </style></head><body>
-<div class="game-page"><div class="robot-card"><div class="rc-header"><div class="rc-icon-fb"><i class="fas fa-robot"></i></div><div><div class="rc-name">${gameName}</div><div class="rc-type"><i class="fas fa-brain"></i> 10 Engines • Thời Gian Thực</div></div><div class="rc-live"><i class="fas fa-circle"></i> TRỰC TIẾP</div></div>
-<div class="pred-display"><div class="pd-label"><i class="fas fa-bullseye"></i> DỰ ĐOÁN PHIÊN TIẾP THEO</div><div class="pd-phien">Phiên #${phien}</div><div class="pd-result ${cls}">${pred}</div><div class="conf-track"><div class="conf-fill ${confBarCls}"></div></div><div class="conf-pct">${conf}%</div><div class="conf-lbl">ĐỘ TIN CẬY</div></div>
-<div class="stats-row"><div class="stat-item"><div class="si-val">${phien}</div><div class="si-lbl">PHIÊN</div></div><div class="stat-item"><div class="si-val">${conf}%</div><div class="si-lbl">TIN CẬY</div></div><div class="stat-item"><div class="si-val" style="color:${wc}">${wr}%</div><div class="si-lbl">TỶ LỆ THẮNG</div></div><div class="stat-item"><div class="si-val">${td1k}Đ/${ts1k}S</div><div class="si-lbl">1000 PHIÊN</div></div></div>
-<div class="rc-footer"><a href="/_home?_token=${token}" class="back-btn"><i class="fas fa-arrow-left"></i> TRANG CHỦ</a><span><i class="fas fa-sync-alt fa-fw"></i> TỰ ĐỘNG 5s</span><span style="color:var(--green)"><i class="fas fa-check-circle"></i> TRỰC TUYẾN</span></div></div>
-<div class="hist-card"><div class="hist-head"><span><i class="fas fa-chart-bar"></i> THỐNG KÊ 200 PHIÊN</span><span style="font-size:10px;color:var(--muted)">${td1k}Đ/${ts1k}S</span></div><div class="dots-grid">${dots1k || 'Đang tải...'}</div></div>
-<div class="hist-card" style="margin-top:14px"><div class="hist-head"><span><i class="fas fa-clock-rotate-left"></i> LỊCH SỬ CHI TIẾT (${all1000.length} phiên)</span></div><div class="hist-body">${histHTML || '<div style="color:var(--muted);font-size:12px;text-align:center;padding:6px 0">Đang tải...</div>'}</div></div></div>
+<div class="game-page"><div class="robot-card"><div class="rc-header"><div class="rc-icon-fb"><i class="fas fa-robot"></i></div><div><div class="rc-name">${gameName}</div><div class="rc-type"><i class="fas fa-brain"></i> 12 Engines • Thoi Gian Thuc</div></div><div class="rc-live"><i class="fas fa-circle"></i> TRUC TIEP</div></div>
+<div class="pred-display"><div class="pd-label"><i class="fas fa-bullseye"></i> DU DOAN PHIEN TIEP THEO</div><div class="pd-phien">Phien #${phien}</div><div class="pd-result ${cls}">${pred}</div><div class="conf-track"><div class="conf-fill ${confBarCls}"></div></div><div class="conf-pct">${conf}%</div><div class="conf-lbl">DO TIN CAY</div></div>
+<div class="stats-row"><div class="stat-item"><div class="si-val">${phien}</div><div class="si-lbl">PHIEN</div></div><div class="stat-item"><div class="si-val">${conf}%</div><div class="si-lbl">TIN CAY</div></div><div class="stat-item"><div class="si-val" style="color:${wc}">${wr}%</div><div class="si-lbl">TY LE THANG</div></div><div class="stat-item"><div class="si-val">${td1k}D/${ts1k}S</div><div class="si-lbl">1000 PHIEN</div></div></div>
+<div class="rc-footer"><a href="/_home?_token=${token}" class="back-btn"><i class="fas fa-arrow-left"></i> TRANG CHU</a><span><i class="fas fa-sync-alt fa-fw"></i> TU DONG 5s</span><span style="color:var(--green)"><i class="fas fa-check-circle"></i> TRUC TUYEN</span></div></div>
+<div class="hist-card"><div class="hist-head"><span><i class="fas fa-chart-bar"></i> THONG KE 200 PHIEN</span><span style="font-size:10px;color:var(--muted)">${td1k}D/${ts1k}S</span></div><div class="dots-grid">${dots1k || 'Dang tai...'}</div></div>
+<div class="hist-card" style="margin-top:14px"><div class="hist-head"><span><i class="fas fa-clock-rotate-left"></i> LICH SU CHI TIET (${all1000.length} phien)</span></div><div class="hist-body">${histHTML || '<div style="color:var(--muted);font-size:12px;text-align:center;padding:6px 0">Dang tai...</div>'}</div></div></div>
 <script>setTimeout(()=>location.reload(),5000);</script></body></html>`;
 }
 
 // API
 app.get('/_login', (req, res) => { res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.send(loginPage()); });
 app.get('/', (req, res) => res.redirect('/_login'));
-app.post('/_api/access', (req, res) => { const { key } = req.body || {}; if (!key) return res.status(400).json({ error: 'Thiếu mã' }); if (key === MASTER_KEY) { const token = createToken(); return res.json({ token }); } return res.status(401).json({ error: 'Sai mã' }); });
+app.post('/_api/access', (req, res) => { const { key } = req.body || {}; if (!key) return res.status(400).json({ error: 'Thieu ma' }); if (key === MASTER_KEY) { const token = createToken(); return res.json({ token }); } return res.status(401).json({ error: 'Sai ma' }); });
 app.get('/_home', checkAuth, (req, res) => { res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.send(homePage(req.query['_token'])); });
 app.get('/_hu', checkAuth, async (req, res) => { const data = await fetchData('hu'); if (data) { for (const r of brainHU.history) { if (r.status && r.status !== '') continue; const a = data.find(d => d.phien.toString() === r.phien_hien_tai); if (a) { r.status = (r.prediction === a.result) ? '✅' : '❌'; r.actual = a.result; brainHU.update(r.prediction, a.result); } } brainHU.save(); } res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.send(dashboardPage(brainHU, 'hu', req.query['_token'])); });
 app.get('/_md5', checkAuth, async (req, res) => { const data = await fetchData('md5'); if (data) { for (const r of brainMD5.history) { if (r.status && r.status !== '') continue; const a = data.find(d => d.phien.toString() === r.phien_hien_tai); if (a) { r.status = (r.prediction === a.result) ? '✅' : '❌'; r.actual = a.result; brainMD5.update(r.prediction, a.result); } } brainMD5.save(); } res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.send(dashboardPage(brainMD5, 'md5', req.query['_token'])); });
-app.get('/_hu/json', checkAuth, async (req, res) => { try { const data = await fetchData('hu'); if (!data || data.length === 0) { const r = brainHU.fb(); return res.json({ prediction: r.duDoan, confidence: r.doTinCay, detail: r.chiTiet }); } const exist = brainHU.history.find(h => h.phien_hien_tai === (data[0].phien + 1).toString()); if (exist) return res.json(exist); const hd = data.map(d => d.result === 'TÀI' ? 'T' : 'X'); if (hd.length >= 50) brainHU.train(hd); const result = brainHU.predict(hd); const rec = { phien: data[0].phien, phien_hien_tai: (data[0].phien + 1).toString(), dice: `${data[0].dice1}-${data[0].dice2}-${data[0].dice3}`, total: data[0].total, actual: data[0].result, prediction: result.duDoan, confidence: result.doTinCay, detail: result.chiTiet, status: '', timestamp: new Date().toISOString(), soMau: result.soMau || 0 }; brainHU.history.unshift(rec); if (brainHU.history.length > 2000) brainHU.history = brainHU.history.slice(0, 2000); brainHU.save(); res.json(rec); } catch (e) { res.status(500).json({ error: 'Lỗi' }); } });
-app.get('/_md5/json', checkAuth, async (req, res) => { try { const data = await fetchData('md5'); if (!data || data.length === 0) { const r = brainMD5.fb(); return res.json({ prediction: r.duDoan, confidence: r.doTinCay, detail: r.chiTiet }); } const exist = brainMD5.history.find(h => h.phien_hien_tai === (data[0].phien + 1).toString()); if (exist) return res.json(exist); const hd = data.map(d => d.result === 'TÀI' ? 'T' : 'X'); if (hd.length >= 50) brainMD5.train(hd); const result = brainMD5.predict(hd); const rec = { phien: data[0].phien, phien_hien_tai: (data[0].phien + 1).toString(), dice: `${data[0].dice1}-${data[0].dice2}-${data[0].dice3}`, total: data[0].total, actual: data[0].result, prediction: result.duDoan, confidence: result.doTinCay, detail: result.chiTiet, status: '', timestamp: new Date().toISOString(), soMau: result.soMau || 0 }; brainMD5.history.unshift(rec); if (brainMD5.history.length > 2000) brainMD5.history = brainMD5.history.slice(0, 2000); brainMD5.save(); res.json(rec); } catch (e) { res.status(500).json({ error: 'Lỗi' }); } });
+app.get('/_hu/json', checkAuth, async (req, res) => { try { const data = await fetchData('hu'); if (!data || data.length === 0) { const r = brainHU.fb(); return res.json({ prediction: r.duDoan, confidence: r.doTinCay, detail: r.chiTiet }); } const exist = brainHU.history.find(h => h.phien_hien_tai === (data[0].phien + 1).toString()); if (exist) return res.json(exist); const hd = data.map(d => d.result === 'TÀI' ? 'T' : 'X'); if (hd.length >= 50) brainHU.train(hd); const result = brainHU.predict(hd); const rec = { phien: data[0].phien, phien_hien_tai: (data[0].phien + 1).toString(), dice: `${data[0].dice1}-${data[0].dice2}-${data[0].dice3}`, total: data[0].total, actual: data[0].result, prediction: result.duDoan, confidence: result.doTinCay, detail: result.chiTiet, status: '', timestamp: new Date().toISOString(), soMau: result.soMau || 0 }; brainHU.history.unshift(rec); if (brainHU.history.length > 2000) brainHU.history = brainHU.history.slice(0, 2000); brainHU.save(); res.json(rec); } catch (e) { res.status(500).json({ error: 'Loi' }); } });
+app.get('/_md5/json', checkAuth, async (req, res) => { try { const data = await fetchData('md5'); if (!data || data.length === 0) { const r = brainMD5.fb(); return res.json({ prediction: r.duDoan, confidence: r.doTinCay, detail: r.chiTiet }); } const exist = brainMD5.history.find(h => h.phien_hien_tai === (data[0].phien + 1).toString()); if (exist) return res.json(exist); const hd = data.map(d => d.result === 'TÀI' ? 'T' : 'X'); if (hd.length >= 50) brainMD5.train(hd); const result = brainMD5.predict(hd); const rec = { phien: data[0].phien, phien_hien_tai: (data[0].phien + 1).toString(), dice: `${data[0].dice1}-${data[0].dice2}-${data[0].dice3}`, total: data[0].total, actual: data[0].result, prediction: result.duDoan, confidence: result.doTinCay, detail: result.chiTiet, status: '', timestamp: new Date().toISOString(), soMau: result.soMau || 0 }; brainMD5.history.unshift(rec); if (brainMD5.history.length > 2000) brainMD5.history = brainMD5.history.slice(0, 2000); brainMD5.save(); res.json(rec); } catch (e) { res.status(500).json({ error: 'Loi' }); } });
 app.use((req, res) => res.status(404).end());
 
-app.listen(PORT, '0.0.0.0', () => { console.log(`\n✅ BẢO LONG - Port ${PORT}\n`); startAuto(); });
+app.listen(PORT, '0.0.0.0', () => { console.log(`\n✅ BAO LONG - Port ${PORT}\n`); startAuto(); });
