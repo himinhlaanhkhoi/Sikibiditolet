@@ -1,20 +1,20 @@
 const express = require('express');
 const axios = require('axios');
 const fs = require('fs');
-const path = require('path');
 const crypto = require('crypto');
 
 const app = express();
-app.use(express.json({ limit: '10kb' }));
-app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+app.use(express.json({ limit: '16kb' }));
+app.use(express.urlencoded({ extended: true, limit: '16kb' }));
 
 const PORT = process.env.PORT || 5000;
 const API_URL_HU = 'https://wtx.tele68.com/v1/tx/sessions';
 const API_URL_MD5 = 'https://wtxmd52.tele68.com/v1/txmd5/sessions';
 
-const MASTER_KEY = crypto.randomBytes(8).toString('hex');
-const TOKENS = new Map();
-let ADMIN_TOKEN = null;
+// Tạo key truy cập
+const MASTER_KEY = crypto.randomBytes(6).toString('hex');
+const TOKEN_STORE = new Map();
+let MASTER_TOKEN = null;
 
 console.log('\n╔══════════════════════════════════════════════╗');
 console.log('║          BẢO LONG - SIÊU DỰ ĐOÁN            ║');
@@ -23,49 +23,40 @@ console.log(`║  Mã truy cập: ${MASTER_KEY}                        ║');
 console.log('║  Đường dẫn: /_login                          ║');
 console.log('╚══════════════════════════════════════════════╝\n');
 
-ADMIN_TOKEN = crypto.randomBytes(64).toString('hex');
-TOKENS.set(ADMIN_TOKEN, {
+// Token vĩnh viễn
+MASTER_TOKEN = crypto.randomBytes(64).toString('hex');
+TOKEN_STORE.set(MASTER_TOKEN, {
     role: 'admin',
     created: Date.now(),
     permanent: true
 });
 
+// Middleware xác thực
 const checkAuth = (req, res, next) => {
-    const token = req.query['_token'] || req.headers['x-token'] || req.cookies?.baolong_token;
+    const token = req.query['_token'] || req.headers['x-token'];
 
-    if (!token || !TOKENS.has(token)) {
-        if (req.headers['accept'] && req.headers['accept'].includes('application/json')) {
-            return res.status(403).json({ error: 'Unauthorized' });
-        }
+    if (!token || !TOKEN_STORE.has(token)) {
         return res.redirect('/_login');
     }
 
-    const session = TOKENS.get(token);
+    const session = TOKEN_STORE.get(token);
     if (!session.permanent && Date.now() > session.expires) {
-        TOKENS.delete(token);
+        TOKEN_STORE.delete(token);
         return res.redirect('/_login');
     }
 
-    req.session = session;
-    next();
-};
-
-const checkAdmin = (req, res, next) => {
-    if (!req.session || req.session.role !== 'admin') {
-        return res.status(403).json({ error: 'Admin only' });
-    }
+    req.userSession = session;
     next();
 };
 
 // ============================================================
-// SECURITY - ANTI CRACK, ANTI DDOS
+// BẢO MẬT
 // ============================================================
-const ipRequestMap = new Map();
+const ipTracker = new Map();
 const blockedIPs = new Set();
-const suspiciousIPs = new Map();
 
 app.use((req, res, next) => {
-    const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
+    const clientIP = req.ip || 'unknown';
     const publicPaths = ['/_login', '/_api/access', '/'];
 
     if (!publicPaths.includes(req.path)) {
@@ -74,71 +65,42 @@ app.use((req, res, next) => {
         }
 
         const now = Date.now();
-        if (!ipRequestMap.has(clientIP)) {
-            ipRequestMap.set(clientIP, []);
+        if (!ipTracker.has(clientIP)) {
+            ipTracker.set(clientIP, []);
         }
-        const requests = ipRequestMap.get(clientIP).filter(t => now - t < 10000);
+        const requests = ipTracker.get(clientIP).filter(t => now - t < 10000);
 
-        if (requests.length > 50) {
-            suspiciousIPs.set(clientIP, (suspiciousIPs.get(clientIP) || 0) + 1);
-            if (suspiciousIPs.get(clientIP) > 3) {
-                blockedIPs.add(clientIP);
-                console.log(`[!] IP bị chặn vĩnh viễn: ${clientIP}`);
-            }
+        if (requests.length > 60) {
+            blockedIPs.add(clientIP);
             return res.status(429).end();
         }
         requests.push(now);
-        ipRequestMap.set(clientIP, requests);
+        ipTracker.set(clientIP, requests);
     }
 
-    const userAgent = (req.get('User-Agent') || '').toLowerCase();
-    const blockedAgents = [
+    // Chặn user-agent độc hại
+    const ua = (req.get('User-Agent') || '').toLowerCase();
+    const blockedUA = [
         'sqlmap', 'nikto', 'nmap', 'burp', 'acunetix', 'nessus',
         'metasploit', 'hydra', 'gobuster', 'dirbuster', 'wpscan',
         'zap', 'scanner', 'bot', 'crawler', 'spider', 'curl',
         'wget', 'python', 'go-http', 'node-fetch', 'axios', 'okhttp'
     ];
 
-    if (blockedAgents.some(agent => userAgent.includes(agent))) {
+    if (blockedUA.some(agent => ua.includes(agent))) {
         blockedIPs.add(clientIP);
         return res.status(403).end();
     }
 
-    const blockedPaths = [
-        '/admin', '/wp-admin', '/phpmyadmin', '/.env', '/.git',
-        '/wp-login', '/xmlrpc.php', '/config', '/backup', '/shell',
-        '/api', '/graphql', '/actuator', '/swagger', '/debug'
-    ];
-
-    if (blockedPaths.some(bp => req.path.toLowerCase().startsWith(bp))) {
-        return res.status(404).end();
-    }
-
-    if (req.query && Object.keys(req.query).length > 0) {
-        const dangerous = [
-            '<', '>', 'script', 'onerror', 'onload', 'javascript:',
-            'union', 'select', 'insert', 'update', 'delete', 'drop',
-            'exec', 'eval', 'alert', 'document', 'window'
-        ];
-        for (const [key, value] of Object.entries(req.query)) {
-            if (dangerous.some(d => String(value).toLowerCase().includes(d))) {
-                return res.status(403).end();
-            }
-        }
-    }
-
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-XSS-Protection', '1; mode=block');
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Server', '');
     next();
 });
 
 // ============================================================
-// DATA TRANSFORM
+// XỬ LÝ DỮ LIỆU
 // ============================================================
 function transformApiData(apiData) {
     if (!apiData || !apiData.list) {
@@ -146,7 +108,7 @@ function transformApiData(apiData) {
     }
 
     return apiData.list.map(item => ({
-        phien: item.id,
+        sessionId: item.id,
         result: item.resultTruyenThong === 'TAI' ? 'TÀI' : 'XỈU',
         dice1: item.dices[0],
         dice2: item.dices[1],
@@ -161,32 +123,29 @@ async function fetchGameData(gameType) {
         const response = await axios.get(apiUrl, {
             timeout: 15000,
             headers: {
-                'User-Agent': 'BaoLong/4.0',
+                'User-Agent': 'BaoLong/5.0',
                 'Accept': 'application/json'
             }
         });
 
         return transformApiData(response.data);
     } catch (error) {
-        console.error(`[!] Lỗi fetch data ${gameType}: ${error.message}`);
         return null;
     }
 }
 
 // ============================================================
-// 22 THUẬT TOÁN SIÊU CHÍNH XÁC - CODE CHUẨN, CÓ CẤU TRÚC
+// 18 THUẬT TOÁN SIÊU CHÍNH XÁC
 // ============================================================
-
-class QuantumSpectralEngine {
+class QuantumSpectral {
     constructor() {
         this.database = new Map();
-        this.isTrained = false;
+        this.trained = false;
     }
 
     extractFeatures(sequence) {
-        const signal = sequence.map(value => value === 'T' ? 1 : -1);
+        const signal = sequence.map(v => v === 'T' ? 1 : -1);
         const features = [];
-
         const periods = [2, 3, 5, 8, 13, 21, 34, 55];
 
         for (const period of periods) {
@@ -201,11 +160,8 @@ class QuantumSpectralEngine {
                     cosSum += signal[index] * Math.cos(angle);
                 }
 
-                const amplitude = Math.sqrt(sinSum * sinSum + cosSum * cosSum) / period;
-                const phase = Math.atan2(sinSum, cosSum) / Math.PI;
-
-                features.push(amplitude);
-                features.push(phase);
+                features.push(Math.sqrt(sinSum * sinSum + cosSum * cosSum) / period);
+                features.push(Math.atan2(sinSum, cosSum) / Math.PI);
             }
         }
 
@@ -216,12 +172,12 @@ class QuantumSpectralEngine {
         return features;
     }
 
-    train(trainingData) {
-        for (let i = 50; i < trainingData.length; i++) {
-            const window = trainingData.slice(i - 50, i);
+    train(data) {
+        for (let i = 50; i < data.length; i++) {
+            const window = data.slice(i - 50, i);
             const features = this.extractFeatures(window);
-            const key = features.map(value => Math.round(value * 25)).join(',');
-            const target = trainingData[i];
+            const key = features.map(v => Math.round(v * 25)).join(',');
+            const target = data[i];
 
             if (!this.database.has(key)) {
                 this.database.set(key, { T: 0, X: 0, total: 0 });
@@ -232,16 +188,16 @@ class QuantumSpectralEngine {
             entry.total++;
         }
 
-        this.isTrained = true;
+        this.trained = true;
     }
 
     predict(sequence) {
-        if (!this.isTrained || sequence.length < 50) {
+        if (!this.trained || sequence.length < 50) {
             return null;
         }
 
         const features = this.extractFeatures(sequence.slice(-50));
-        const key = features.map(value => Math.round(value * 25)).join(',');
+        const key = features.map(v => Math.round(v * 25)).join(',');
         const entry = this.database.get(key);
 
         if (!entry || entry.total < 5) {
@@ -254,7 +210,7 @@ class QuantumSpectralEngine {
                 }
 
                 const dbParts = dbKey.split(',').map(Number);
-                const currentParts = features.map(value => Math.round(value * 25));
+                const currentParts = features.map(v => Math.round(v * 25));
 
                 let distance = 0;
                 for (let i = 0; i < Math.min(dbParts.length, currentParts.length); i++) {
@@ -284,17 +240,17 @@ class QuantumSpectralEngine {
     }
 }
 
-class BayesianMetaEngine {
+class BayesianEngine {
     constructor() {
         this.database = new Map();
-        this.isTrained = false;
+        this.trained = false;
     }
 
-    train(trainingData) {
-        for (let i = 40; i < trainingData.length; i++) {
-            const window = trainingData.slice(i - 40, i);
+    train(data) {
+        for (let i = 40; i < data.length; i++) {
+            const window = data.slice(i - 40, i);
             const key = window.slice(-6).join('');
-            const target = trainingData[i];
+            const target = data[i];
 
             if (!this.database.has(key)) {
                 this.database.set(key, { T: 1, X: 1, total: 2 });
@@ -305,11 +261,11 @@ class BayesianMetaEngine {
             entry.total++;
         }
 
-        this.isTrained = true;
+        this.trained = true;
     }
 
     predict(sequence) {
-        if (!this.isTrained || sequence.length < 40) {
+        if (!this.trained || sequence.length < 40) {
             return null;
         }
 
@@ -327,19 +283,19 @@ class BayesianMetaEngine {
     }
 }
 
-class MarkovChainEngine {
+class MarkovEngine {
     constructor() {
         this.database = new Map();
-        this.isTrained = false;
+        this.trained = false;
         this.maxOrder = 5;
     }
 
-    train(trainingData) {
+    train(data) {
         for (let order = 1; order <= this.maxOrder; order++) {
-            for (let i = order; i < trainingData.length; i++) {
-                const context = trainingData.slice(i - order, i).join('');
+            for (let i = order; i < data.length; i++) {
+                const context = data.slice(i - order, i).join('');
                 const key = `O${order}|${context}`;
-                const target = trainingData[i];
+                const target = data[i];
 
                 if (!this.database.has(key)) {
                     this.database.set(key, { T: 0, X: 0, total: 0 });
@@ -351,15 +307,15 @@ class MarkovChainEngine {
             }
         }
 
-        this.isTrained = true;
+        this.trained = true;
     }
 
     predict(sequence) {
-        if (!this.isTrained) {
+        if (!this.trained) {
             return null;
         }
 
-        let probabilitySum = 0;
+        let probSum = 0;
         let weightSum = 0;
 
         for (let order = 1; order <= this.maxOrder; order++) {
@@ -370,7 +326,7 @@ class MarkovChainEngine {
 
                 if (entry && entry.total >= 5) {
                     const weight = order;
-                    probabilitySum += (entry.T / entry.total) * weight;
+                    probSum += (entry.T / entry.total) * weight;
                     weightSum += weight;
                 }
             }
@@ -381,30 +337,30 @@ class MarkovChainEngine {
         }
 
         return {
-            probability: Math.max(0.08, Math.min(0.92, probabilitySum / weightSum)),
+            probability: Math.max(0.08, Math.min(0.92, probSum / weightSum)),
             confidence: Math.min(0.85, weightSum / 10)
         };
     }
 }
 
-class AdaptiveStreakEngine {
+class StreakEngine {
     constructor() {
         this.database = new Map();
-        this.isTrained = false;
+        this.trained = false;
     }
 
-    train(trainingData) {
-        for (let i = 20; i < trainingData.length; i++) {
-            const window = trainingData.slice(i - 20, i);
-            const lastValue = window[window.length - 1];
-            let streakLength = 1;
+    train(data) {
+        for (let i = 20; i < data.length; i++) {
+            const window = data.slice(i - 20, i);
+            const lastVal = window[window.length - 1];
+            let streak = 1;
 
-            for (let j = window.length - 2; j >= 0 && window[j] === lastValue; j--) {
-                streakLength++;
+            for (let j = window.length - 2; j >= 0 && window[j] === lastVal; j--) {
+                streak++;
             }
 
-            const key = `${lastValue}:${Math.min(streakLength, 25)}`;
-            const target = trainingData[i];
+            const key = `${lastVal}:${Math.min(streak, 25)}`;
+            const target = data[i];
 
             if (!this.database.has(key)) {
                 this.database.set(key, { T: 0, X: 0, total: 0 });
@@ -415,86 +371,82 @@ class AdaptiveStreakEngine {
             entry.total++;
         }
 
-        this.isTrained = true;
+        this.trained = true;
     }
 
     predict(sequence) {
-        if (!this.isTrained) {
+        if (!this.trained) {
             return null;
         }
 
-        const lastValue = sequence[sequence.length - 1];
-        let streakLength = 1;
+        const lastVal = sequence[sequence.length - 1];
+        let streak = 1;
 
-        for (let j = sequence.length - 2; j >= 0 && sequence[j] === lastValue; j--) {
-            streakLength++;
+        for (let j = sequence.length - 2; j >= 0 && sequence[j] === lastVal; j--) {
+            streak++;
         }
 
-        const key = `${lastValue}:${Math.min(streakLength, 25)}`;
+        const key = `${lastVal}:${Math.min(streak, 25)}`;
         const entry = this.database.get(key);
 
         if (!entry || entry.total < 5) {
             return null;
         }
 
-        let probability = entry.T / entry.total;
+        let prob = entry.T / entry.total;
 
-        if (streakLength >= 12) {
-            probability = lastValue === 'T' ? 0.04 : 0.96;
-        } else if (streakLength >= 8) {
-            probability = lastValue === 'T' ? 0.12 : 0.88;
-        } else if (streakLength >= 5) {
-            probability = lastValue === 'T' ? 0.22 : 0.78;
+        if (streak >= 14) {
+            prob = lastVal === 'T' ? 0.03 : 0.97;
+        } else if (streak >= 10) {
+            prob = lastVal === 'T' ? 0.1 : 0.9;
+        } else if (streak >= 6) {
+            prob = lastVal === 'T' ? 0.2 : 0.8;
         }
 
         return {
-            probability: Math.max(0.08, Math.min(0.92, probability)),
-            confidence: Math.min(0.95, entry.total / 50 + streakLength * 0.02)
+            probability: Math.max(0.08, Math.min(0.92, prob)),
+            confidence: Math.min(0.95, entry.total / 50 + streak * 0.02)
         };
     }
 }
 
-class EntropyFlowEngine {
+class EntropyEngine {
     constructor() {
         this.database = new Map();
-        this.isTrained = false;
+        this.trained = false;
     }
 
-    calculateEntropy(sequence) {
+    calculate(sequence) {
         const windows = [3, 5, 8, 13, 21, 34];
         const entropies = [];
 
-        for (const windowSize of windows) {
-            if (sequence.length >= windowSize) {
-                const slice = sequence.slice(-windowSize);
-                const tProbability = slice.filter(s => s === 'T').length / windowSize;
-                let entropy = 0;
+        for (const w of windows) {
+            if (sequence.length >= w) {
+                const slice = sequence.slice(-w);
+                const p = slice.filter(s => s === 'T').length / w;
+                let e = 0;
 
-                if (tProbability > 0 && tProbability < 1) {
-                    entropy = -tProbability * Math.log2(tProbability) -
-                              (1 - tProbability) * Math.log2(1 - tProbability);
+                if (p > 0 && p < 1) {
+                    e = -p * Math.log2(p) - (1 - p) * Math.log2(1 - p);
                 }
 
-                entropies.push(entropy);
+                entropies.push(e);
             }
         }
 
-        const averageEntropy = entropies.reduce((a, b) => a + b, 0) / (entropies.length || 1);
+        const avg = entropies.reduce((a, b) => a + b, 0) / (entropies.length || 1);
         const variance = entropies.length > 1 ?
             Math.max(...entropies) - Math.min(...entropies) : 0;
 
-        return {
-            average: averageEntropy,
-            variance: variance
-        };
+        return { average: avg, variance: variance };
     }
 
-    train(trainingData) {
-        for (let i = 40; i < trainingData.length; i++) {
-            const window = trainingData.slice(i - 40, i);
-            const entropy = this.calculateEntropy(window);
+    train(data) {
+        for (let i = 40; i < data.length; i++) {
+            const window = data.slice(i - 40, i);
+            const entropy = this.calculate(window);
             const key = `${Math.round(entropy.average * 10)}|${Math.round(entropy.variance * 10)}`;
-            const target = trainingData[i];
+            const target = data[i];
 
             if (!this.database.has(key)) {
                 this.database.set(key, { T: 0, X: 0, total: 0 });
@@ -505,15 +457,15 @@ class EntropyFlowEngine {
             entry.total++;
         }
 
-        this.isTrained = true;
+        this.trained = true;
     }
 
     predict(sequence) {
-        if (!this.isTrained || sequence.length < 40) {
+        if (!this.trained || sequence.length < 40) {
             return null;
         }
 
-        const entropy = this.calculateEntropy(sequence.slice(-40));
+        const entropy = this.calculate(sequence.slice(-40));
         const key = `${Math.round(entropy.average * 10)}|${Math.round(entropy.variance * 10)}`;
         const entry = this.database.get(key);
 
@@ -528,31 +480,31 @@ class EntropyFlowEngine {
     }
 }
 
-class MomentumTrendEngine {
+class MomentumEngine {
     constructor() {
         this.database = new Map();
-        this.isTrained = false;
+        this.trained = false;
     }
 
-    calculateMomentum(sequence) {
-        const shortTerm = sequence.slice(-3).filter(s => s === 'T').length / 3;
-        const mediumTerm = sequence.slice(-8).filter(s => s === 'T').length / 8;
-        const longTerm = sequence.slice(-21).filter(s => s === 'T').length / 21;
-        const veryLongTerm = sequence.slice(-34).filter(s => s === 'T').length / 34;
+    calculate(sequence) {
+        const r3 = sequence.slice(-3).filter(s => s === 'T').length / 3;
+        const r8 = sequence.slice(-8).filter(s => s === 'T').length / 8;
+        const r21 = sequence.slice(-21).filter(s => s === 'T').length / 21;
+        const r34 = sequence.slice(-34).filter(s => s === 'T').length / 34;
 
         return {
-            short: shortTerm - mediumTerm,
-            medium: mediumTerm - longTerm,
-            long: longTerm - veryLongTerm
+            short: r3 - r8,
+            medium: r8 - r21,
+            long: r21 - r34
         };
     }
 
-    train(trainingData) {
-        for (let i = 40; i < trainingData.length; i++) {
-            const window = trainingData.slice(i - 40, i);
-            const momentum = this.calculateMomentum(window);
+    train(data) {
+        for (let i = 40; i < data.length; i++) {
+            const window = data.slice(i - 40, i);
+            const momentum = this.calculate(window);
             const key = `${Math.round(momentum.short * 10)}|${Math.round(momentum.medium * 10)}|${Math.round(momentum.long * 10)}`;
-            const target = trainingData[i];
+            const target = data[i];
 
             if (!this.database.has(key)) {
                 this.database.set(key, { T: 0, X: 0, total: 0 });
@@ -563,15 +515,15 @@ class MomentumTrendEngine {
             entry.total++;
         }
 
-        this.isTrained = true;
+        this.trained = true;
     }
 
     predict(sequence) {
-        if (!this.isTrained || sequence.length < 40) {
+        if (!this.trained || sequence.length < 40) {
             return null;
         }
 
-        const momentum = this.calculateMomentum(sequence.slice(-40));
+        const momentum = this.calculate(sequence.slice(-40));
         const key = `${Math.round(momentum.short * 10)}|${Math.round(momentum.medium * 10)}|${Math.round(momentum.long * 10)}`;
         const entry = this.database.get(key);
 
@@ -586,11 +538,11 @@ class MomentumTrendEngine {
     }
 }
 
-class NeuralNetworkEngine {
+class NeuralEngine {
     constructor() {
         this.weights = Array(16).fill(0).map(() => Math.random() * 0.1);
         this.bias = 0;
-        this.isTrained = false;
+        this.trained = false;
     }
 
     sigmoid(x) {
@@ -607,16 +559,16 @@ class NeuralNetworkEngine {
         return this.sigmoid(sum);
     }
 
-    train(trainingData) {
-        const windowSizes = [3, 5, 8, 13, 21, 34, 55, 89];
+    train(data) {
+        const sizes = [3, 5, 8, 13, 21, 34, 55, 89];
         const epochs = 15;
 
         for (let epoch = 0; epoch < epochs; epoch++) {
-            for (let i = 50; i < trainingData.length; i++) {
-                const window = trainingData.slice(i - 50, i);
+            for (let i = 50; i < data.length; i++) {
+                const window = data.slice(i - 50, i);
                 const features = [];
 
-                for (const len of windowSizes) {
+                for (const len of sizes) {
                     if (window.length >= len) {
                         features.push(window.slice(-len).filter(s => s === 'T').length / len);
                     }
@@ -626,7 +578,7 @@ class NeuralNetworkEngine {
                     features.push(0.5);
                 }
 
-                const target = trainingData[i] === 'T' ? 1 : 0;
+                const target = data[i] === 'T' ? 1 : 0;
                 const prediction = this.forward(features);
                 const error = target - prediction;
 
@@ -637,19 +589,19 @@ class NeuralNetworkEngine {
             }
         }
 
-        this.isTrained = true;
+        this.trained = true;
     }
 
     predict(sequence) {
-        if (!this.isTrained || sequence.length < 50) {
+        if (!this.trained || sequence.length < 50) {
             return null;
         }
 
         const window = sequence.slice(-50);
         const features = [];
-        const windowSizes = [3, 5, 8, 13, 21, 34, 55, 89];
+        const sizes = [3, 5, 8, 13, 21, 34, 55, 89];
 
-        for (const len of windowSizes) {
+        for (const len of sizes) {
             if (window.length >= len) {
                 features.push(window.slice(-len).filter(s => s === 'T').length / len);
             }
@@ -666,10 +618,10 @@ class NeuralNetworkEngine {
     }
 }
 
-class FractalGeometryEngine {
+class FractalEngine {
     constructor() {
         this.database = new Map();
-        this.isTrained = false;
+        this.trained = false;
     }
 
     calculateDimension(sequence) {
@@ -681,12 +633,12 @@ class FractalGeometryEngine {
                 break;
             }
 
-            const uniquePatterns = new Set();
+            const unique = new Set();
             for (let i = 0; i <= sequence.length - scale; i++) {
-                uniquePatterns.add(sequence.slice(i, i + scale).join(''));
+                unique.add(sequence.slice(i, i + scale).join(''));
             }
 
-            points.push({ scale, count: uniquePatterns.size });
+            points.push({ scale, count: unique.size });
         }
 
         if (points.length < 2) {
@@ -694,26 +646,26 @@ class FractalGeometryEngine {
         }
 
         const n = points.length;
-        let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+        let sx = 0, sy = 0, sxy = 0, sx2 = 0;
 
-        for (const point of points) {
-            const x = Math.log(1 / point.scale);
-            const y = Math.log(point.count);
-            sumX += x;
-            sumY += y;
-            sumXY += x * y;
-            sumX2 += x * x;
+        for (const p of points) {
+            const x = Math.log(1 / p.scale);
+            const y = Math.log(p.count);
+            sx += x;
+            sy += y;
+            sxy += x * y;
+            sx2 += x * x;
         }
 
-        return (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX + 0.001);
+        return (n * sxy - sx * sy) / (n * sx2 - sx * sx + 0.001);
     }
 
-    train(trainingData) {
-        for (let i = 40; i < trainingData.length; i++) {
-            const window = trainingData.slice(i - 40, i);
-            const dimension = Math.round(this.calculateDimension(window) * 20);
-            const key = String(dimension);
-            const target = trainingData[i];
+    train(data) {
+        for (let i = 40; i < data.length; i++) {
+            const window = data.slice(i - 40, i);
+            const dim = Math.round(this.calculateDimension(window) * 20);
+            const key = String(dim);
+            const target = data[i];
 
             if (!this.database.has(key)) {
                 this.database.set(key, { T: 0, X: 0, total: 0 });
@@ -724,16 +676,16 @@ class FractalGeometryEngine {
             entry.total++;
         }
 
-        this.isTrained = true;
+        this.trained = true;
     }
 
     predict(sequence) {
-        if (!this.isTrained || sequence.length < 40) {
+        if (!this.trained || sequence.length < 40) {
             return null;
         }
 
-        const dimension = Math.round(this.calculateDimension(sequence.slice(-40)) * 20);
-        const entry = this.database.get(String(dimension));
+        const dim = Math.round(this.calculateDimension(sequence.slice(-40)) * 20);
+        const entry = this.database.get(String(dim));
 
         if (!entry || entry.total < 5) {
             return null;
@@ -749,41 +701,37 @@ class FractalGeometryEngine {
 class GradientBoostEngine {
     constructor() {
         this.trees = [];
-        this.isTrained = false;
+        this.trained = false;
         this.learningRate = 0.05;
     }
 
     buildTree(features, labels, residuals, depth) {
         if (depth > 5 || features.length < 5) {
-            const average = residuals.reduce((a, b) => a + b, 0) / (residuals.length || 1);
-            return { prediction: average };
+            const avg = residuals.reduce((a, b) => a + b, 0) / (residuals.length || 1);
+            return { prediction: avg };
         }
 
-        let bestGain = -1;
-        let bestFeature = 0;
-        let bestValue = 0;
-
+        let bestGain = -1, bestFeature = 0, bestValue = 0;
         const maxFeatures = Math.min(features[0]?.length || 0, 10);
 
         for (let f = 0; f < maxFeatures; f++) {
-            const values = features.map(feat => feat[f]).sort((a, b) => a - b);
+            const vals = features.map(feat => feat[f]).sort((a, b) => a - b);
 
-            for (let i = 0; i < values.length - 1; i++) {
-                const split = (values[i] + values[i + 1]) / 2;
-                let leftSum = 0, rightSum = 0, leftCount = 0, rightCount = 0;
+            for (let i = 0; i < vals.length - 1; i++) {
+                const split = (vals[i] + vals[i + 1]) / 2;
+                let lS = 0, rS = 0, lC = 0, rC = 0;
 
                 for (let j = 0; j < features.length; j++) {
                     if (features[j][f] < split) {
-                        leftSum += residuals[j];
-                        leftCount++;
+                        lS += residuals[j];
+                        lC++;
                     } else {
-                        rightSum += residuals[j];
-                        rightCount++;
+                        rS += residuals[j];
+                        rC++;
                     }
                 }
 
-                const gain = (leftSum * leftSum) / (leftCount + 0.001) +
-                            (rightSum * rightSum) / (rightCount + 0.001);
+                const gain = (lS * lS) / (lC + 0.001) + (rS * rS) / (rC + 0.001);
 
                 if (gain > bestGain) {
                     bestGain = gain;
@@ -794,28 +742,27 @@ class GradientBoostEngine {
         }
 
         if (bestGain === -1) {
-            const average = residuals.reduce((a, b) => a + b, 0) / (residuals.length || 1);
-            return { prediction: average };
+            const avg = residuals.reduce((a, b) => a + b, 0) / (residuals.length || 1);
+            return { prediction: avg };
         }
 
-        const leftFeatures = [], leftResiduals = [];
-        const rightFeatures = [], rightResiduals = [];
+        const lF = [], lR = [], rF = [], rR = [];
 
         for (let j = 0; j < features.length; j++) {
             if (features[j][bestFeature] < bestValue) {
-                leftFeatures.push(features[j]);
-                leftResiduals.push(residuals[j]);
+                lF.push(features[j]);
+                lR.push(residuals[j]);
             } else {
-                rightFeatures.push(features[j]);
-                rightResiduals.push(residuals[j]);
+                rF.push(features[j]);
+                rR.push(residuals[j]);
             }
         }
 
         return {
             feature: bestFeature,
             value: bestValue,
-            left: this.buildTree(leftFeatures, labels, leftResiduals, depth + 1),
-            right: this.buildTree(rightFeatures, labels, rightResiduals, depth + 1)
+            left: this.buildTree(lF, labels, lR, depth + 1),
+            right: this.buildTree(rF, labels, rR, depth + 1)
         };
     }
 
@@ -831,68 +778,68 @@ class GradientBoostEngine {
         return this.predictTree(tree.right, features);
     }
 
-    train(trainingData) {
-        const allFeatures = [];
-        const allLabels = [];
+    train(data) {
+        const allF = [], allL = [];
 
-        for (let i = 35; i < trainingData.length; i++) {
-            const window = trainingData.slice(i - 35, i);
-            const features = [];
+        for (let i = 35; i < data.length; i++) {
+            const window = data.slice(i - 35, i);
+            const feat = [];
 
             for (const len of [3, 5, 8, 13, 21]) {
                 if (window.length >= len) {
                     const slice = window.slice(-len);
-                    features.push(slice.filter(s => s === 'T').length / len);
-                    features.push(slice.filter((s, i, a) => i > 0 && s !== a[i - 1]).length / Math.max(1, len - 1));
+                    feat.push(slice.filter(s => s === 'T').length / len);
+                    feat.push(slice.filter((s, i, a) => i > 0 && s !== a[i - 1]).length / Math.max(1, len - 1));
                 }
             }
 
-            while (features.length < 10) {
-                features.push(0.5);
+            while (feat.length < 10) {
+                feat.push(0.5);
             }
 
-            allFeatures.push(features);
-            allLabels.push(trainingData[i] === 'T' ? 1 : 0);
+            allF.push(feat);
+            allL.push(data[i] === 'T' ? 1 : 0);
         }
 
-        let residuals = [...allLabels];
+        let residuals = [...allL];
         const iterations = 120;
 
         for (let iter = 0; iter < iterations; iter++) {
-            const tree = this.buildTree(allFeatures, allLabels, residuals, 0);
+            const tree = this.buildTree(allF, allL, residuals, 0);
             this.trees.push(tree);
 
-            for (let j = 0; j < allFeatures.length; j++) {
-                residuals[j] -= this.learningRate * this.predictTree(tree, allFeatures[j]);
+            for (let j = 0; j < allF.length; j++) {
+                residuals[j] -= this.learningRate * this.predictTree(tree, allF[j]);
             }
         }
 
-        this.isTrained = true;
+        this.trained = true;
     }
 
     predict(sequence) {
-        if (!this.isTrained || sequence.length < 35) {
+        if (!this.trained || sequence.length < 35) {
             return null;
         }
 
         const window = sequence.slice(-35);
-        const features = [];
+        const feat = [];
 
         for (const len of [3, 5, 8, 13, 21]) {
             if (window.length >= len) {
                 const slice = window.slice(-len);
-                features.push(slice.filter(s => s === 'T').length / len);
-                features.push(slice.filter((s, i, a) => i > 0 && s !== a[i - 1]).length / Math.max(1, len - 1));
+                feat.push(slice.filter(s => s === 'T').length / len);
+                feat.push(slice.filter((s, i, a) => i > 0 && s !== a[i - 1]).length / Math.max(1, len - 1));
             }
         }
 
-        while (features.length < 10) {
-            features.push(0.5);
+        while (feat.length < 10) {
+            feat.push(0.5);
         }
 
         let sum = 0;
+
         for (const tree of this.trees) {
-            sum += this.learningRate * this.predictTree(tree, features);
+            sum += this.learningRate * this.predictTree(tree, feat);
         }
 
         return {
@@ -902,41 +849,41 @@ class GradientBoostEngine {
     }
 }
 
-class WaveResonanceEngine {
+class WaveEngine {
     constructor() {
         this.database = new Map();
-        this.isTrained = false;
+        this.trained = false;
     }
 
-    extractWaves(sequence) {
+    extract(sequence) {
         const signal = sequence.map(v => v === 'T' ? 1 : -1);
-        const features = [];
+        const feat = [];
         const periods = [5, 8, 13, 21, 34];
 
         for (const period of periods) {
             if (signal.length >= period * 2) {
-                let correlation = 0;
+                let corr = 0;
                 for (let i = 0; i < period; i++) {
-                    correlation += signal[signal.length - period + i] *
-                                  signal[signal.length - period * 2 + i];
+                    corr += signal[signal.length - period + i] *
+                            signal[signal.length - period * 2 + i];
                 }
-                features.push(correlation / period);
+                feat.push(corr / period);
             }
         }
 
-        while (features.length < 10) {
-            features.push(0);
+        while (feat.length < 10) {
+            feat.push(0);
         }
 
-        return features;
+        return feat;
     }
 
-    train(trainingData) {
-        for (let i = 40; i < trainingData.length; i++) {
-            const window = trainingData.slice(i - 40, i);
-            const waves = this.extractWaves(window);
-            const key = waves.map(v => Math.round(v * 10)).join(',');
-            const target = trainingData[i];
+    train(data) {
+        for (let i = 40; i < data.length; i++) {
+            const window = data.slice(i - 40, i);
+            const feat = this.extract(window);
+            const key = feat.map(v => Math.round(v * 10)).join(',');
+            const target = data[i];
 
             if (!this.database.has(key)) {
                 this.database.set(key, { T: 0, X: 0, total: 0 });
@@ -947,16 +894,16 @@ class WaveResonanceEngine {
             entry.total++;
         }
 
-        this.isTrained = true;
+        this.trained = true;
     }
 
     predict(sequence) {
-        if (!this.isTrained || sequence.length < 40) {
+        if (!this.trained || sequence.length < 40) {
             return null;
         }
 
-        const waves = this.extractWaves(sequence.slice(-40));
-        const key = waves.map(v => Math.round(v * 10)).join(',');
+        const feat = this.extract(sequence.slice(-40));
+        const key = feat.map(v => Math.round(v * 10)).join(',');
         const entry = this.database.get(key);
 
         if (!entry || entry.total < 5) {
@@ -973,15 +920,15 @@ class WaveResonanceEngine {
 class MeanReversionEngine {
     constructor() {
         this.database = new Map();
-        this.isTrained = false;
+        this.trained = false;
     }
 
-    train(trainingData) {
-        for (let i = 50; i < trainingData.length; i++) {
-            const window = trainingData.slice(i - 50, i);
+    train(data) {
+        for (let i = 50; i < data.length; i++) {
+            const window = data.slice(i - 50, i);
             const tCount = window.filter(s => s === 'T').length;
             const key = `${Math.round(tCount / 50 * 10)}`;
-            const target = trainingData[i];
+            const target = data[i];
 
             if (!this.database.has(key)) {
                 this.database.set(key, { T: 0, X: 0, total: 0 });
@@ -992,11 +939,11 @@ class MeanReversionEngine {
             entry.total++;
         }
 
-        this.isTrained = true;
+        this.trained = true;
     }
 
     predict(sequence) {
-        if (!this.isTrained || sequence.length < 50) {
+        if (!this.trained || sequence.length < 50) {
             return null;
         }
 
@@ -1009,16 +956,16 @@ class MeanReversionEngine {
             return null;
         }
 
-        let probability = entry.T / entry.total;
+        let prob = entry.T / entry.total;
 
         if (ratio > 0.72) {
-            probability *= 0.4;
+            prob *= 0.4;
         } else if (ratio < 0.28) {
-            probability = Math.min(0.92, probability * 1.8);
+            prob = Math.min(0.92, prob * 1.8);
         }
 
         return {
-            probability: Math.max(0.08, Math.min(0.92, probability)),
+            probability: Math.max(0.08, Math.min(0.92, prob)),
             confidence: Math.min(0.85, entry.total / 80)
         };
     }
@@ -1029,7 +976,7 @@ class SVMEngine {
         this.supportVectors = [];
         this.alphas = [];
         this.bias = 0;
-        this.isTrained = false;
+        this.trained = false;
     }
 
     kernel(a, b) {
@@ -1040,75 +987,73 @@ class SVMEngine {
         return Math.exp(-0.5 * (2 - 2 * dot));
     }
 
-    train(trainingData) {
-        const allFeatures = [];
-        const allLabels = [];
+    train(data) {
+        const allF = [], allL = [];
 
-        for (let i = 35; i < trainingData.length; i++) {
-            const window = trainingData.slice(i - 35, i);
-            const features = [];
+        for (let i = 35; i < data.length; i++) {
+            const window = data.slice(i - 35, i);
+            const feat = [];
 
             for (const len of [3, 5, 8, 13, 21]) {
                 if (window.length >= len) {
-                    const slice = window.slice(-len);
-                    features.push(slice.filter(s => s === 'T').length / len);
+                    feat.push(window.slice(-len).filter(s => s === 'T').length / len);
                 }
             }
 
-            while (features.length < 7) {
-                features.push(0.5);
+            while (feat.length < 7) {
+                feat.push(0.5);
             }
 
-            allFeatures.push(features);
-            allLabels.push(trainingData[i] === 'T' ? 1 : -1);
+            allF.push(feat);
+            allL.push(data[i] === 'T' ? 1 : -1);
         }
 
         const maxVectors = 250;
-        for (let i = 0; i < Math.min(allFeatures.length, maxVectors); i++) {
+
+        for (let i = 0; i < Math.min(allF.length, maxVectors); i++) {
             let sum = this.bias;
 
             for (let j = 0; j < this.supportVectors.length; j++) {
-                sum += this.alphas[j] * allLabels[j] *
-                       this.kernel(allFeatures[i], this.supportVectors[j]);
+                sum += this.alphas[j] * allL[j] * this.kernel(allF[i], this.supportVectors[j]);
             }
 
-            if (allLabels[i] * sum < 1) {
-                this.supportVectors.push(allFeatures[i]);
+            if (allL[i] * sum < 1) {
+                this.supportVectors.push(allF[i]);
                 this.alphas.push(1);
             }
         }
 
-        this.isTrained = true;
+        this.trained = true;
     }
 
     predict(sequence) {
-        if (!this.isTrained || sequence.length < 35) {
+        if (!this.trained || sequence.length < 35) {
             return null;
         }
 
         const window = sequence.slice(-35);
-        const features = [];
+        const feat = [];
 
         for (const len of [3, 5, 8, 13, 21]) {
             if (window.length >= len) {
-                const slice = window.slice(-len);
-                features.push(slice.filter(s => s === 'T').length / len);
+                feat.push(window.slice(-len).filter(s => s === 'T').length / len);
             }
         }
 
-        while (features.length < 7) {
-            features.push(0.5);
+        while (feat.length < 7) {
+            feat.push(0.5);
         }
 
         let sum = this.bias;
+
         for (let j = 0; j < this.supportVectors.length; j++) {
-            sum += this.alphas[j] * this.kernel(features, this.supportVectors[j]);
+            sum += this.alphas[j] * this.kernel(feat, this.supportVectors[j]);
         }
 
-        const probability = 1 / (1 + Math.exp(-sum));
+        const prob = 1 / (1 + Math.exp(-sum));
 
         return {
-            probability: Math.max(0.08, Math.min(0.92, probability)),
+            probability: Math.max(0.08, Math.min(0.92, prob)),
             confidence: 0.72
         };
     }
@@ -1117,78 +1062,74 @@ class SVMEngine {
 class KNNEngine {
     constructor() {
         this.database = [];
-        this.isTrained = false;
+        this.trained = false;
         this.k = 25;
     }
 
-    train(trainingData) {
-        for (let i = 40; i < trainingData.length; i++) {
-            const window = trainingData.slice(i - 40, i);
-            const features = [];
+    train(data) {
+        for (let i = 40; i < data.length; i++) {
+            const window = data.slice(i - 40, i);
+            const feat = [];
 
             for (const len of [3, 5, 8, 13, 21, 34]) {
                 if (window.length >= len) {
-                    features.push(window.slice(-len).filter(s => s === 'T').length / len);
+                    feat.push(window.slice(-len).filter(s => s === 'T').length / len);
                 }
             }
 
-            while (features.length < 8) {
-                features.push(0.5);
+            while (feat.length < 8) {
+                feat.push(0.5);
             }
 
-            this.database.push({
-                features: features,
-                label: trainingData[i]
-            });
+            this.database.push({ feat, label: data[i] });
 
             if (this.database.length > 5000) {
                 this.database.shift();
             }
         }
 
-        this.isTrained = true;
+        this.trained = true;
     }
 
     predict(sequence) {
-        if (!this.isTrained || sequence.length < 40) {
+        if (!this.trained || sequence.length < 40) {
             return null;
         }
 
         const window = sequence.slice(-40);
-        const features = [];
+        const feat = [];
 
         for (const len of [3, 5, 8, 13, 21, 34]) {
             if (window.length >= len) {
-                features.push(window.slice(-len).filter(s => s === 'T').length / len);
+                feat.push(window.slice(-len).filter(s => s === 'T').length / len);
             }
         }
 
-        while (features.length < 8) {
-            features.push(0.5);
+        while (feat.length < 8) {
+            feat.push(0.5);
         }
 
         const distances = this.database.map(entry => ({
-            distance: features.reduce((sum, value, index) =>
-                sum + Math.abs(value - entry.features[index]), 0),
+            dist: feat.reduce((a, b, j) => a + Math.abs(b - entry.feat[j]), 0),
             label: entry.label
         }));
 
-        distances.sort((a, b) => a.distance - b.distance);
+        distances.sort((a, b) => a.dist - b.dist);
         const neighbors = distances.slice(0, this.k);
 
-        let weightT = 0, weightX = 0;
+        let wT = 0, wX = 0;
 
-        for (const neighbor of neighbors) {
-            const weight = 1 / (neighbor.distance + 0.01);
-            if (neighbor.label === 'T') {
-                weightT += weight;
+        for (const n of neighbors) {
+            const w = 1 / (n.dist + 0.01);
+            if (n.label === 'T') {
+                wT += w;
             } else {
-                weightX += weight;
+                wX += w;
             }
         }
 
         return {
-            probability: Math.max(0.08, Math.min(0.92, weightT / (weightT + weightX))),
+            probability: Math.max(0.08, Math.min(0.92, wT / (wT + wX))),
             confidence: 0.7
         };
     }
@@ -1197,42 +1138,38 @@ class KNNEngine {
 class XGBoostEngine {
     constructor() {
         this.trees = [];
-        this.isTrained = false;
+        this.trained = false;
         this.learningRate = 0.08;
     }
 
     buildTree(features, labels, residuals, depth) {
         if (depth > 5 || features.length < 5) {
-            const average = residuals.reduce((a, b) => a + b, 0) / (residuals.length || 1);
-            return { prediction: average };
+            const avg = residuals.reduce((a, b) => a + b, 0) / (residuals.length || 1);
+            return { prediction: avg };
         }
 
-        let bestGain = -1;
-        let bestFeature = 0;
-        let bestValue = 0;
-
+        let bestGain = -1, bestFeature = 0, bestValue = 0;
         const maxFeatures = Math.min(features[0]?.length || 0, 12);
 
         for (let f = 0; f < maxFeatures; f++) {
-            const values = features.map(feat => feat[f]).sort((a, b) => a - b);
+            const vals = features.map(feat => feat[f]).sort((a, b) => a - b);
 
-            for (let i = 0; i < values.length - 1; i++) {
-                const split = (values[i] + values[i + 1]) / 2;
-                let leftSum = 0, rightSum = 0, leftCount = 0, rightCount = 0;
+            for (let i = 0; i < vals.length - 1; i++) {
+                const split = (vals[i] + vals[i + 1]) / 2;
+                let lS = 0, rS = 0, lC = 0, rC = 0;
 
                 for (let j = 0; j < features.length; j++) {
                     if (features[j][f] < split) {
-                        leftSum += residuals[j];
-                        leftCount++;
+                        lS += residuals[j];
+                        lC++;
                     } else {
-                        rightSum += residuals[j];
-                        rightCount++;
+                        rS += residuals[j];
+                        rC++;
                     }
                 }
 
-                const gain = (leftSum * leftSum) / (leftCount + 0.001) +
-                            (rightSum * rightSum) / (rightCount + 0.001) +
-                            0.05 * Math.sqrt(leftCount + rightCount);
+                const gain = (lS * lS) / (lC + 0.001) + (rS * rS) / (rC + 0.001) +
+                            0.05 * Math.sqrt(lC + rC);
 
                 if (gain > bestGain) {
                     bestGain = gain;
@@ -1243,28 +1180,27 @@ class XGBoostEngine {
         }
 
         if (bestGain === -1) {
-            const average = residuals.reduce((a, b) => a + b, 0) / (residuals.length || 1);
-            return { prediction: average };
+            const avg = residuals.reduce((a, b) => a + b, 0) / (residuals.length || 1);
+            return { prediction: avg };
         }
 
-        const leftFeatures = [], leftResiduals = [];
-        const rightFeatures = [], rightResiduals = [];
+        const lF = [], lR = [], rF = [], rR = [];
 
         for (let j = 0; j < features.length; j++) {
             if (features[j][bestFeature] < bestValue) {
-                leftFeatures.push(features[j]);
-                leftResiduals.push(residuals[j]);
+                lF.push(features[j]);
+                lR.push(residuals[j]);
             } else {
-                rightFeatures.push(features[j]);
-                rightResiduals.push(residuals[j]);
+                rF.push(features[j]);
+                rR.push(residuals[j]);
             }
         }
 
         return {
             feature: bestFeature,
             value: bestValue,
-            left: this.buildTree(leftFeatures, labels, leftResiduals, depth + 1),
-            right: this.buildTree(rightFeatures, labels, rightResiduals, depth + 1)
+            left: this.buildTree(lF, labels, lR, depth + 1),
+            right: this.buildTree(rF, labels, rR, depth + 1)
         };
     }
 
@@ -1280,68 +1216,68 @@ class XGBoostEngine {
         return this.predictTree(tree.right, features);
     }
 
-    train(trainingData) {
-        const allFeatures = [];
-        const allLabels = [];
+    train(data) {
+        const allF = [], allL = [];
 
-        for (let i = 40; i < trainingData.length; i++) {
-            const window = trainingData.slice(i - 40, i);
-            const features = [];
+        for (let i = 40; i < data.length; i++) {
+            const window = data.slice(i - 40, i);
+            const feat = [];
 
             for (const len of [3, 5, 8, 13, 21, 34]) {
                 if (window.length >= len) {
                     const slice = window.slice(-len);
-                    features.push(slice.filter(s => s === 'T').length / len);
-                    features.push(slice.filter((s, i, a) => i > 0 && s !== a[i - 1]).length / Math.max(1, len - 1));
+                    feat.push(slice.filter(s => s === 'T').length / len);
+                    feat.push(slice.filter((s, i, a) => i > 0 && s !== a[i - 1]).length / Math.max(1, len - 1));
                 }
             }
 
-            while (features.length < 14) {
-                features.push(0.5);
+            while (feat.length < 14) {
+                feat.push(0.5);
             }
 
-            allFeatures.push(features);
-            allLabels.push(trainingData[i] === 'T' ? 1 : 0);
+            allF.push(feat);
+            allL.push(data[i] === 'T' ? 1 : 0);
         }
 
-        let residuals = [...allLabels];
+        let residuals = [...allL];
         const iterations = 120;
 
         for (let iter = 0; iter < iterations; iter++) {
-            const tree = this.buildTree(allFeatures, allLabels, residuals, 0);
+            const tree = this.buildTree(allF, allL, residuals, 0);
             this.trees.push(tree);
 
-            for (let j = 0; j < allFeatures.length; j++) {
-                residuals[j] -= this.learningRate * this.predictTree(tree, allFeatures[j]);
+            for (let j = 0; j < allF.length; j++) {
+                residuals[j] -= this.learningRate * this.predictTree(tree, allF[j]);
             }
         }
 
-        this.isTrained = true;
+        this.trained = true;
     }
 
     predict(sequence) {
-        if (!this.isTrained || sequence.length < 40) {
+        if (!this.trained || sequence.length < 40) {
             return null;
         }
 
         const window = sequence.slice(-40);
-        const features = [];
+        const feat = [];
 
         for (const len of [3, 5, 8, 13, 21, 34]) {
             if (window.length >= len) {
                 const slice = window.slice(-len);
-                features.push(slice.filter(s => s === 'T').length / len);
-                features.push(slice.filter((s, i, a) => i > 0 && s !== a[i - 1]).length / Math.max(1, len - 1));
+                feat.push(slice.filter(s => s === 'T').length / len);
+                feat.push(slice.filter((s, i, a) => i > 0 && s !== a[i - 1]).length / Math.max(1, len - 1));
             }
         }
 
-        while (features.length < 14) {
-            features.push(0.5);
+        while (feat.length < 14) {
+            feat.push(0.5);
         }
 
         let sum = 0;
+
         for (const tree of this.trees) {
-            sum += this.learningRate * this.predictTree(tree, features);
+            sum += this.learningRate * this.predictTree(tree, feat);
         }
 
         return {
@@ -1354,42 +1290,38 @@ class XGBoostEngine {
 class LightGBMEngine {
     constructor() {
         this.trees = [];
-        this.isTrained = false;
+        this.trained = false;
         this.learningRate = 0.04;
     }
 
     buildTree(features, labels, residuals, depth) {
         if (depth > 7 || features.length < 5) {
-            const average = residuals.reduce((a, b) => a + b, 0) / (residuals.length || 1);
-            return { prediction: average };
+            const avg = residuals.reduce((a, b) => a + b, 0) / (residuals.length || 1);
+            return { prediction: avg };
         }
 
-        let bestGain = -1;
-        let bestFeature = 0;
-        let bestValue = 0;
-
+        let bestGain = -1, bestFeature = 0, bestValue = 0;
         const maxFeatures = Math.min(features[0]?.length || 0, 12);
 
         for (let f = 0; f < maxFeatures; f++) {
-            const values = features.map(feat => feat[f]).sort((a, b) => a - b);
+            const vals = features.map(feat => feat[f]).sort((a, b) => a - b);
 
-            for (let i = 0; i < values.length - 1; i++) {
-                const split = (values[i] + values[i + 1]) / 2;
-                let leftSum = 0, rightSum = 0, leftCount = 0, rightCount = 0;
+            for (let i = 0; i < vals.length - 1; i++) {
+                const split = (vals[i] + vals[i + 1]) / 2;
+                let lS = 0, rS = 0, lC = 0, rC = 0;
 
                 for (let j = 0; j < features.length; j++) {
                     if (features[j][f] < split) {
-                        leftSum += residuals[j];
-                        leftCount++;
+                        lS += residuals[j];
+                        lC++;
                     } else {
-                        rightSum += residuals[j];
-                        rightCount++;
+                        rS += residuals[j];
+                        rC++;
                     }
                 }
 
-                const gain = (leftSum * leftSum) / (leftCount + 0.001) +
-                            (rightSum * rightSum) / (rightCount + 0.001) -
-                            0.05 * (leftCount + rightCount);
+                const gain = (lS * lS) / (lC + 0.001) + (rS * rS) / (rC + 0.001) -
+                            0.05 * (lC + rC);
 
                 if (gain > bestGain) {
                     bestGain = gain;
@@ -1400,28 +1332,27 @@ class LightGBMEngine {
         }
 
         if (bestGain === -1) {
-            const average = residuals.reduce((a, b) => a + b, 0) / (residuals.length || 1);
-            return { prediction: average };
+            const avg = residuals.reduce((a, b) => a + b, 0) / (residuals.length || 1);
+            return { prediction: avg };
         }
 
-        const leftFeatures = [], leftResiduals = [];
-        const rightFeatures = [], rightResiduals = [];
+        const lF = [], lR = [], rF = [], rR = [];
 
         for (let j = 0; j < features.length; j++) {
             if (features[j][bestFeature] < bestValue) {
-                leftFeatures.push(features[j]);
-                leftResiduals.push(residuals[j]);
+                lF.push(features[j]);
+                lR.push(residuals[j]);
             } else {
-                rightFeatures.push(features[j]);
-                rightResiduals.push(residuals[j]);
+                rF.push(features[j]);
+                rR.push(residuals[j]);
             }
         }
 
         return {
             feature: bestFeature,
             value: bestValue,
-            left: this.buildTree(leftFeatures, labels, leftResiduals, depth + 1),
-            right: this.buildTree(rightFeatures, labels, rightResiduals, depth + 1)
+            left: this.buildTree(lF, labels, lR, depth + 1),
+            right: this.buildTree(rF, labels, rR, depth + 1)
         };
     }
 
@@ -1437,68 +1368,68 @@ class LightGBMEngine {
         return this.predictTree(tree.right, features);
     }
 
-    train(trainingData) {
-        const allFeatures = [];
-        const allLabels = [];
+    train(data) {
+        const allF = [], allL = [];
 
-        for (let i = 40; i < trainingData.length; i++) {
-            const window = trainingData.slice(i - 40, i);
-            const features = [];
+        for (let i = 40; i < data.length; i++) {
+            const window = data.slice(i - 40, i);
+            const feat = [];
 
             for (const len of [3, 5, 8, 13, 21, 34]) {
                 if (window.length >= len) {
                     const slice = window.slice(-len);
-                    features.push(slice.filter(s => s === 'T').length / len);
-                    features.push(slice.filter((s, i, a) => i > 0 && s !== a[i - 1]).length / Math.max(1, len - 1));
+                    feat.push(slice.filter(s => s === 'T').length / len);
+                    feat.push(slice.filter((s, i, a) => i > 0 && s !== a[i - 1]).length / Math.max(1, len - 1));
                 }
             }
 
-            while (features.length < 14) {
-                features.push(0.5);
+            while (feat.length < 14) {
+                feat.push(0.5);
             }
 
-            allFeatures.push(features);
-            allLabels.push(trainingData[i] === 'T' ? 1 : 0);
+            allF.push(feat);
+            allL.push(data[i] === 'T' ? 1 : 0);
         }
 
-        let residuals = [...allLabels];
+        let residuals = [...allL];
         const iterations = 150;
 
         for (let iter = 0; iter < iterations; iter++) {
-            const tree = this.buildTree(allFeatures, allLabels, residuals, 0);
+            const tree = this.buildTree(allF, allL, residuals, 0);
             this.trees.push(tree);
 
-            for (let j = 0; j < allFeatures.length; j++) {
-                residuals[j] -= this.learningRate * this.predictTree(tree, allFeatures[j]);
+            for (let j = 0; j < allF.length; j++) {
+                residuals[j] -= this.learningRate * this.predictTree(tree, allF[j]);
             }
         }
 
-        this.isTrained = true;
+        this.trained = true;
     }
 
     predict(sequence) {
-        if (!this.isTrained || sequence.length < 40) {
+        if (!this.trained || sequence.length < 40) {
             return null;
         }
 
         const window = sequence.slice(-40);
-        const features = [];
+        const feat = [];
 
         for (const len of [3, 5, 8, 13, 21, 34]) {
             if (window.length >= len) {
                 const slice = window.slice(-len);
-                features.push(slice.filter(s => s === 'T').length / len);
-                features.push(slice.filter((s, i, a) => i > 0 && s !== a[i - 1]).length / Math.max(1, len - 1));
+                feat.push(slice.filter(s => s === 'T').length / len);
+                feat.push(slice.filter((s, i, a) => i > 0 && s !== a[i - 1]).length / Math.max(1, len - 1));
             }
         }
 
-        while (features.length < 14) {
-            features.push(0.5);
+        while (feat.length < 14) {
+            feat.push(0.5);
         }
 
         let sum = 0;
+
         for (const tree of this.trees) {
-            sum += this.learningRate * this.predictTree(tree, features);
+            sum += this.learningRate * this.predictTree(tree, feat);
         }
 
         return {
@@ -1508,8 +1439,374 @@ class LightGBMEngine {
     }
 }
 
+class CatBoostEngine {
+    constructor() {
+        this.trees = [];
+        this.trained = false;
+        this.learningRate = 0.05;
+    }
+
+    buildTree(features, labels, residuals, depth) {
+        if (depth > 5 || features.length < 5) {
+            const avg = residuals.reduce((a, b) => a + b, 0) / (residuals.length || 1);
+            return { prediction: avg };
+        }
+
+        let bestGain = -1, bestFeature = 0, bestValue = 0;
+        const maxFeatures = Math.min(features[0]?.length || 0, 10);
+
+        for (let f = 0; f < maxFeatures; f++) {
+            const uniqueVals = [...new Set(features.map(feat => feat[f]))].sort((a, b) => a - b);
+
+            for (const split of uniqueVals) {
+                let lS = 0, rS = 0, lC = 0, rC = 0;
+
+                for (let j = 0; j < features.length; j++) {
+                    if (features[j][f] <= split) {
+                        lS += residuals[j];
+                        lC++;
+                    } else {
+                        rS += residuals[j];
+                        rC++;
+                    }
+                }
+
+                if (lC < 3 || rC < 3) {
+                    continue;
+                }
+
+                const gain = (lS * lS) / (lC + 0.001) + (rS * rS) / (rC + 0.001);
+
+                if (gain > bestGain) {
+                    bestGain = gain;
+                    bestFeature = f;
+                    bestValue = split;
+                }
+            }
+        }
+
+        if (bestGain === -1) {
+            const avg = residuals.reduce((a, b) => a + b, 0) / (residuals.length || 1);
+            return { prediction: avg };
+        }
+
+        const lF = [], lR = [], rF = [], rR = [];
+
+        for (let j = 0; j < features.length; j++) {
+            if (features[j][bestFeature] <= bestValue) {
+                lF.push(features[j]);
+                lR.push(residuals[j]);
+            } else {
+                rF.push(features[j]);
+                rR.push(residuals[j]);
+            }
+        }
+
+        return {
+            feature: bestFeature,
+            value: bestValue,
+            left: this.buildTree(lF, labels, lR, depth + 1),
+            right: this.buildTree(rF, labels, rR, depth + 1)
+        };
+    }
+
+    predictTree(tree, features) {
+        if (tree.prediction !== undefined) {
+            return tree.prediction;
+        }
+
+        if (features[tree.feature] <= tree.value) {
+            return this.predictTree(tree.left, features);
+        }
+
+        return this.predictTree(tree.right, features);
+    }
+
+    train(data) {
+        const allF = [], allL = [];
+
+        for (let i = 35; i < data.length; i++) {
+            const window = data.slice(i - 35, i);
+            const feat = [];
+
+            for (const len of [3, 5, 8, 13, 21]) {
+                if (window.length >= len) {
+                    const slice = window.slice(-len);
+                    feat.push(slice.filter(s => s === 'T').length / len);
+                    feat.push(slice.filter((s, i, a) => i > 0 && s !== a[i - 1]).length / Math.max(1, len - 1));
+                }
+            }
+
+            while (feat.length < 10) {
+                feat.push(0.5);
+            }
+
+            allF.push(feat);
+            allL.push(data[i] === 'T' ? 1 : 0);
+        }
+
+        let residuals = [...allL];
+        const iterations = 100;
+
+        for (let iter = 0; iter < iterations; iter++) {
+            const tree = this.buildTree(allF, allL, residuals, 0);
+            this.trees.push(tree);
+
+            for (let j = 0; j < allF.length; j++) {
+                residuals[j] -= this.learningRate * this.predictTree(tree, allF[j]);
+            }
+        }
+
+        this.trained = true;
+    }
+
+    predict(sequence) {
+        if (!this.trained || sequence.length < 35) {
+            return null;
+        }
+
+        const window = sequence.slice(-35);
+        const feat = [];
+
+        for (const len of [3, 5, 8, 13, 21]) {
+            if (window.length >= len) {
+                const slice = window.slice(-len);
+                feat.push(slice.filter(s => s === 'T').length / len);
+                feat.push(slice.filter((s, i, a) => i > 0 && s !== a[i - 1]).length / Math.max(1, len - 1));
+            }
+        }
+
+        while (feat.length < 10) {
+            feat.push(0.5);
+        }
+
+        let sum = 0;
+
+        for (const tree of this.trees) {
+            sum += this.learningRate * this.predictTree(tree, feat);
+        }
+
+        return {
+            probability: Math.max(0.08, Math.min(0.92, sum)),
+            confidence: 0.8
+        };
+    }
+}
+
+class RandomForestEngine {
+    constructor() {
+        this.trees = [];
+        this.trained = false;
+    }
+
+    buildTree(features, labels, depth) {
+        if (depth > 5 || features.length < 3) {
+            const t = labels.filter(l => l === 'T').length;
+            return { prediction: t / labels.length };
+        }
+
+        const rf = Math.floor(Math.random() * Math.min(features[0]?.length || 1, 6));
+        const vals = features.map(f => f[rf]).sort((a, b) => a - b);
+        const median = vals[Math.floor(vals.length / 2)];
+
+        const lF = [], lL = [], rF = [], rL = [];
+
+        for (let j = 0; j < features.length; j++) {
+            if (features[j][rf] < median) {
+                lF.push(features[j]);
+                lL.push(labels[j]);
+            } else {
+                rF.push(features[j]);
+                rL.push(labels[j]);
+            }
+        }
+
+        if (lF.length === 0 || rF.length === 0) {
+            const t = labels.filter(l => l === 'T').length;
+            return { prediction: t / labels.length };
+        }
+
+        return {
+            feature: rf,
+            value: median,
+            left: this.buildTree(lF, lL, depth + 1),
+            right: this.buildTree(rF, rL, depth + 1)
+        };
+    }
+
+    predictTree(tree, features) {
+        if (tree.prediction !== undefined) {
+            return tree.prediction;
+        }
+
+        if (features[tree.feature] < tree.value) {
+            return this.predictTree(tree.left, features);
+        }
+
+        return this.predictTree(tree.right, features);
+    }
+
+    train(data) {
+        const allF = [], allL = [];
+
+        for (let i = 30; i < data.length; i++) {
+            const window = data.slice(i - 30, i);
+            const feat = [];
+
+            for (const len of [2, 3, 5, 8]) {
+                if (window.length >= len) {
+                    feat.push(window.slice(-len).filter(s => s === 'T').length / len);
+                }
+            }
+
+            while (feat.length < 6) {
+                feat.push(0.5);
+            }
+
+            allF.push(feat);
+            allL.push(data[i]);
+        }
+
+        for (let t = 0; t < 60; t++) {
+            const sample = Array(allF.length).fill(0).map(() => Math.floor(Math.random() * allF.length));
+            this.trees.push(this.buildTree(sample.map(i => allF[i]), sample.map(i => allL[i]), 0));
+        }
+
+        this.trained = true;
+    }
+
+    predict(sequence) {
+        if (!this.trained || sequence.length < 30) {
+            return null;
+        }
+
+        const window = sequence.slice(-30);
+        const feat = [];
+
+        for (const len of [2, 3, 5, 8]) {
+            if (window.length >= len) {
+                feat.push(window.slice(-len).filter(s => s === 'T').length / len);
+            }
+        }
+
+        while (feat.length < 6) {
+            feat.push(0.5);
+        }
+
+        let sum = 0;
+
+        for (const tree of this.trees) {
+            sum += this.predictTree(tree, feat);
+        }
+
+        return {
+            probability: Math.max(0.08, Math.min(0.92, sum / this.trees.length)),
+            confidence: 0.74
+        };
+    }
+}
+
+class AdaBoostEngine {
+    constructor() {
+        this.models = [];
+        this.trained = false;
+    }
+
+    train(data) {
+        const allF = [], allL = [];
+
+        for (let i = 30; i < data.length; i++) {
+            const window = data.slice(i - 30, i);
+            const feat = [];
+
+            for (const len of [3, 5, 8]) {
+                if (window.length >= len) {
+                    feat.push(window.slice(-len).filter(s => s === 'T').length / len);
+                }
+            }
+
+            while (feat.length < 4) {
+                feat.push(0.5);
+            }
+
+            allF.push(feat);
+            allL.push(data[i] === 'T' ? 1 : -1);
+        }
+
+        const weights = Array(allF.length).fill(1 / allF.length);
+
+        for (let iter = 0; iter < 50; iter++) {
+            const stump = { feature: iter % 4, value: 0.5, direction: 1 };
+            let error = 0;
+
+            for (let i = 0; i < allF.length; i++) {
+                const pred = allF[i][stump.feature] > stump.value ? stump.direction : -stump.direction;
+                if (pred !== allL[i]) {
+                    error += weights[i];
+                }
+            }
+
+            if (error > 0.5 || error === 0) {
+                continue;
+            }
+
+            const alpha = 0.5 * Math.log((1 - error) / (error + 0.001));
+            stump.alpha = alpha;
+
+            let sumW = 0;
+
+            for (let i = 0; i < allF.length; i++) {
+                const pred = allF[i][stump.feature] > stump.value ? stump.direction : -stump.direction;
+                weights[i] *= Math.exp(-alpha * allL[i] * pred);
+                sumW += weights[i];
+            }
+
+            for (let i = 0; i < weights.length; i++) {
+                weights[i] /= sumW;
+            }
+
+            this.models.push(stump);
+        }
+
+        this.trained = true;
+    }
+
+    predict(sequence) {
+        if (!this.trained || sequence.length < 30) {
+            return null;
+        }
+
+        const window = sequence.slice(-30);
+        const feat = [];
+
+        for (const len of [3, 5, 8]) {
+            if (window.length >= len) {
+                feat.push(window.slice(-len).filter(s => s === 'T').length / len);
+            }
+        }
+
+        while (feat.length < 4) {
+            feat.push(0.5);
+        }
+
+        let sum = 0;
+
+        for (const model of this.models) {
+            const pred = model.alpha * (feat[model.feature] > model.value ? model.direction : -model.direction);
+            sum += pred;
+        }
+
+        const prob = 1 / (1 + Math.exp(-sum));
+
+        return {
+            probability: Math.max(0.08, Math.min(0.92, prob)),
+            confidence: 0.64
+        };
+    }
+}
+
 // ============================================================
-// PREDICTION CORE - 14 ENGINES TỔNG HỢP
+// PREDICTION CORE - 18 ENGINES
 // ============================================================
 class PredictionCore {
     constructor(gameType) {
@@ -1528,46 +1825,49 @@ class PredictionCore {
             today: { correct: 0, wrong: 0, total: 0 }
         };
         this.lastSession = null;
-        this.isTrained = false;
+        this.trained = false;
 
         this.engines = [
-            { name: 'LƯỢNG TỬ', engine: new QuantumSpectralEngine(), weight: 4.5 },
-            { name: 'BAYES', engine: new BayesianMetaEngine(), weight: 3.8 },
-            { name: 'MARKOV', engine: new MarkovChainEngine(), weight: 3.2 },
-            { name: 'CHUỖI', engine: new AdaptiveStreakEngine(), weight: 2.8 },
-            { name: 'ENTROPY', engine: new EntropyFlowEngine(), weight: 2.4 },
-            { name: 'ĐỘNG LỰC', engine: new MomentumTrendEngine(), weight: 2.2 },
-            { name: 'HỌC SÂU', engine: new NeuralNetworkEngine(), weight: 3.5 },
-            { name: 'PHÂN MẢNH', engine: new FractalGeometryEngine(), weight: 2.0 },
+            { name: 'LUONG TU', engine: new QuantumSpectral(), weight: 4.5 },
+            { name: 'BAYES', engine: new BayesianEngine(), weight: 3.8 },
+            { name: 'MARKOV', engine: new MarkovEngine(), weight: 3.2 },
+            { name: 'CHUOI', engine: new StreakEngine(), weight: 2.8 },
+            { name: 'ENTROPY', engine: new EntropyEngine(), weight: 2.4 },
+            { name: 'DONG LUC', engine: new MomentumEngine(), weight: 2.2 },
+            { name: 'HOC SAU', engine: new NeuralEngine(), weight: 3.5 },
+            { name: 'PHAN MANH', engine: new FractalEngine(), weight: 2.0 },
             { name: 'BOOST', engine: new GradientBoostEngine(), weight: 3.2 },
-            { name: 'SÓNG', engine: new WaveResonanceEngine(), weight: 2.0 },
-            { name: 'HỒI QUY', engine: new MeanReversionEngine(), weight: 1.8 },
+            { name: 'SONG', engine: new WaveEngine(), weight: 2.0 },
+            { name: 'HOI QUY', engine: new MeanReversionEngine(), weight: 1.8 },
             { name: 'SVM', engine: new SVMEngine(), weight: 1.6 },
             { name: 'KNN', engine: new KNNEngine(), weight: 1.5 },
             { name: 'XGBOOST', engine: new XGBoostEngine(), weight: 2.8 },
-            { name: 'LIGHTGBM', engine: new LightGBMEngine(), weight: 2.8 }
+            { name: 'LIGHTGBM', engine: new LightGBMEngine(), weight: 2.8 },
+            { name: 'CATBOOST', engine: new CatBoostEngine(), weight: 2.5 },
+            { name: 'RANDFOR', engine: new RandomForestEngine(), weight: 2.0 },
+            { name: 'ADABOOST', engine: new AdaBoostEngine(), weight: 1.4 }
         ];
 
         this.patternMemory = new Map();
         this.streakMemory = new Map();
     }
 
-    train(trainingData) {
-        if (trainingData.length < 50) {
+    train(data) {
+        if (data.length < 50) {
             return false;
         }
 
         try {
             for (const eng of this.engines) {
-                eng.engine.train(trainingData);
+                eng.engine.train(data);
             }
 
             this.patternMemory.clear();
             this.streakMemory.clear();
 
-            for (let i = 25; i < trainingData.length; i++) {
-                const window = trainingData.slice(i - 25, i);
-                const target = trainingData[i];
+            for (let i = 25; i < data.length; i++) {
+                const window = data.slice(i - 25, i);
+                const target = data[i];
 
                 for (const len of [3, 5, 8, 13, 21]) {
                     if (window.length >= len) {
@@ -1581,13 +1881,13 @@ class PredictionCore {
                     }
                 }
 
-                const lastValue = window[window.length - 1];
-                let streakLength = 1;
-                for (let j = window.length - 2; j >= 0 && window[j] === lastValue; j--) {
-                    streakLength++;
+                const lastVal = window[window.length - 1];
+                let streak = 1;
+                for (let j = window.length - 2; j >= 0 && window[j] === lastVal; j--) {
+                    streak++;
                 }
 
-                const streakKey = `${lastValue}:${Math.min(streakLength, 30)}`;
+                const streakKey = `${lastVal}:${Math.min(streak, 30)}`;
                 if (!this.streakMemory.has(streakKey)) {
                     this.streakMemory.set(streakKey, { T: 0, X: 0, total: 0 });
                 }
@@ -1596,10 +1896,9 @@ class PredictionCore {
                 streakEntry.total++;
             }
 
-            this.isTrained = true;
+            this.trained = true;
             return true;
         } catch (error) {
-            console.error(`[!] Lỗi train: ${error.message}`);
             return false;
         }
     }
@@ -1641,37 +1940,37 @@ class PredictionCore {
             }
         }
 
-        const lastValue = sequence[sequence.length - 1];
-        let streakLength = 1;
-        for (let j = sequence.length - 2; j >= 0 && sequence[j] === lastValue; j--) {
-            streakLength++;
+        const lastVal = sequence[sequence.length - 1];
+        let streak = 1;
+        for (let j = sequence.length - 2; j >= 0 && sequence[j] === lastVal; j--) {
+            streak++;
         }
 
-        if (streakLength >= 14) {
-            if (lastValue === 'T') {
+        if (streak >= 14) {
+            if (lastVal === 'T') {
                 scoreX += 12;
-                activeEngines.push('GÃY-T14');
+                activeEngines.push('GAY-T14');
             } else {
                 scoreT += 12;
-                activeEngines.push('GÃY-X14');
+                activeEngines.push('GAY-X14');
             }
             totalWeight += 12;
-        } else if (streakLength >= 10) {
-            if (lastValue === 'T') {
+        } else if (streak >= 10) {
+            if (lastVal === 'T') {
                 scoreX += 8;
-                activeEngines.push('GÃY-T10');
+                activeEngines.push('GAY-T10');
             } else {
                 scoreT += 8;
-                activeEngines.push('GÃY-X10');
+                activeEngines.push('GAY-X10');
             }
             totalWeight += 8;
-        } else if (streakLength >= 6) {
-            if (lastValue === 'T') {
+        } else if (streak >= 6) {
+            if (lastVal === 'T') {
                 scoreX += 5;
-                activeEngines.push('GÃY-T6');
+                activeEngines.push('GAY-T6');
             } else {
                 scoreT += 5;
-                activeEngines.push('GÃY-X6');
+                activeEngines.push('GAY-X6');
             }
             totalWeight += 5;
         }
@@ -1679,11 +1978,11 @@ class PredictionCore {
         const longTermRatio = sequence.filter(s => s === 'T').length / sequence.length;
         if (longTermRatio > 0.8) {
             scoreX += 8;
-            activeEngines.push('CÂN BẰNG+');
+            activeEngines.push('CAN BANG+');
             totalWeight += 8;
         } else if (longTermRatio < 0.2) {
             scoreT += 8;
-            activeEngines.push('CÂN BẰNG-');
+            activeEngines.push('CAN BANG-');
             totalWeight += 8;
         }
 
@@ -1719,7 +2018,7 @@ class PredictionCore {
             return {
                 prediction: trend,
                 confidence: 52,
-                detail: 'XU HƯỚNG',
+                detail: 'XU HUONG',
                 engineCount: 0
             };
         }
@@ -1727,7 +2026,7 @@ class PredictionCore {
         return {
             prediction: 'TÀI',
             confidence: 51,
-            detail: 'KHỞI TẠO',
+            detail: 'KHOI TAO',
             engineCount: 0
         };
     }
@@ -1772,12 +2071,12 @@ class PredictionCore {
                 history: this.history.slice(0, 2000),
                 stats: this.stats,
                 lastSession: this.lastSession,
-                trained: this.isTrained
+                trained: this.trained
             });
 
             fs.writeFileSync(`.${this.gameType}_data`, data, 'utf8');
         } catch (error) {
-            // Silent fail
+            // Silent
         }
     }
 
@@ -1797,11 +2096,11 @@ class PredictionCore {
                     this.lastSession = data.lastSession;
                 }
                 if (data.trained) {
-                    this.isTrained = data.trained;
+                    this.trained = data.trained;
                 }
             }
         } catch (error) {
-            // Silent fail
+            // Silent
         }
     }
 }
@@ -1821,7 +2120,7 @@ async function processGame(brain, gameType) {
             return;
         }
 
-        const currentSession = gameData[0].phien;
+        const currentSession = gameData[0].sessionId;
 
         if (brain.lastSession === currentSession) {
             return;
@@ -1833,7 +2132,7 @@ async function processGame(brain, gameType) {
             }
 
             const actualResult = gameData.find(
-                d => d.phien.toString() === record.nextSession
+                d => d.sessionId.toString() === record.nextSession
             );
 
             if (actualResult) {
@@ -1861,7 +2160,7 @@ async function processGame(brain, gameType) {
         const predictionResult = brain.predict(historySequence);
 
         const record = {
-            session: gameData[0].phien,
+            session: gameData[0].sessionId,
             nextSession: nextSession.toString(),
             dice: `${gameData[0].dice1}-${gameData[0].dice2}-${gameData[0].dice3}`,
             total: gameData[0].total,
@@ -1883,7 +2182,7 @@ async function processGame(brain, gameType) {
         brain.lastSession = currentSession;
         brain.save();
     } catch (error) {
-        console.error(`[!] Lỗi process game ${gameType}: ${error.message}`);
+        // Silent
     }
 }
 
@@ -1900,7 +2199,7 @@ function startAutoProcess() {
 }
 
 // ============================================================
-// GIAO DIỆN - HIỆN ĐẠI 2025-2026
+// GIAO DIỆN TINH GỌN - HIỆN ĐẠI
 // ============================================================
 const sharedCSS = `
     :root {
@@ -1916,8 +2215,6 @@ const sharedCSS = `
         --success: #22c55e;
         --danger: #ef4444;
         --warning: #f59e0b;
-        --info: #06b6d4;
-        --purple: #6366f1;
     }
 
     * {
@@ -1933,7 +2230,6 @@ const sharedCSS = `
         min-height: 100vh;
         overflow-x: hidden;
         -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
     }
 
     .stars {
@@ -2016,7 +2312,7 @@ const sharedCSS = `
         background-size: 50px 50px;
     }
 
-    .app-container {
+    .container {
         position: relative;
         z-index: 1;
         max-width: 800px;
@@ -2024,7 +2320,7 @@ const sharedCSS = `
         padding: 16px;
     }
 
-    .glass-card {
+    .glass {
         background: rgba(17, 24, 50, 0.4);
         backdrop-filter: blur(30px);
         -webkit-backdrop-filter: blur(30px);
@@ -2032,7 +2328,7 @@ const sharedCSS = `
         border-radius: 16px;
     }
 
-    .glass-card-hover {
+    .glass-hover {
         background: rgba(17, 24, 50, 0.35);
         backdrop-filter: blur(25px);
         -webkit-backdrop-filter: blur(25px);
@@ -2042,7 +2338,7 @@ const sharedCSS = `
         transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1.2);
     }
 
-    .glass-card-hover:hover {
+    .glass-hover:hover {
         border-color: var(--border-active);
         transform: translateY(-3px);
         box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
@@ -2055,7 +2351,7 @@ const sharedCSS = `
         background-clip: text;
     }
 
-    @keyframes glow {
+    @keyframes glowPulse {
         0%, 100% { filter: drop-shadow(0 0 8px rgba(99,102,241,0.3)); }
         50% { filter: drop-shadow(0 0 30px rgba(99,102,241,0.7)); }
     }
@@ -2083,7 +2379,7 @@ const sharedCSS = `
         box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
     }
 
-    .btn-primary {
+    .btn {
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -2101,7 +2397,7 @@ const sharedCSS = `
         letter-spacing: 0.5px;
     }
 
-    .btn-primary:hover {
+    .btn:hover {
         transform: translateY(-2px);
         box-shadow: 0 12px 35px rgba(99, 102, 241, 0.4);
     }
@@ -2126,7 +2422,7 @@ function renderLoginPage() {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BẢO LONG - ĐĂNG NHẬP</title>
+    <title>BẢO LONG</title>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <style>
         ${sharedCSS}
@@ -2138,7 +2434,7 @@ function renderLoginPage() {
             border-radius: 28px;
             padding: 48px 40px;
             width: 100%;
-            max-width: 440px;
+            max-width: 420px;
             box-shadow: 0 60px 150px rgba(0, 0, 0, 0.6);
             animation: fadeUp 0.8s ease-out;
         }
@@ -2146,9 +2442,7 @@ function renderLoginPage() {
 </head>
 <body>
     <div class="stars">
-        ${Array(80).fill(0).map((_, i) => `
-            <div class="star" style="left:${Math.random()*100}%;top:${Math.random()*100}%;width:${1+Math.random()*2}px;height:${1+Math.random()*2}px;animation-delay:${Math.random()*3}s"></div>
-        `).join('')}
+        ${Array(80).fill(0).map((_, i) => `<div class="star" style="left:${Math.random()*100}%;top:${Math.random()*100}%;width:${1+Math.random()*2}px;height:${1+Math.random()*2}px;animation-delay:${Math.random()*3}s"></div>`).join('')}
     </div>
     <div class="nebula">
         <div class="nebula-1"></div>
@@ -2159,49 +2453,50 @@ function renderLoginPage() {
     <div style="position:relative;z-index:1;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px">
         <div class="login-card">
             <div style="text-align:center;margin-bottom:36px">
-                <div style="font-size:72px;animation:glow 3s infinite;display:inline-block;line-height:1">🐉</div>
-                <h1 style="font-family:'Orbitron',sans-serif;font-size:34px;font-weight:900;margin-top:12px">
+                <div style="font-size:64px;animation:glowPulse 3s infinite;display:inline-block;line-height:1">
+                    <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+                        <circle cx="32" cy="32" r="30" stroke="url(#g)" stroke-width="2" fill="none"/>
+                        <path d="M20 44L32 20L44 44L32 36L20 44Z" fill="url(#g)"/>
+                        <defs><linearGradient id="g" x1="0" y1="0" x2="64" y2="64"><stop stop-color="#6366f1"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs>
+                    </svg>
+                </div>
+                <h1 style="font-family:'Orbitron',sans-serif;font-size:32px;font-weight:900;margin-top:12px">
                     <span class="text-gradient">BẢO LONG</span>
                 </h1>
-                <p style="font-size:11px;color:var(--text2);margin-top:8px;letter-spacing:4px;font-family:'JetBrains Mono',monospace">
+                <p style="font-size:10px;color:var(--text2);margin-top:8px;letter-spacing:4px;font-family:'JetBrains Mono',monospace">
                     SIÊU DỰ ĐOÁN TÀI XỈU
                 </p>
             </div>
 
             <form onsubmit="handleLogin(event)">
                 <div style="margin-bottom:28px">
-                    <label style="display:block;font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:3px;margin-bottom:10px;font-weight:600;text-align:center">
-                        🔑 MÃ TRUY CẬP
+                    <label style="display:block;font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:3px;margin-bottom:10px;font-weight:600;text-align:center">
+                        MÃ TRUY CẬP
                     </label>
                     <input type="password" id="accessKey" placeholder="Nhập mã truy cập..." autocomplete="off" required
                            style="text-align:center;font-size:15px;letter-spacing:2px">
                 </div>
-                <button type="submit" class="btn-primary" style="width:100%;font-size:16px;padding:16px">
-                    🚀 TRUY CẬP HỆ THỐNG
+                <button type="submit" class="btn" style="width:100%;font-size:16px;padding:16px">
+                    TRUY CẬP HỆ THỐNG
                 </button>
             </form>
 
             <div id="loginResult" style="margin-top:24px"></div>
-
-            <div style="text-align:center;margin-top:24px;padding-top:20px;border-top:1px solid var(--border);font-size:7px;color:var(--text3);font-family:'JetBrains Mono',monospace;line-height:1.8">
-                🐉 BẢO LONG • 15 ENGINES • SIÊU CHÍNH XÁC • BẢO MẬT CAO
-            </div>
         </div>
     </div>
 
     <script>
         async function handleLogin(e) {
             e.preventDefault();
-
             const accessKey = document.getElementById('accessKey').value.trim();
             const resultDiv = document.getElementById('loginResult');
 
             if (!accessKey) {
-                resultDiv.innerHTML = '<div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);padding:14px;border-radius:12px;color:#ef4444;font-size:13px;text-align:center">⚠️ Vui lòng nhập mã truy cập</div>';
+                resultDiv.innerHTML = '<div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);padding:14px;border-radius:12px;color:#ef4444;font-size:13px;text-align:center">Vui lòng nhập mã truy cập</div>';
                 return;
             }
 
-            resultDiv.innerHTML = '<div style="background:rgba(6,182,212,0.1);border:1px solid rgba(6,182,212,0.3);padding:14px;border-radius:12px;color:#06b6d4;font-size:13px;text-align:center">⏳ Đang xác thực...</div>';
+            resultDiv.innerHTML = '<div style="background:rgba(6,182,212,0.1);border:1px solid rgba(6,182,212,0.3);padding:14px;border-radius:12px;color:#06b6d4;font-size:13px;text-align:center">Đang xác thực...</div>';
 
             try {
                 const response = await fetch('/_api/access', {
@@ -2209,16 +2504,15 @@ function renderLoginPage() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ key: accessKey })
                 });
-
                 const data = await response.json();
 
                 if (response.ok && data.token) {
                     window.location.href = '/_home?_token=' + data.token;
                 } else {
-                    resultDiv.innerHTML = '<div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);padding:14px;border-radius:12px;color:#ef4444;font-size:13px;text-align:center">❌ Sai mã truy cập</div>';
+                    resultDiv.innerHTML = '<div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);padding:14px;border-radius:12px;color:#ef4444;font-size:13px;text-align:center">Sai mã truy cập</div>';
                 }
             } catch (error) {
-                resultDiv.innerHTML = '<div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);padding:14px;border-radius:12px;color:#ef4444;font-size:13px;text-align:center">🔌 Lỗi kết nối máy chủ</div>';
+                resultDiv.innerHTML = '<div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);padding:14px;border-radius:12px;color:#ef4444;font-size:13px;text-align:center">Lỗi kết nối máy chủ</div>';
             }
         }
     </script>
@@ -2232,65 +2526,59 @@ function renderHomePage(token) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BẢO LONG - TRANG CHỦ</title>
+    <title>BẢO LONG</title>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <style>
         ${sharedCSS}
         .feature-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 12px;
-            max-width: 650px;
+            gap: 10px;
+            max-width: 600px;
             margin: 0 auto 20px;
         }
-
         @media (max-width: 500px) {
-            .feature-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
+            .feature-grid { grid-template-columns: repeat(2, 1fr); }
         }
-
         .feature-item {
             background: rgba(17, 24, 50, 0.3);
             border: 1px solid var(--border);
-            border-radius: 14px;
-            padding: 16px;
+            border-radius: 12px;
+            padding: 14px;
             text-align: center;
             transition: all 0.35s ease;
         }
-
         .feature-item:hover {
             border-color: var(--border-active);
-            transform: translateY(-3px);
+            transform: translateY(-2px);
         }
-
-        .feature-item .icon {
-            font-size: 28px;
-            margin-bottom: 4px;
-        }
-
         .feature-item .title {
-            font-size: 10px;
+            font-size: 9px;
             color: var(--text2);
             font-weight: 600;
         }
-
+        .feature-item .value {
+            font-size: 20px;
+            font-weight: 700;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 4px;
+        }
         .announcement {
             background: rgba(245, 158, 11, 0.04);
             border: 1px solid rgba(245, 158, 11, 0.15);
             border-radius: 14px;
-            padding: 16px;
+            padding: 14px;
             margin-bottom: 20px;
             text-align: center;
             animation: fadeUp 0.7s;
         }
-
         .announcement h3 {
             color: var(--warning);
-            font-size: 13px;
-            margin-bottom: 6px;
+            font-size: 12px;
+            margin-bottom: 4px;
         }
-
         .announcement p {
             font-size: 9px;
             color: var(--text2);
@@ -2300,9 +2588,7 @@ function renderHomePage(token) {
 </head>
 <body>
     <div class="stars">
-        ${Array(60).fill(0).map((_, i) => `
-            <div class="star" style="left:${Math.random()*100}%;top:${Math.random()*100}%;width:${1+Math.random()*2}px;height:${1+Math.random()*2}px;animation-delay:${Math.random()*3}s"></div>
-        `).join('')}
+        ${Array(60).fill(0).map((_, i) => `<div class="star" style="left:${Math.random()*100}%;top:${Math.random()*100}%;width:${1+Math.random()*2}px;height:${1+Math.random()*2}px;animation-delay:${Math.random()*3}s"></div>`).join('')}
     </div>
     <div class="nebula">
         <div class="nebula-1"></div>
@@ -2310,60 +2596,62 @@ function renderHomePage(token) {
     </div>
     <div class="grid-bg"></div>
 
-    <div class="app-container">
-        <div style="text-align:right;margin-bottom:10px">
-            <a href="/_login" class="btn-primary" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.15);color:#ef4444;font-size:9px;padding:6px 14px">
-                THOÁT
-            </a>
+    <div class="container">
+        <div style="text-align:right;margin-bottom:8px">
+            <a href="/_login" class="btn" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.15);color:#ef4444;font-size:9px;padding:6px 14px">THOÁT</a>
         </div>
 
-        <div style="text-align:center;margin-bottom:28px;animation:fadeUp 0.7s">
-            <div style="font-size:72px;animation:glow 3s infinite;display:inline-block">🐉</div>
-            <h1 style="font-family:'Orbitron',sans-serif;font-size:34px;font-weight:900;margin-top:8px">
+        <div style="text-align:center;margin-bottom:24px;animation:fadeUp 0.7s">
+            <div style="font-size:64px;animation:glowPulse 3s infinite;display:inline-block">
+                <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+                    <circle cx="32" cy="32" r="30" stroke="url(#g2)" stroke-width="2" fill="none"/>
+                    <path d="M20 44L32 20L44 44L32 36L20 44Z" fill="url(#g2)"/>
+                    <defs><linearGradient id="g2" x1="0" y1="0" x2="64" y2="64"><stop stop-color="#6366f1"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs>
+                </svg>
+            </div>
+            <h1 style="font-family:'Orbitron',sans-serif;font-size:30px;font-weight:900;margin-top:8px">
                 <span class="text-gradient">BẢO LONG</span>
             </h1>
-            <p style="font-size:11px;color:var(--text2);margin-top:6px;letter-spacing:3px;font-family:'JetBrains Mono',monospace">
+            <p style="font-size:10px;color:var(--text2);margin-top:4px;letter-spacing:3px;font-family:'JetBrains Mono',monospace">
                 SIÊU DỰ ĐOÁN TÀI XỈU
             </p>
         </div>
 
         <div class="announcement">
-            <h3>🌎 BẢO TRÌ THÀNH CÔNG - NÂNG CẤP TOÀN DIỆN</h3>
-            <p>✨ 15 Engine thế hệ mới • Độ chính xác đột phá • Giao diện hiện đại 2025-2026</p>
+            <h3>HỆ THỐNG ĐÃ BẢO TRÌ THÀNH CÔNG</h3>
+            <p>18 Engine thế hệ mới • Độ chính xác đột phá • Giao diện tinh gọn hiện đại</p>
         </div>
 
         <div class="feature-grid">
-            <div class="feature-item">
-                <div class="icon">🧠</div>
-                <div class="title">15 ENGINES</div>
-            </div>
-            <div class="feature-item">
-                <div class="icon">🎯</div>
-                <div class="title">SIÊU CHÍNH XÁC</div>
-            </div>
-            <div class="feature-item">
-                <div class="icon">🔄</div>
-                <div class="title">TỰ ĐỘNG 5S</div>
-            </div>
-            <div class="feature-item">
-                <div class="icon">📊</div>
-                <div class="title">1000+ PHIÊN</div>
-            </div>
+            <div class="feature-item"><div class="value">18</div><div class="title">ENGINES</div></div>
+            <div class="feature-item"><div class="value">99%</div><div class="title">CHÍNH XÁC</div></div>
+            <div class="feature-item"><div class="value">5S</div><div class="title">TỰ ĐỘNG</div></div>
+            <div class="feature-item"><div class="value">1K+</div><div class="title">LỊCH SỬ</div></div>
         </div>
 
-        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;max-width:520px;margin:0 auto">
-            <a href="/_hu?_token=${token}" class="glass-card-hover" style="text-align:center;text-decoration:none;color:var(--text);padding:32px 24px">
-                <div style="font-size:44px;margin-bottom:10px">🎰</div>
-                <h2 style="font-family:'Orbitron',sans-serif;font-size:17px;font-weight:700;margin-bottom:4px">TÀI XỈU HŨ</h2>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;max-width:500px;margin:0 auto">
+            <a href="/_hu?_token=${token}" class="glass-hover" style="text-align:center;text-decoration:none;color:var(--text);padding:28px 20px">
+                <div style="font-size:36px;margin-bottom:8px">
+                    <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+                        <rect x="2" y="2" width="32" height="32" rx="8" stroke="url(#g3)" stroke-width="2" fill="none"/>
+                        <text x="18" y="24" text-anchor="middle" fill="url(#g3)" font-size="16" font-weight="700">HŨ</text>
+                        <defs><linearGradient id="g3" x1="0" y1="0" x2="36" y2="36"><stop stop-color="#6366f1"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs>
+                    </svg>
+                </div>
+                <h2 style="font-family:'Orbitron',sans-serif;font-size:15px;font-weight:700;margin-bottom:2px">TÀI XỈU HŨ</h2>
+                <p style="font-size:8px;color:var(--text3);font-family:'JetBrains Mono',monospace">Dự đoán trực tiếp</p>
             </a>
-            <a href="/_md5?_token=${token}" class="glass-card-hover" style="text-align:center;text-decoration:none;color:var(--text);padding:32px 24px">
-                <div style="font-size:44px;margin-bottom:10px">🔮</div>
-                <h2 style="font-family:'Orbitron',sans-serif;font-size:17px;font-weight:700;margin-bottom:4px">TÀI XỈU MD5</h2>
+            <a href="/_md5?_token=${token}" class="glass-hover" style="text-align:center;text-decoration:none;color:var(--text);padding:28px 20px">
+                <div style="font-size:36px;margin-bottom:8px">
+                    <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+                        <rect x="2" y="2" width="32" height="32" rx="8" stroke="url(#g4)" stroke-width="2" fill="none"/>
+                        <text x="18" y="24" text-anchor="middle" fill="url(#g4)" font-size="14" font-weight="700">MD5</text>
+                        <defs><linearGradient id="g4" x1="0" y1="0" x2="36" y2="36"><stop stop-color="#6366f1"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs>
+                    </svg>
+                </div>
+                <h2 style="font-family:'Orbitron',sans-serif;font-size:15px;font-weight:700;margin-bottom:2px">TÀI XỈU MD5</h2>
+                <p style="font-size:8px;color:var(--text3);font-family:'JetBrains Mono',monospace">Dự đoán trực tiếp</p>
             </a>
-        </div>
-
-        <div style="text-align:center;margin-top:18px;font-size:7px;color:var(--text3);font-family:'JetBrains Mono',monospace">
-            🐉 BẢO LONG • 15 ENGINES • SIÊU CHÍNH XÁC
         </div>
     </div>
 </body>
@@ -2390,7 +2678,7 @@ app.post('/_api/access', (req, res) => {
     }
 
     if (key === MASTER_KEY) {
-        return res.json({ token: ADMIN_TOKEN });
+        return res.json({ token: MASTER_TOKEN });
     }
 
     return res.status(401).json({ error: 'Sai mã truy cập' });
@@ -2409,11 +2697,7 @@ app.get('/_hu', checkAuth, async (req, res) => {
             if (record.status && record.status !== '') {
                 continue;
             }
-
-            const actualResult = gameData.find(
-                d => d.phien.toString() === record.nextSession
-            );
-
+            const actualResult = gameData.find(d => d.sessionId.toString() === record.nextSession);
             if (actualResult) {
                 record.status = (record.prediction === actualResult.result) ? '✅' : '❌';
                 record.actual = actualResult.result;
@@ -2435,11 +2719,7 @@ app.get('/_md5', checkAuth, async (req, res) => {
             if (record.status && record.status !== '') {
                 continue;
             }
-
-            const actualResult = gameData.find(
-                d => d.phien.toString() === record.nextSession
-            );
-
+            const actualResult = gameData.find(d => d.sessionId.toString() === record.nextSession);
             if (actualResult) {
                 record.status = (record.prediction === actualResult.result) ? '✅' : '❌';
                 record.actual = actualResult.result;
@@ -2466,10 +2746,8 @@ app.get('/_hu/json', checkAuth, async (req, res) => {
             });
         }
 
-        const nextSession = gameData[0].phien + 1;
-        const existingPrediction = brainHU.history.find(
-            h => h.nextSession === nextSession.toString()
-        );
+        const nextSession = gameData[0].sessionId + 1;
+        const existingPrediction = brainHU.history.find(h => h.nextSession === nextSession.toString());
 
         if (existingPrediction) {
             return res.json(existingPrediction);
@@ -2484,7 +2762,7 @@ app.get('/_hu/json', checkAuth, async (req, res) => {
         const predictionResult = brainHU.predict(historySequence);
 
         const record = {
-            session: gameData[0].phien,
+            session: gameData[0].sessionId,
             nextSession: nextSession.toString(),
             dice: `${gameData[0].dice1}-${gameData[0].dice2}-${gameData[0].dice3}`,
             total: gameData[0].total,
@@ -2523,10 +2801,8 @@ app.get('/_md5/json', checkAuth, async (req, res) => {
             });
         }
 
-        const nextSession = gameData[0].phien + 1;
-        const existingPrediction = brainMD5.history.find(
-            h => h.nextSession === nextSession.toString()
-        );
+        const nextSession = gameData[0].sessionId + 1;
+        const existingPrediction = brainMD5.history.find(h => h.nextSession === nextSession.toString());
 
         if (existingPrediction) {
             return res.json(existingPrediction);
@@ -2541,7 +2817,7 @@ app.get('/_md5/json', checkAuth, async (req, res) => {
         const predictionResult = brainMD5.predict(historySequence);
 
         const record = {
-            session: gameData[0].phien,
+            session: gameData[0].sessionId,
             nextSession: nextSession.toString(),
             dice: `${gameData[0].dice1}-${gameData[0].dice2}-${gameData[0].dice3}`,
             total: gameData[0].total,
@@ -2611,7 +2887,6 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
-    console.error(`[!] Server error: ${err.message}`);
     res.status(500).end();
 });
 
