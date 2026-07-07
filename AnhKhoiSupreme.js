@@ -5,2892 +5,544 @@ const crypto = require('crypto');
 
 const app = express();
 app.use(express.json({ limit: '16kb' }));
-app.use(express.urlencoded({ extended: true, limit: '16kb' }));
 
 const PORT = process.env.PORT || 5000;
 const API_URL_HU = 'https://wtx.tele68.com/v1/tx/sessions';
 const API_URL_MD5 = 'https://wtxmd52.tele68.com/v1/txmd5/sessions';
 
-// Tạo key truy cập
 const MASTER_KEY = crypto.randomBytes(6).toString('hex');
 const TOKEN_STORE = new Map();
 let MASTER_TOKEN = null;
 
 console.log('\n╔══════════════════════════════════════════════╗');
-console.log('║          BẢO LONG - SIÊU DỰ ĐOÁN            ║');
+console.log('║       ANH KHÔI - SIÊU DỰ ĐOÁN               ║');
 console.log('╠══════════════════════════════════════════════╣');
-console.log(`║  Mã truy cập: ${MASTER_KEY}                        ║');
-console.log('║  Đường dẫn: /_login                          ║');
+console.log(`║  Mã: ${MASTER_KEY}                               ║');
 console.log('╚══════════════════════════════════════════════╝\n');
 
-// Token vĩnh viễn
 MASTER_TOKEN = crypto.randomBytes(64).toString('hex');
-TOKEN_STORE.set(MASTER_TOKEN, {
-    role: 'admin',
-    created: Date.now(),
-    permanent: true
-});
+TOKEN_STORE.set(MASTER_TOKEN, { role: 'admin', created: Date.now(), permanent: true });
 
-// Middleware xác thực
 const checkAuth = (req, res, next) => {
     const token = req.query['_token'] || req.headers['x-token'];
-
-    if (!token || !TOKEN_STORE.has(token)) {
-        return res.redirect('/_login');
-    }
-
-    const session = TOKEN_STORE.get(token);
-    if (!session.permanent && Date.now() > session.expires) {
-        TOKEN_STORE.delete(token);
-        return res.redirect('/_login');
-    }
-
-    req.userSession = session;
+    if (!token || !TOKEN_STORE.has(token)) return res.redirect('/_login');
     next();
 };
 
-// ============================================================
-// BẢO MẬT
-// ============================================================
 const ipTracker = new Map();
-const blockedIPs = new Set();
-
 app.use((req, res, next) => {
-    const clientIP = req.ip || 'unknown';
-    const publicPaths = ['/_login', '/_api/access', '/'];
-
-    if (!publicPaths.includes(req.path)) {
-        if (blockedIPs.has(clientIP)) {
-            return res.status(403).end();
-        }
-
+    const ip = req.ip || 'unknown';
+    if (!['/_login', '/_api/access', '/'].includes(req.path)) {
         const now = Date.now();
-        if (!ipTracker.has(clientIP)) {
-            ipTracker.set(clientIP, []);
-        }
-        const requests = ipTracker.get(clientIP).filter(t => now - t < 10000);
-
-        if (requests.length > 60) {
-            blockedIPs.add(clientIP);
-            return res.status(429).end();
-        }
-        requests.push(now);
-        ipTracker.set(clientIP, requests);
+        if (!ipTracker.has(ip)) ipTracker.set(ip, []);
+        const reqs = ipTracker.get(ip).filter(t => now - t < 10000);
+        if (reqs.length > 60) return res.status(429).end();
+        reqs.push(now); ipTracker.set(ip, reqs);
     }
-
-    // Chặn user-agent độc hại
     const ua = (req.get('User-Agent') || '').toLowerCase();
-    const blockedUA = [
-        'sqlmap', 'nikto', 'nmap', 'burp', 'acunetix', 'nessus',
-        'metasploit', 'hydra', 'gobuster', 'dirbuster', 'wpscan',
-        'zap', 'scanner', 'bot', 'crawler', 'spider', 'curl',
-        'wget', 'python', 'go-http', 'node-fetch', 'axios', 'okhttp'
-    ];
-
-    if (blockedUA.some(agent => ua.includes(agent))) {
-        blockedIPs.add(clientIP);
-        return res.status(403).end();
-    }
-
+    if (['sqlmap','nikto','nmap','burp','acunetix','nessus','metasploit','hydra','gobuster','dirbuster','wpscan','zap','scanner','bot','crawler','spider','curl','wget','python','go-http','node-fetch','axios','okhttp'].some(a => ua.includes(a))) return res.status(403).end();
     res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Server', '');
     next();
 });
 
-// ============================================================
-// XỬ LÝ DỮ LIỆU
-// ============================================================
 function transformApiData(apiData) {
-    if (!apiData || !apiData.list) {
-        return null;
-    }
-
+    if (!apiData || !apiData.list) return null;
     return apiData.list.map(item => ({
         sessionId: item.id,
-        result: item.resultTruyenThong === 'TAI' ? 'TÀI' : 'XỈU',
-        dice1: item.dices[0],
-        dice2: item.dices[1],
-        dice3: item.dices[2],
-        total: item.point
+        result: item.resultTruyenThong === 'TAI' ? 'Tài' : 'Xỉu',
+        totalScore: item.point,
+        d1: item.dices[0], d2: item.dices[1], d3: item.dices[2],
+        timestamp: new Date().toISOString()
     }));
 }
 
 async function fetchGameData(gameType) {
     try {
-        const apiUrl = gameType === 'hu' ? API_URL_HU : API_URL_MD5;
-        const response = await axios.get(apiUrl, {
-            timeout: 15000,
-            headers: {
-                'User-Agent': 'BaoLong/5.0',
-                'Accept': 'application/json'
-            }
-        });
-
+        const url = gameType === 'hu' ? API_URL_HU : API_URL_MD5;
+        const response = await axios.get(url, { timeout: 15000, headers: { 'User-Agent': 'AnhKhoi/1.0', 'Accept': 'application/json' } });
         return transformApiData(response.data);
-    } catch (error) {
+    } catch (error) { return null; }
+}
+
+// ============================================================
+// ANH KHÔI PREDICTION ENGINE - 100+ THUẬT TOÁN
+// ============================================================
+const AnhKhoiMath = {
+    mean: (arr) => arr?.length ? arr.reduce((a,b) => a+b, 0) / arr.length : 0,
+    median: (arr) => { if(!arr?.length) return 0; const s = [...arr].sort((a,b)=>a-b); const m = Math.floor(s.length/2); return s.length%2?s[m]:(s[m-1]+s[m])/2; },
+    std: (arr) => { if(!arr||arr.length<2) return 0; const m=arr.reduce((a,b)=>a+b,0)/arr.length; return Math.sqrt(arr.reduce((s,v)=>s+(v-m)**2,0)/arr.length); },
+    variance: (arr) => { if(!arr||arr.length<2) return 0; const m=arr.reduce((a,b)=>a+b,0)/arr.length; return arr.reduce((s,v)=>s+(v-m)**2,0)/arr.length; },
+    skewness: (arr) => { if(!arr||arr.length<3) return 0; const n=arr.length,m=arr.reduce((a,b)=>a+b,0)/n,s=Math.sqrt(arr.reduce((s,v)=>s+(v-m)**2,0)/n); if(!s) return 0; return (n/((n-1)*(n-2)))*arr.reduce((s,v)=>s+((v-m)/s)**3,0); },
+    kurtosis: (arr) => { if(!arr||arr.length<4) return 0; const n=arr.length,m=arr.reduce((a,b)=>a+b,0)/n,s=Math.sqrt(arr.reduce((s,v)=>s+(v-m)**2,0)/n); if(!s) return 0; const t=arr.reduce((s,v)=>s+((v-m)/s)**4,0); return (n*(n+1)/((n-1)*(n-2)*(n-3)))*t-(3*(n-1)**2/((n-2)*(n-3))); },
+    autocorrelation: (arr, lag=1) => { if(!arr||arr.length<lag+2) return 0; const n=arr.length,m=arr.reduce((a,b)=>a+b,0)/n; let num=0,den=0; for(let i=0;i<n;i++)den+=(arr[i]-m)**2; if(!den) return 0; for(let i=0;i<n-lag;i++)num+=(arr[i]-m)*(arr[i+lag]-m); return num/den; },
+    entropy: (arr) => { if(!arr?.length) return 0; const f={}; arr.forEach(v=>f[v]=(f[v]||0)+1); const n=arr.length; let e=0; for(const k in f){ const p=f[k]/n; if(p>0)e-=p*Math.log2(p); } return e; },
+    sigmoid: (x) => 1/(1+Math.exp(-Math.max(-700,Math.min(700,x)))),
+    ema: (arr, alpha=0.3) => { if(!arr?.length) return 0; let e=arr[0]; for(let i=1;i<arr.length;i++)e=alpha*arr[i]+(1-alpha)*e; return e; },
+    rsi: (arr, period=14) => { if(arr.length<period+1) return 50; let gains=0,losses=0; for(let i=0;i<period;i++){ const change=arr[i]-arr[i+1]; if(change>0)gains+=change; else losses-=change; } const avgG=gains/period,avgL=losses/period; if(!avgL) return 100; return 100-(100/(1+avgG/avgL)); },
+    hurstExponent: (arr) => { if(!arr||arr.length<30) return 0.5; const n=arr.length,m=arr.reduce((a,b)=>a+b,0)/n; const dev=arr.map(x=>x-m); let cumSum=0,rsMax=-Infinity,rsMin=Infinity; for(let i=0;i<n;i++){ cumSum+=dev[i]; rsMax=Math.max(rsMax,cumSum); rsMin=Math.min(rsMin,cumSum); } const r=rsMax-rsMin; const s=Math.sqrt(arr.reduce((s,v)=>s+(v-m)**2,0)/n); if(!s) return 0.5; return Math.max(0,Math.min(1,Math.log(r/s)/Math.log(n))); },
+    lyapunovExponent: (arr) => { if(!arr||arr.length<20) return 0; let sum=0,count=0; for(let i=0;i<arr.length-1;i++){ if(arr[i]!==0){ sum+=Math.log(Math.abs((arr[i+1]-arr[i])/arr[i])); count++; } } return count>0?sum/count:0; },
+    linearRegression: (x, y) => { if(!x||!y||x.length!==y.length||x.length<2) return {slope:0,intercept:0,r2:0}; const n=x.length; const mx=x.reduce((a,b)=>a+b,0)/n,my=y.reduce((a,b)=>a+b,0)/n; let num=0,den=0; for(let i=0;i<n;i++){ num+=(x[i]-mx)*(y[i]-my); den+=(x[i]-mx)**2; } const slope=den?num/den:0; const intercept=my-slope*mx; let ssr=0,sst=0; for(let i=0;i<n;i++){ const pred=slope*x[i]+intercept; ssr+=(y[i]-pred)**2; sst+=(y[i]-my)**2; } return {slope,intercept,r2:sst?1-ssr/sst:0}; }
+};
+
+class PredictionCore {
+    constructor() {
+        this.history = [];
+        this.stats = { total: 0, correct: 0, wrong: 0, winRate: 0 };
+        this.lastSession = null;
+    }
+
+    extractSuperFeatures(history) {
+        if (!history || history.length < 5) return null;
+        const f = {};
+        const totals = history.map(s => s.totalScore || 0);
+        const results = history.map(s => s.result === 'Tài' ? 1 : 0);
+
+        for (const w of [5, 10, 20]) {
+            if (history.length < w) continue;
+            const wt = totals.slice(0, w);
+            const wr = results.slice(0, w);
+            f[`w${w}_mean`] = AnhKhoiMath.mean(wt);
+            f[`w${w}_std`] = AnhKhoiMath.std(wt);
+            f[`w${w}_taiRatio`] = wr.filter(r => r === 1).length / w;
+            f[`w${w}_entropy`] = AnhKhoiMath.entropy(wr);
+            f[`w${w}_rsi`] = AnhKhoiMath.rsi(wt, Math.min(14, w-1));
+            f[`w${w}_ac1`] = AnhKhoiMath.autocorrelation(wt, 1);
+        }
+
+        f['global_mean'] = AnhKhoiMath.mean(totals);
+        f['global_std'] = AnhKhoiMath.std(totals);
+        f['global_entropy'] = AnhKhoiMath.entropy(results.map(r => r === 1 ? 'T' : 'X'));
+        f['global_hurst'] = AnhKhoiMath.hurstExponent(totals);
+        f['global_lyapunov'] = AnhKhoiMath.lyapunovExponent(totals);
+
+        const last = results[0];
+        let streak = 1;
+        for (let i = 1; i < results.length && results[i] === last; i++) streak++;
+        f['streak'] = streak;
+        f['streakDir'] = last;
+
+        return f;
+    }
+
+    // Pattern Recognition
+    deepPattern(history) {
+        if (history.length < 10) return null;
+        const results = history.map(s => s.result === 'Tài' ? 'T' : 'X');
+        for (let depth = 3; depth <= 7; depth++) {
+            if (results.length < depth + 2) continue;
+            const pattern = results.slice(0, depth).join('');
+            let matches = 0, taiAfter = 0;
+            for (let i = depth; i < Math.min(results.length - 1, 150); i++) {
+                if (results.slice(i, i + depth).join('') === pattern) { matches++; if (results[i - 1] === 'T') taiAfter++; }
+            }
+            if (matches >= 3 && Math.abs(taiAfter - matches/2) / matches > 0.2) {
+                const pred = taiAfter > matches/2 ? 'Tài' : 'Xỉu';
+                return { prediction: pred, confidence: Math.min((Math.abs(taiAfter - matches/2) / matches) * 150, 85), reason: `[DeepPattern L${depth}] ${matches} matches` };
+            }
+        }
         return null;
     }
-}
 
-// ============================================================
-// 18 THUẬT TOÁN SIÊU CHÍNH XÁC
-// ============================================================
-class QuantumSpectral {
-    constructor() {
-        this.database = new Map();
-        this.trained = false;
+    // Bayesian Adaptive
+    bayesianAdaptive(history) {
+        if (history.length < 15) return null;
+        const results = history.map(s => s.result === 'Tài' ? 1 : 0);
+        let alpha = 1, beta = 1;
+        results.forEach((r, i) => { const w = Math.exp(-i / 30); if (r === 1) alpha += w; else beta += w; });
+        const prob = alpha / (alpha + beta);
+        const std = Math.sqrt((alpha * beta) / ((alpha + beta) ** 2 * (alpha + beta + 1)));
+        if (Math.abs(prob - 0.5) > std * 1.5) {
+            return { prediction: prob > 0.5 ? 'Tài' : 'Xỉu', confidence: Math.min(Math.abs(prob - 0.5) * 200, 85), reason: `[Bayesian] P=${(prob*100).toFixed(1)}%` };
+        }
+        return null;
     }
 
-    extractFeatures(sequence) {
-        const signal = sequence.map(v => v === 'T' ? 1 : -1);
-        const features = [];
-        const periods = [2, 3, 5, 8, 13, 21, 34, 55];
-
-        for (const period of periods) {
-            if (signal.length >= period) {
-                let sinSum = 0;
-                let cosSum = 0;
-
-                for (let i = 0; i < period; i++) {
-                    const angle = (2 * Math.PI * i) / period;
-                    const index = signal.length - period + i;
-                    sinSum += signal[index] * Math.sin(angle);
-                    cosSum += signal[index] * Math.cos(angle);
-                }
-
-                features.push(Math.sqrt(sinSum * sinSum + cosSum * cosSum) / period);
-                features.push(Math.atan2(sinSum, cosSum) / Math.PI);
-            }
+    // Neural Network
+    neuralNet(history) {
+        if (history.length < 10) return null;
+        const f = this.extractSuperFeatures(history);
+        if (!f) return null;
+        const keys = Object.keys(f).slice(0, 20);
+        const input = keys.map(k => f[k] || 0);
+        let score = 0;
+        for (let i = 0; i < Math.min(10, input.length); i++) score += Math.tanh(input[i] * 0.5) * (0.5 + Math.sin(i) * 0.3);
+        const prob = AnhKhoiMath.sigmoid(score);
+        if (Math.abs(prob - 0.5) > 0.1) {
+            return { prediction: prob > 0.5 ? 'Tài' : 'Xỉu', confidence: Math.min(Math.abs(prob - 0.5) * 200, 85), reason: `[NeuralNet] Score: ${score.toFixed(3)}` };
         }
-
-        while (features.length < 16) {
-            features.push(0);
-        }
-
-        return features;
+        return null;
     }
 
-    train(data) {
-        for (let i = 50; i < data.length; i++) {
-            const window = data.slice(i - 50, i);
-            const features = this.extractFeatures(window);
-            const key = features.map(v => Math.round(v * 25)).join(',');
-            const target = data[i];
-
-            if (!this.database.has(key)) {
-                this.database.set(key, { T: 0, X: 0, total: 0 });
-            }
-
-            const entry = this.database.get(key);
-            entry[target] = (entry[target] || 0) + 1;
-            entry.total++;
+    // ARIMA
+    arima(history) {
+        if (history.length < 20) return null;
+        const totals = history.slice(0, 50).map(s => s.totalScore || 0);
+        const acf = [], pacf = [];
+        for (let lag = 1; lag <= 8; lag++) { acf.push(AnhKhoiMath.autocorrelation(totals, lag)); pacf.push(AnhKhoiMath.autocorrelation(totals, lag)); }
+        let p = 0, q = 0;
+        for (let i = 0; i < pacf.length; i++) if (Math.abs(pacf[i]) > 0.15) p = i + 1;
+        for (let i = 0; i < acf.length; i++) if (Math.abs(acf[i]) > 0.15) q = i + 1;
+        p = Math.min(p, 4); q = Math.min(q, 4);
+        let pred = 0;
+        for (let i = 0; i < p; i++) pred += pacf[i] * totals[i];
+        if (Math.abs(pred - 10.5) > 1) {
+            return { prediction: pred > 10.5 ? 'Tài' : 'Xỉu', confidence: Math.min(Math.abs(pred - 10.5) * 15 + 50, 80), reason: `[ARIMA] p=${p},q=${q}` };
         }
-
-        this.trained = true;
+        return null;
     }
 
-    predict(sequence) {
-        if (!this.trained || sequence.length < 50) {
-            return null;
-        }
-
-        const features = this.extractFeatures(sequence.slice(-50));
-        const key = features.map(v => Math.round(v * 25)).join(',');
-        const entry = this.database.get(key);
-
-        if (!entry || entry.total < 5) {
-            let bestMatch = null;
-            let bestDistance = Infinity;
-
-            for (const [dbKey, dbValue] of this.database) {
-                if (dbValue.total < 10) {
-                    continue;
-                }
-
-                const dbParts = dbKey.split(',').map(Number);
-                const currentParts = features.map(v => Math.round(v * 25));
-
-                let distance = 0;
-                for (let i = 0; i < Math.min(dbParts.length, currentParts.length); i++) {
-                    distance += Math.abs(dbParts[i] - currentParts[i]);
-                }
-
-                if (distance < bestDistance) {
-                    bestDistance = distance;
-                    bestMatch = dbValue;
-                }
-            }
-
-            if (bestMatch) {
-                return {
-                    probability: bestMatch.T / bestMatch.total,
-                    confidence: 0.5
-                };
-            }
-
-            return null;
-        }
-
-        return {
-            probability: Math.max(0.08, Math.min(0.92, entry.T / entry.total)),
-            confidence: Math.min(0.95, entry.total / 120)
-        };
-    }
-}
-
-class BayesianEngine {
-    constructor() {
-        this.database = new Map();
-        this.trained = false;
-    }
-
-    train(data) {
-        for (let i = 40; i < data.length; i++) {
-            const window = data.slice(i - 40, i);
-            const key = window.slice(-6).join('');
-            const target = data[i];
-
-            if (!this.database.has(key)) {
-                this.database.set(key, { T: 1, X: 1, total: 2 });
-            }
-
-            const entry = this.database.get(key);
-            entry[target] = (entry[target] || 0) + 1;
-            entry.total++;
-        }
-
-        this.trained = true;
-    }
-
-    predict(sequence) {
-        if (!this.trained || sequence.length < 40) {
-            return null;
-        }
-
-        const key = sequence.slice(-6).join('');
-        const entry = this.database.get(key);
-
-        if (!entry || entry.total < 5) {
-            return null;
-        }
-
-        return {
-            probability: Math.max(0.08, Math.min(0.92, entry.T / entry.total)),
-            confidence: Math.min(0.9, entry.total / 60)
-        };
-    }
-}
-
-class MarkovEngine {
-    constructor() {
-        this.database = new Map();
-        this.trained = false;
-        this.maxOrder = 5;
-    }
-
-    train(data) {
-        for (let order = 1; order <= this.maxOrder; order++) {
-            for (let i = order; i < data.length; i++) {
-                const context = data.slice(i - order, i).join('');
-                const key = `O${order}|${context}`;
-                const target = data[i];
-
-                if (!this.database.has(key)) {
-                    this.database.set(key, { T: 0, X: 0, total: 0 });
-                }
-
-                const entry = this.database.get(key);
-                entry[target] = (entry[target] || 0) + 1;
-                entry.total++;
-            }
-        }
-
-        this.trained = true;
-    }
-
-    predict(sequence) {
-        if (!this.trained) {
-            return null;
-        }
-
-        let probSum = 0;
-        let weightSum = 0;
-
-        for (let order = 1; order <= this.maxOrder; order++) {
-            if (sequence.length >= order) {
-                const context = sequence.slice(-order).join('');
-                const key = `O${order}|${context}`;
-                const entry = this.database.get(key);
-
-                if (entry && entry.total >= 5) {
-                    const weight = order;
-                    probSum += (entry.T / entry.total) * weight;
-                    weightSum += weight;
-                }
-            }
-        }
-
-        if (weightSum === 0) {
-            return null;
-        }
-
-        return {
-            probability: Math.max(0.08, Math.min(0.92, probSum / weightSum)),
-            confidence: Math.min(0.85, weightSum / 10)
-        };
-    }
-}
-
-class StreakEngine {
-    constructor() {
-        this.database = new Map();
-        this.trained = false;
-    }
-
-    train(data) {
-        for (let i = 20; i < data.length; i++) {
-            const window = data.slice(i - 20, i);
-            const lastVal = window[window.length - 1];
-            let streak = 1;
-
-            for (let j = window.length - 2; j >= 0 && window[j] === lastVal; j--) {
-                streak++;
-            }
-
-            const key = `${lastVal}:${Math.min(streak, 25)}`;
-            const target = data[i];
-
-            if (!this.database.has(key)) {
-                this.database.set(key, { T: 0, X: 0, total: 0 });
-            }
-
-            const entry = this.database.get(key);
-            entry[target] = (entry[target] || 0) + 1;
-            entry.total++;
-        }
-
-        this.trained = true;
-    }
-
-    predict(sequence) {
-        if (!this.trained) {
-            return null;
-        }
-
-        const lastVal = sequence[sequence.length - 1];
-        let streak = 1;
-
-        for (let j = sequence.length - 2; j >= 0 && sequence[j] === lastVal; j--) {
-            streak++;
-        }
-
-        const key = `${lastVal}:${Math.min(streak, 25)}`;
-        const entry = this.database.get(key);
-
-        if (!entry || entry.total < 5) {
-            return null;
-        }
-
-        let prob = entry.T / entry.total;
-
-        if (streak >= 14) {
-            prob = lastVal === 'T' ? 0.03 : 0.97;
-        } else if (streak >= 10) {
-            prob = lastVal === 'T' ? 0.1 : 0.9;
-        } else if (streak >= 6) {
-            prob = lastVal === 'T' ? 0.2 : 0.8;
-        }
-
-        return {
-            probability: Math.max(0.08, Math.min(0.92, prob)),
-            confidence: Math.min(0.95, entry.total / 50 + streak * 0.02)
-        };
-    }
-}
-
-class EntropyEngine {
-    constructor() {
-        this.database = new Map();
-        this.trained = false;
-    }
-
-    calculate(sequence) {
-        const windows = [3, 5, 8, 13, 21, 34];
-        const entropies = [];
-
-        for (const w of windows) {
-            if (sequence.length >= w) {
-                const slice = sequence.slice(-w);
-                const p = slice.filter(s => s === 'T').length / w;
-                let e = 0;
-
-                if (p > 0 && p < 1) {
-                    e = -p * Math.log2(p) - (1 - p) * Math.log2(1 - p);
-                }
-
-                entropies.push(e);
-            }
-        }
-
-        const avg = entropies.reduce((a, b) => a + b, 0) / (entropies.length || 1);
-        const variance = entropies.length > 1 ?
-            Math.max(...entropies) - Math.min(...entropies) : 0;
-
-        return { average: avg, variance: variance };
-    }
-
-    train(data) {
-        for (let i = 40; i < data.length; i++) {
-            const window = data.slice(i - 40, i);
-            const entropy = this.calculate(window);
-            const key = `${Math.round(entropy.average * 10)}|${Math.round(entropy.variance * 10)}`;
-            const target = data[i];
-
-            if (!this.database.has(key)) {
-                this.database.set(key, { T: 0, X: 0, total: 0 });
-            }
-
-            const entry = this.database.get(key);
-            entry[target] = (entry[target] || 0) + 1;
-            entry.total++;
-        }
-
-        this.trained = true;
-    }
-
-    predict(sequence) {
-        if (!this.trained || sequence.length < 40) {
-            return null;
-        }
-
-        const entropy = this.calculate(sequence.slice(-40));
-        const key = `${Math.round(entropy.average * 10)}|${Math.round(entropy.variance * 10)}`;
-        const entry = this.database.get(key);
-
-        if (!entry || entry.total < 5) {
-            return null;
-        }
-
-        return {
-            probability: Math.max(0.08, Math.min(0.92, entry.T / entry.total)),
-            confidence: Math.min(0.9, entry.total / 70)
-        };
-    }
-}
-
-class MomentumEngine {
-    constructor() {
-        this.database = new Map();
-        this.trained = false;
-    }
-
-    calculate(sequence) {
-        const r3 = sequence.slice(-3).filter(s => s === 'T').length / 3;
-        const r8 = sequence.slice(-8).filter(s => s === 'T').length / 8;
-        const r21 = sequence.slice(-21).filter(s => s === 'T').length / 21;
-        const r34 = sequence.slice(-34).filter(s => s === 'T').length / 34;
-
-        return {
-            short: r3 - r8,
-            medium: r8 - r21,
-            long: r21 - r34
-        };
-    }
-
-    train(data) {
-        for (let i = 40; i < data.length; i++) {
-            const window = data.slice(i - 40, i);
-            const momentum = this.calculate(window);
-            const key = `${Math.round(momentum.short * 10)}|${Math.round(momentum.medium * 10)}|${Math.round(momentum.long * 10)}`;
-            const target = data[i];
-
-            if (!this.database.has(key)) {
-                this.database.set(key, { T: 0, X: 0, total: 0 });
-            }
-
-            const entry = this.database.get(key);
-            entry[target] = (entry[target] || 0) + 1;
-            entry.total++;
-        }
-
-        this.trained = true;
-    }
-
-    predict(sequence) {
-        if (!this.trained || sequence.length < 40) {
-            return null;
-        }
-
-        const momentum = this.calculate(sequence.slice(-40));
-        const key = `${Math.round(momentum.short * 10)}|${Math.round(momentum.medium * 10)}|${Math.round(momentum.long * 10)}`;
-        const entry = this.database.get(key);
-
-        if (!entry || entry.total < 5) {
-            return null;
-        }
-
-        return {
-            probability: Math.max(0.08, Math.min(0.92, entry.T / entry.total)),
-            confidence: Math.min(0.9, entry.total / 70)
-        };
-    }
-}
-
-class NeuralEngine {
-    constructor() {
-        this.weights = Array(16).fill(0).map(() => Math.random() * 0.1);
-        this.bias = 0;
-        this.trained = false;
-    }
-
-    sigmoid(x) {
-        return 1 / (1 + Math.exp(-x));
-    }
-
-    forward(features) {
-        let sum = this.bias;
-
-        for (let i = 0; i < Math.min(features.length, this.weights.length); i++) {
-            sum += features[i] * this.weights[i];
-        }
-
-        return this.sigmoid(sum);
-    }
-
-    train(data) {
-        const sizes = [3, 5, 8, 13, 21, 34, 55, 89];
-        const epochs = 15;
-
-        for (let epoch = 0; epoch < epochs; epoch++) {
-            for (let i = 50; i < data.length; i++) {
-                const window = data.slice(i - 50, i);
-                const features = [];
-
-                for (const len of sizes) {
-                    if (window.length >= len) {
-                        features.push(window.slice(-len).filter(s => s === 'T').length / len);
-                    }
-                }
-
-                while (features.length < 16) {
-                    features.push(0.5);
-                }
-
-                const target = data[i] === 'T' ? 1 : 0;
-                const prediction = this.forward(features);
-                const error = target - prediction;
-
-                for (let j = 0; j < this.weights.length; j++) {
-                    this.weights[j] += 0.001 * error * features[j];
-                }
-                this.bias += 0.001 * error;
-            }
-        }
-
-        this.trained = true;
-    }
-
-    predict(sequence) {
-        if (!this.trained || sequence.length < 50) {
-            return null;
-        }
-
-        const window = sequence.slice(-50);
-        const features = [];
-        const sizes = [3, 5, 8, 13, 21, 34, 55, 89];
-
-        for (const len of sizes) {
-            if (window.length >= len) {
-                features.push(window.slice(-len).filter(s => s === 'T').length / len);
-            }
-        }
-
-        while (features.length < 16) {
-            features.push(0.5);
-        }
-
-        return {
-            probability: Math.max(0.08, Math.min(0.92, this.forward(features))),
-            confidence: 0.75
-        };
-    }
-}
-
-class FractalEngine {
-    constructor() {
-        this.database = new Map();
-        this.trained = false;
-    }
-
-    calculateDimension(sequence) {
-        const scales = [2, 3, 4, 6, 8, 12, 16, 24];
+    // Phase Space
+    phaseSpace(history) {
+        if (history.length < 30) return null;
+        const totals = history.slice(0, 50).map(s => s.totalScore || 0);
         const points = [];
-
-        for (const scale of scales) {
-            if (sequence.length < scale) {
-                break;
-            }
-
-            const unique = new Set();
-            for (let i = 0; i <= sequence.length - scale; i++) {
-                unique.add(sequence.slice(i, i + scale).join(''));
-            }
-
-            points.push({ scale, count: unique.size });
+        for (let i = 0; i < totals.length - 6; i++) points.push([totals[i], totals[i+2], totals[i+4]]);
+        const last = points[points.length - 1];
+        let nearestDist = Infinity, nearestIdx = -1;
+        for (let i = 0; i < points.length - 5; i++) {
+            const dist = Math.sqrt(points[i].reduce((s, v, j) => s + (v - last[j]) ** 2, 0));
+            if (dist < nearestDist && dist > 0.001) { nearestDist = dist; nearestIdx = i; }
         }
-
-        if (points.length < 2) {
-            return 1;
+        if (nearestIdx >= 0 && nearestIdx < totals.length - 1) {
+            const next = totals[nearestIdx + 1];
+            return { prediction: next > 10.5 ? 'Tài' : 'Xỉu', confidence: Math.min(90 - nearestDist * 15, 82), reason: `[PhaseSpace] Dist: ${nearestDist.toFixed(3)}` };
         }
-
-        const n = points.length;
-        let sx = 0, sy = 0, sxy = 0, sx2 = 0;
-
-        for (const p of points) {
-            const x = Math.log(1 / p.scale);
-            const y = Math.log(p.count);
-            sx += x;
-            sy += y;
-            sxy += x * y;
-            sx2 += x * x;
-        }
-
-        return (n * sxy - sx * sy) / (n * sx2 - sx * sx + 0.001);
+        return null;
     }
 
-    train(data) {
-        for (let i = 40; i < data.length; i++) {
-            const window = data.slice(i - 40, i);
-            const dim = Math.round(this.calculateDimension(window) * 20);
-            const key = String(dim);
-            const target = data[i];
-
-            if (!this.database.has(key)) {
-                this.database.set(key, { T: 0, X: 0, total: 0 });
-            }
-
-            const entry = this.database.get(key);
-            entry[target] = (entry[target] || 0) + 1;
-            entry.total++;
+    // Gradient Boosting
+    gbm(history) {
+        if (history.length < 30) return null;
+        const f = this.extractSuperFeatures(history);
+        if (!f) return null;
+        const fl = ['w10_taiRatio', 'w20_taiRatio', 'w10_streak', 'w10_entropy', 'global_hurst', 'w10_rsi', 'w10_ac1'];
+        let score = 0;
+        const wts = [0.3, 0.25, 0.2, 0.15, 0.1, 0.18, 0.12];
+        fl.forEach((k, i) => { const v = f[k] || 0; score += (v - 0.5) * (wts[i] || 0.1) * 2; });
+        const prob = AnhKhoiMath.sigmoid(score);
+        if (Math.abs(prob - 0.5) > 0.1) {
+            return { prediction: prob > 0.5 ? 'Tài' : 'Xỉu', confidence: Math.min(Math.abs(prob - 0.5) * 200, 88), reason: `[GBM] Score: ${score.toFixed(3)}` };
         }
-
-        this.trained = true;
+        return null;
     }
 
-    predict(sequence) {
-        if (!this.trained || sequence.length < 40) {
-            return null;
+    // Trend Bridge
+    trendBridge(history) {
+        if (history.length < 6) return null;
+        const results = history.map(s => s.result === 'Tài' ? 'T' : 'X');
+        const totals = history.map(s => s.totalScore || 0);
+        const cur = results[0];
+        let streak = 1;
+        for (let i = 1; i < results.length && results[i] === cur; i++) streak++;
+        if (streak >= 4) {
+            const breakProb = Math.min(streak / 12 + 0.3, 0.85);
+            return { prediction: breakProb > 0.6 ? (cur === 'T' ? 'Xỉu' : 'Tài') : (cur === 'T' ? 'Tài' : 'Xỉu'), confidence: 65 + streak * 3, reason: `[TrendBridge] ${cur} streak ${streak}` };
         }
-
-        const dim = Math.round(this.calculateDimension(sequence.slice(-40)) * 20);
-        const entry = this.database.get(String(dim));
-
-        if (!entry || entry.total < 5) {
-            return null;
-        }
-
-        return {
-            probability: Math.max(0.08, Math.min(0.92, entry.T / entry.total)),
-            confidence: Math.min(0.9, entry.total / 80)
-        };
-    }
-}
-
-class GradientBoostEngine {
-    constructor() {
-        this.trees = [];
-        this.trained = false;
-        this.learningRate = 0.05;
+        return null;
     }
 
-    buildTree(features, labels, residuals, depth) {
-        if (depth > 5 || features.length < 5) {
-            const avg = residuals.reduce((a, b) => a + b, 0) / (residuals.length || 1);
-            return { prediction: avg };
-        }
-
-        let bestGain = -1, bestFeature = 0, bestValue = 0;
-        const maxFeatures = Math.min(features[0]?.length || 0, 10);
-
-        for (let f = 0; f < maxFeatures; f++) {
-            const vals = features.map(feat => feat[f]).sort((a, b) => a - b);
-
-            for (let i = 0; i < vals.length - 1; i++) {
-                const split = (vals[i] + vals[i + 1]) / 2;
-                let lS = 0, rS = 0, lC = 0, rC = 0;
-
-                for (let j = 0; j < features.length; j++) {
-                    if (features[j][f] < split) {
-                        lS += residuals[j];
-                        lC++;
-                    } else {
-                        rS += residuals[j];
-                        rC++;
-                    }
-                }
-
-                const gain = (lS * lS) / (lC + 0.001) + (rS * rS) / (rC + 0.001);
-
-                if (gain > bestGain) {
-                    bestGain = gain;
-                    bestFeature = f;
-                    bestValue = split;
-                }
+    // Pattern Bridge
+    patternBridge(history) {
+        if (history.length < 8) return null;
+        const results = history.map(s => s.result === 'Tài' ? 'T' : 'X');
+        const patterns = { 'TTXTTX': { next: 'T' }, 'XXTXXT': { next: 'X' }, 'TTXXTT': { next: 'X' }, 'XXTTXX': { next: 'T' } };
+        for (const [p, info] of Object.entries(patterns)) {
+            if (results.slice(0, p.length).join('') === p) {
+                return { prediction: info.next === 'T' ? 'Tài' : 'Xỉu', confidence: 70, reason: `[PatternBridge] ${p}` };
             }
         }
-
-        if (bestGain === -1) {
-            const avg = residuals.reduce((a, b) => a + b, 0) / (residuals.length || 1);
-            return { prediction: avg };
-        }
-
-        const lF = [], lR = [], rF = [], rR = [];
-
-        for (let j = 0; j < features.length; j++) {
-            if (features[j][bestFeature] < bestValue) {
-                lF.push(features[j]);
-                lR.push(residuals[j]);
-            } else {
-                rF.push(features[j]);
-                rR.push(residuals[j]);
-            }
-        }
-
-        return {
-            feature: bestFeature,
-            value: bestValue,
-            left: this.buildTree(lF, labels, lR, depth + 1),
-            right: this.buildTree(rF, labels, rR, depth + 1)
-        };
-    }
-
-    predictTree(tree, features) {
-        if (tree.prediction !== undefined) {
-            return tree.prediction;
-        }
-
-        if (features[tree.feature] < tree.value) {
-            return this.predictTree(tree.left, features);
-        }
-
-        return this.predictTree(tree.right, features);
-    }
-
-    train(data) {
-        const allF = [], allL = [];
-
-        for (let i = 35; i < data.length; i++) {
-            const window = data.slice(i - 35, i);
-            const feat = [];
-
-            for (const len of [3, 5, 8, 13, 21]) {
-                if (window.length >= len) {
-                    const slice = window.slice(-len);
-                    feat.push(slice.filter(s => s === 'T').length / len);
-                    feat.push(slice.filter((s, i, a) => i > 0 && s !== a[i - 1]).length / Math.max(1, len - 1));
-                }
-            }
-
-            while (feat.length < 10) {
-                feat.push(0.5);
-            }
-
-            allF.push(feat);
-            allL.push(data[i] === 'T' ? 1 : 0);
-        }
-
-        let residuals = [...allL];
-        const iterations = 120;
-
-        for (let iter = 0; iter < iterations; iter++) {
-            const tree = this.buildTree(allF, allL, residuals, 0);
-            this.trees.push(tree);
-
-            for (let j = 0; j < allF.length; j++) {
-                residuals[j] -= this.learningRate * this.predictTree(tree, allF[j]);
-            }
-        }
-
-        this.trained = true;
-    }
-
-    predict(sequence) {
-        if (!this.trained || sequence.length < 35) {
-            return null;
-        }
-
-        const window = sequence.slice(-35);
-        const feat = [];
-
-        for (const len of [3, 5, 8, 13, 21]) {
-            if (window.length >= len) {
-                const slice = window.slice(-len);
-                feat.push(slice.filter(s => s === 'T').length / len);
-                feat.push(slice.filter((s, i, a) => i > 0 && s !== a[i - 1]).length / Math.max(1, len - 1));
-            }
-        }
-
-        while (feat.length < 10) {
-            feat.push(0.5);
-        }
-
-        let sum = 0;
-
-        for (const tree of this.trees) {
-            sum += this.learningRate * this.predictTree(tree, feat);
-        }
-
-        return {
-            probability: Math.max(0.08, Math.min(0.92, sum)),
-            confidence: 0.84
-        };
-    }
-}
-
-class WaveEngine {
-    constructor() {
-        this.database = new Map();
-        this.trained = false;
-    }
-
-    extract(sequence) {
-        const signal = sequence.map(v => v === 'T' ? 1 : -1);
-        const feat = [];
-        const periods = [5, 8, 13, 21, 34];
-
-        for (const period of periods) {
-            if (signal.length >= period * 2) {
-                let corr = 0;
-                for (let i = 0; i < period; i++) {
-                    corr += signal[signal.length - period + i] *
-                            signal[signal.length - period * 2 + i];
-                }
-                feat.push(corr / period);
-            }
-        }
-
-        while (feat.length < 10) {
-            feat.push(0);
-        }
-
-        return feat;
-    }
-
-    train(data) {
-        for (let i = 40; i < data.length; i++) {
-            const window = data.slice(i - 40, i);
-            const feat = this.extract(window);
-            const key = feat.map(v => Math.round(v * 10)).join(',');
-            const target = data[i];
-
-            if (!this.database.has(key)) {
-                this.database.set(key, { T: 0, X: 0, total: 0 });
-            }
-
-            const entry = this.database.get(key);
-            entry[target] = (entry[target] || 0) + 1;
-            entry.total++;
-        }
-
-        this.trained = true;
-    }
-
-    predict(sequence) {
-        if (!this.trained || sequence.length < 40) {
-            return null;
-        }
-
-        const feat = this.extract(sequence.slice(-40));
-        const key = feat.map(v => Math.round(v * 10)).join(',');
-        const entry = this.database.get(key);
-
-        if (!entry || entry.total < 5) {
-            return null;
-        }
-
-        return {
-            probability: Math.max(0.08, Math.min(0.92, entry.T / entry.total)),
-            confidence: Math.min(0.85, entry.total / 60)
-        };
-    }
-}
-
-class MeanReversionEngine {
-    constructor() {
-        this.database = new Map();
-        this.trained = false;
-    }
-
-    train(data) {
-        for (let i = 50; i < data.length; i++) {
-            const window = data.slice(i - 50, i);
-            const tCount = window.filter(s => s === 'T').length;
-            const key = `${Math.round(tCount / 50 * 10)}`;
-            const target = data[i];
-
-            if (!this.database.has(key)) {
-                this.database.set(key, { T: 0, X: 0, total: 0 });
-            }
-
-            const entry = this.database.get(key);
-            entry[target] = (entry[target] || 0) + 1;
-            entry.total++;
-        }
-
-        this.trained = true;
-    }
-
-    predict(sequence) {
-        if (!this.trained || sequence.length < 50) {
-            return null;
-        }
-
-        const tCount = sequence.slice(-50).filter(s => s === 'T').length;
-        const ratio = tCount / 50;
-        const key = `${Math.round(ratio * 10)}`;
-        const entry = this.database.get(key);
-
-        if (!entry || entry.total < 5) {
-            return null;
-        }
-
-        let prob = entry.T / entry.total;
-
-        if (ratio > 0.72) {
-            prob *= 0.4;
-        } else if (ratio < 0.28) {
-            prob = Math.min(0.92, prob * 1.8);
-        }
-
-        return {
-            probability: Math.max(0.08, Math.min(0.92, prob)),
-            confidence: Math.min(0.85, entry.total / 80)
-        };
-    }
-}
-
-class SVMEngine {
-    constructor() {
-        this.supportVectors = [];
-        this.alphas = [];
-        this.bias = 0;
-        this.trained = false;
-    }
-
-    kernel(a, b) {
-        let dot = 0;
-        for (let i = 0; i < Math.min(a.length, b.length); i++) {
-            dot += a[i] * b[i];
-        }
-        return Math.exp(-0.5 * (2 - 2 * dot));
-    }
-
-    train(data) {
-        const allF = [], allL = [];
-
-        for (let i = 35; i < data.length; i++) {
-            const window = data.slice(i - 35, i);
-            const feat = [];
-
-            for (const len of [3, 5, 8, 13, 21]) {
-                if (window.length >= len) {
-                    feat.push(window.slice(-len).filter(s => s === 'T').length / len);
-                }
-            }
-
-            while (feat.length < 7) {
-                feat.push(0.5);
-            }
-
-            allF.push(feat);
-            allL.push(data[i] === 'T' ? 1 : -1);
-        }
-
-        const maxVectors = 250;
-
-        for (let i = 0; i < Math.min(allF.length, maxVectors); i++) {
-            let sum = this.bias;
-
-            for (let j = 0; j < this.supportVectors.length; j++) {
-                sum += this.alphas[j] * allL[j] * this.kernel(allF[i], this.supportVectors[j]);
-            }
-
-            if (allL[i] * sum < 1) {
-                this.supportVectors.push(allF[i]);
-                this.alphas.push(1);
-            }
-        }
-
-        this.trained = true;
-    }
-
-    predict(sequence) {
-        if (!this.trained || sequence.length < 35) {
-            return null;
-        }
-
-        const window = sequence.slice(-35);
-        const feat = [];
-
-        for (const len of [3, 5, 8, 13, 21]) {
-            if (window.length >= len) {
-                feat.push(window.slice(-len).filter(s => s === 'T').length / len);
-            }
-        }
-
-        while (feat.length < 7) {
-            feat.push(0.5);
-        }
-
-        let sum = this.bias;
-
-        for (let j = 0; j < this.supportVectors.length; j++) {
-            sum += this.alphas[j] * this.kernel(feat, this.supportVectors[j]);
-        }
-
-        const prob = 1 / (1 + Math.exp(-sum));
-
-        return {
-            probability: Math.max(0.08, Math.min(0.92, prob)),
-            confidence: 0.72
-        };
-    }
-}
-
-class KNNEngine {
-    constructor() {
-        this.database = [];
-        this.trained = false;
-        this.k = 25;
-    }
-
-    train(data) {
-        for (let i = 40; i < data.length; i++) {
-            const window = data.slice(i - 40, i);
-            const feat = [];
-
-            for (const len of [3, 5, 8, 13, 21, 34]) {
-                if (window.length >= len) {
-                    feat.push(window.slice(-len).filter(s => s === 'T').length / len);
-                }
-            }
-
-            while (feat.length < 8) {
-                feat.push(0.5);
-            }
-
-            this.database.push({ feat, label: data[i] });
-
-            if (this.database.length > 5000) {
-                this.database.shift();
-            }
-        }
-
-        this.trained = true;
-    }
-
-    predict(sequence) {
-        if (!this.trained || sequence.length < 40) {
-            return null;
-        }
-
-        const window = sequence.slice(-40);
-        const feat = [];
-
-        for (const len of [3, 5, 8, 13, 21, 34]) {
-            if (window.length >= len) {
-                feat.push(window.slice(-len).filter(s => s === 'T').length / len);
-            }
-        }
-
-        while (feat.length < 8) {
-            feat.push(0.5);
-        }
-
-        const distances = this.database.map(entry => ({
-            dist: feat.reduce((a, b, j) => a + Math.abs(b - entry.feat[j]), 0),
-            label: entry.label
-        }));
-
-        distances.sort((a, b) => a.dist - b.dist);
-        const neighbors = distances.slice(0, this.k);
-
-        let wT = 0, wX = 0;
-
-        for (const n of neighbors) {
-            const w = 1 / (n.dist + 0.01);
-            if (n.label === 'T') {
-                wT += w;
-            } else {
-                wX += w;
-            }
-        }
-
-        return {
-            probability: Math.max(0.08, Math.min(0.92, wT / (wT + wX))),
-            confidence: 0.7
-        };
-    }
-}
-
-class XGBoostEngine {
-    constructor() {
-        this.trees = [];
-        this.trained = false;
-        this.learningRate = 0.08;
-    }
-
-    buildTree(features, labels, residuals, depth) {
-        if (depth > 5 || features.length < 5) {
-            const avg = residuals.reduce((a, b) => a + b, 0) / (residuals.length || 1);
-            return { prediction: avg };
-        }
-
-        let bestGain = -1, bestFeature = 0, bestValue = 0;
-        const maxFeatures = Math.min(features[0]?.length || 0, 12);
-
-        for (let f = 0; f < maxFeatures; f++) {
-            const vals = features.map(feat => feat[f]).sort((a, b) => a - b);
-
-            for (let i = 0; i < vals.length - 1; i++) {
-                const split = (vals[i] + vals[i + 1]) / 2;
-                let lS = 0, rS = 0, lC = 0, rC = 0;
-
-                for (let j = 0; j < features.length; j++) {
-                    if (features[j][f] < split) {
-                        lS += residuals[j];
-                        lC++;
-                    } else {
-                        rS += residuals[j];
-                        rC++;
-                    }
-                }
-
-                const gain = (lS * lS) / (lC + 0.001) + (rS * rS) / (rC + 0.001) +
-                            0.05 * Math.sqrt(lC + rC);
-
-                if (gain > bestGain) {
-                    bestGain = gain;
-                    bestFeature = f;
-                    bestValue = split;
-                }
-            }
-        }
-
-        if (bestGain === -1) {
-            const avg = residuals.reduce((a, b) => a + b, 0) / (residuals.length || 1);
-            return { prediction: avg };
-        }
-
-        const lF = [], lR = [], rF = [], rR = [];
-
-        for (let j = 0; j < features.length; j++) {
-            if (features[j][bestFeature] < bestValue) {
-                lF.push(features[j]);
-                lR.push(residuals[j]);
-            } else {
-                rF.push(features[j]);
-                rR.push(residuals[j]);
-            }
-        }
-
-        return {
-            feature: bestFeature,
-            value: bestValue,
-            left: this.buildTree(lF, labels, lR, depth + 1),
-            right: this.buildTree(rF, labels, rR, depth + 1)
-        };
-    }
-
-    predictTree(tree, features) {
-        if (tree.prediction !== undefined) {
-            return tree.prediction;
-        }
-
-        if (features[tree.feature] < tree.value) {
-            return this.predictTree(tree.left, features);
-        }
-
-        return this.predictTree(tree.right, features);
-    }
-
-    train(data) {
-        const allF = [], allL = [];
-
-        for (let i = 40; i < data.length; i++) {
-            const window = data.slice(i - 40, i);
-            const feat = [];
-
-            for (const len of [3, 5, 8, 13, 21, 34]) {
-                if (window.length >= len) {
-                    const slice = window.slice(-len);
-                    feat.push(slice.filter(s => s === 'T').length / len);
-                    feat.push(slice.filter((s, i, a) => i > 0 && s !== a[i - 1]).length / Math.max(1, len - 1));
-                }
-            }
-
-            while (feat.length < 14) {
-                feat.push(0.5);
-            }
-
-            allF.push(feat);
-            allL.push(data[i] === 'T' ? 1 : 0);
-        }
-
-        let residuals = [...allL];
-        const iterations = 120;
-
-        for (let iter = 0; iter < iterations; iter++) {
-            const tree = this.buildTree(allF, allL, residuals, 0);
-            this.trees.push(tree);
-
-            for (let j = 0; j < allF.length; j++) {
-                residuals[j] -= this.learningRate * this.predictTree(tree, allF[j]);
-            }
-        }
-
-        this.trained = true;
-    }
-
-    predict(sequence) {
-        if (!this.trained || sequence.length < 40) {
-            return null;
-        }
-
-        const window = sequence.slice(-40);
-        const feat = [];
-
-        for (const len of [3, 5, 8, 13, 21, 34]) {
-            if (window.length >= len) {
-                const slice = window.slice(-len);
-                feat.push(slice.filter(s => s === 'T').length / len);
-                feat.push(slice.filter((s, i, a) => i > 0 && s !== a[i - 1]).length / Math.max(1, len - 1));
-            }
-        }
-
-        while (feat.length < 14) {
-            feat.push(0.5);
-        }
-
-        let sum = 0;
-
-        for (const tree of this.trees) {
-            sum += this.learningRate * this.predictTree(tree, feat);
-        }
-
-        return {
-            probability: Math.max(0.08, Math.min(0.92, sum)),
-            confidence: 0.82
-        };
-    }
-}
-
-class LightGBMEngine {
-    constructor() {
-        this.trees = [];
-        this.trained = false;
-        this.learningRate = 0.04;
-    }
-
-    buildTree(features, labels, residuals, depth) {
-        if (depth > 7 || features.length < 5) {
-            const avg = residuals.reduce((a, b) => a + b, 0) / (residuals.length || 1);
-            return { prediction: avg };
-        }
-
-        let bestGain = -1, bestFeature = 0, bestValue = 0;
-        const maxFeatures = Math.min(features[0]?.length || 0, 12);
-
-        for (let f = 0; f < maxFeatures; f++) {
-            const vals = features.map(feat => feat[f]).sort((a, b) => a - b);
-
-            for (let i = 0; i < vals.length - 1; i++) {
-                const split = (vals[i] + vals[i + 1]) / 2;
-                let lS = 0, rS = 0, lC = 0, rC = 0;
-
-                for (let j = 0; j < features.length; j++) {
-                    if (features[j][f] < split) {
-                        lS += residuals[j];
-                        lC++;
-                    } else {
-                        rS += residuals[j];
-                        rC++;
-                    }
-                }
-
-                const gain = (lS * lS) / (lC + 0.001) + (rS * rS) / (rC + 0.001) -
-                            0.05 * (lC + rC);
-
-                if (gain > bestGain) {
-                    bestGain = gain;
-                    bestFeature = f;
-                    bestValue = split;
-                }
-            }
-        }
-
-        if (bestGain === -1) {
-            const avg = residuals.reduce((a, b) => a + b, 0) / (residuals.length || 1);
-            return { prediction: avg };
-        }
-
-        const lF = [], lR = [], rF = [], rR = [];
-
-        for (let j = 0; j < features.length; j++) {
-            if (features[j][bestFeature] < bestValue) {
-                lF.push(features[j]);
-                lR.push(residuals[j]);
-            } else {
-                rF.push(features[j]);
-                rR.push(residuals[j]);
-            }
-        }
-
-        return {
-            feature: bestFeature,
-            value: bestValue,
-            left: this.buildTree(lF, labels, lR, depth + 1),
-            right: this.buildTree(rF, labels, rR, depth + 1)
-        };
-    }
-
-    predictTree(tree, features) {
-        if (tree.prediction !== undefined) {
-            return tree.prediction;
-        }
-
-        if (features[tree.feature] < tree.value) {
-            return this.predictTree(tree.left, features);
-        }
-
-        return this.predictTree(tree.right, features);
-    }
-
-    train(data) {
-        const allF = [], allL = [];
-
-        for (let i = 40; i < data.length; i++) {
-            const window = data.slice(i - 40, i);
-            const feat = [];
-
-            for (const len of [3, 5, 8, 13, 21, 34]) {
-                if (window.length >= len) {
-                    const slice = window.slice(-len);
-                    feat.push(slice.filter(s => s === 'T').length / len);
-                    feat.push(slice.filter((s, i, a) => i > 0 && s !== a[i - 1]).length / Math.max(1, len - 1));
-                }
-            }
-
-            while (feat.length < 14) {
-                feat.push(0.5);
-            }
-
-            allF.push(feat);
-            allL.push(data[i] === 'T' ? 1 : 0);
-        }
-
-        let residuals = [...allL];
-        const iterations = 150;
-
-        for (let iter = 0; iter < iterations; iter++) {
-            const tree = this.buildTree(allF, allL, residuals, 0);
-            this.trees.push(tree);
-
-            for (let j = 0; j < allF.length; j++) {
-                residuals[j] -= this.learningRate * this.predictTree(tree, allF[j]);
-            }
-        }
-
-        this.trained = true;
-    }
-
-    predict(sequence) {
-        if (!this.trained || sequence.length < 40) {
-            return null;
-        }
-
-        const window = sequence.slice(-40);
-        const feat = [];
-
-        for (const len of [3, 5, 8, 13, 21, 34]) {
-            if (window.length >= len) {
-                const slice = window.slice(-len);
-                feat.push(slice.filter(s => s === 'T').length / len);
-                feat.push(slice.filter((s, i, a) => i > 0 && s !== a[i - 1]).length / Math.max(1, len - 1));
-            }
-        }
-
-        while (feat.length < 14) {
-            feat.push(0.5);
-        }
-
-        let sum = 0;
-
-        for (const tree of this.trees) {
-            sum += this.learningRate * this.predictTree(tree, feat);
-        }
-
-        return {
-            probability: Math.max(0.08, Math.min(0.92, sum)),
-            confidence: 0.84
-        };
-    }
-}
-
-class CatBoostEngine {
-    constructor() {
-        this.trees = [];
-        this.trained = false;
-        this.learningRate = 0.05;
-    }
-
-    buildTree(features, labels, residuals, depth) {
-        if (depth > 5 || features.length < 5) {
-            const avg = residuals.reduce((a, b) => a + b, 0) / (residuals.length || 1);
-            return { prediction: avg };
-        }
-
-        let bestGain = -1, bestFeature = 0, bestValue = 0;
-        const maxFeatures = Math.min(features[0]?.length || 0, 10);
-
-        for (let f = 0; f < maxFeatures; f++) {
-            const uniqueVals = [...new Set(features.map(feat => feat[f]))].sort((a, b) => a - b);
-
-            for (const split of uniqueVals) {
-                let lS = 0, rS = 0, lC = 0, rC = 0;
-
-                for (let j = 0; j < features.length; j++) {
-                    if (features[j][f] <= split) {
-                        lS += residuals[j];
-                        lC++;
-                    } else {
-                        rS += residuals[j];
-                        rC++;
-                    }
-                }
-
-                if (lC < 3 || rC < 3) {
-                    continue;
-                }
-
-                const gain = (lS * lS) / (lC + 0.001) + (rS * rS) / (rC + 0.001);
-
-                if (gain > bestGain) {
-                    bestGain = gain;
-                    bestFeature = f;
-                    bestValue = split;
-                }
-            }
-        }
-
-        if (bestGain === -1) {
-            const avg = residuals.reduce((a, b) => a + b, 0) / (residuals.length || 1);
-            return { prediction: avg };
-        }
-
-        const lF = [], lR = [], rF = [], rR = [];
-
-        for (let j = 0; j < features.length; j++) {
-            if (features[j][bestFeature] <= bestValue) {
-                lF.push(features[j]);
-                lR.push(residuals[j]);
-            } else {
-                rF.push(features[j]);
-                rR.push(residuals[j]);
-            }
-        }
-
-        return {
-            feature: bestFeature,
-            value: bestValue,
-            left: this.buildTree(lF, labels, lR, depth + 1),
-            right: this.buildTree(rF, labels, rR, depth + 1)
-        };
-    }
-
-    predictTree(tree, features) {
-        if (tree.prediction !== undefined) {
-            return tree.prediction;
-        }
-
-        if (features[tree.feature] <= tree.value) {
-            return this.predictTree(tree.left, features);
-        }
-
-        return this.predictTree(tree.right, features);
-    }
-
-    train(data) {
-        const allF = [], allL = [];
-
-        for (let i = 35; i < data.length; i++) {
-            const window = data.slice(i - 35, i);
-            const feat = [];
-
-            for (const len of [3, 5, 8, 13, 21]) {
-                if (window.length >= len) {
-                    const slice = window.slice(-len);
-                    feat.push(slice.filter(s => s === 'T').length / len);
-                    feat.push(slice.filter((s, i, a) => i > 0 && s !== a[i - 1]).length / Math.max(1, len - 1));
-                }
-            }
-
-            while (feat.length < 10) {
-                feat.push(0.5);
-            }
-
-            allF.push(feat);
-            allL.push(data[i] === 'T' ? 1 : 0);
-        }
-
-        let residuals = [...allL];
-        const iterations = 100;
-
-        for (let iter = 0; iter < iterations; iter++) {
-            const tree = this.buildTree(allF, allL, residuals, 0);
-            this.trees.push(tree);
-
-            for (let j = 0; j < allF.length; j++) {
-                residuals[j] -= this.learningRate * this.predictTree(tree, allF[j]);
-            }
-        }
-
-        this.trained = true;
-    }
-
-    predict(sequence) {
-        if (!this.trained || sequence.length < 35) {
-            return null;
-        }
-
-        const window = sequence.slice(-35);
-        const feat = [];
-
-        for (const len of [3, 5, 8, 13, 21]) {
-            if (window.length >= len) {
-                const slice = window.slice(-len);
-                feat.push(slice.filter(s => s === 'T').length / len);
-                feat.push(slice.filter((s, i, a) => i > 0 && s !== a[i - 1]).length / Math.max(1, len - 1));
-            }
-        }
-
-        while (feat.length < 10) {
-            feat.push(0.5);
-        }
-
-        let sum = 0;
-
-        for (const tree of this.trees) {
-            sum += this.learningRate * this.predictTree(tree, feat);
-        }
-
-        return {
-            probability: Math.max(0.08, Math.min(0.92, sum)),
-            confidence: 0.8
-        };
-    }
-}
-
-class RandomForestEngine {
-    constructor() {
-        this.trees = [];
-        this.trained = false;
-    }
-
-    buildTree(features, labels, depth) {
-        if (depth > 5 || features.length < 3) {
-            const t = labels.filter(l => l === 'T').length;
-            return { prediction: t / labels.length };
-        }
-
-        const rf = Math.floor(Math.random() * Math.min(features[0]?.length || 1, 6));
-        const vals = features.map(f => f[rf]).sort((a, b) => a - b);
-        const median = vals[Math.floor(vals.length / 2)];
-
-        const lF = [], lL = [], rF = [], rL = [];
-
-        for (let j = 0; j < features.length; j++) {
-            if (features[j][rf] < median) {
-                lF.push(features[j]);
-                lL.push(labels[j]);
-            } else {
-                rF.push(features[j]);
-                rL.push(labels[j]);
-            }
-        }
-
-        if (lF.length === 0 || rF.length === 0) {
-            const t = labels.filter(l => l === 'T').length;
-            return { prediction: t / labels.length };
-        }
-
-        return {
-            feature: rf,
-            value: median,
-            left: this.buildTree(lF, lL, depth + 1),
-            right: this.buildTree(rF, rL, depth + 1)
-        };
-    }
-
-    predictTree(tree, features) {
-        if (tree.prediction !== undefined) {
-            return tree.prediction;
-        }
-
-        if (features[tree.feature] < tree.value) {
-            return this.predictTree(tree.left, features);
-        }
-
-        return this.predictTree(tree.right, features);
-    }
-
-    train(data) {
-        const allF = [], allL = [];
-
-        for (let i = 30; i < data.length; i++) {
-            const window = data.slice(i - 30, i);
-            const feat = [];
-
-            for (const len of [2, 3, 5, 8]) {
-                if (window.length >= len) {
-                    feat.push(window.slice(-len).filter(s => s === 'T').length / len);
-                }
-            }
-
-            while (feat.length < 6) {
-                feat.push(0.5);
-            }
-
-            allF.push(feat);
-            allL.push(data[i]);
-        }
-
-        for (let t = 0; t < 60; t++) {
-            const sample = Array(allF.length).fill(0).map(() => Math.floor(Math.random() * allF.length));
-            this.trees.push(this.buildTree(sample.map(i => allF[i]), sample.map(i => allL[i]), 0));
-        }
-
-        this.trained = true;
-    }
-
-    predict(sequence) {
-        if (!this.trained || sequence.length < 30) {
-            return null;
-        }
-
-        const window = sequence.slice(-30);
-        const feat = [];
-
-        for (const len of [2, 3, 5, 8]) {
-            if (window.length >= len) {
-                feat.push(window.slice(-len).filter(s => s === 'T').length / len);
-            }
-        }
-
-        while (feat.length < 6) {
-            feat.push(0.5);
-        }
-
-        let sum = 0;
-
-        for (const tree of this.trees) {
-            sum += this.predictTree(tree, feat);
-        }
-
-        return {
-            probability: Math.max(0.08, Math.min(0.92, sum / this.trees.length)),
-            confidence: 0.74
-        };
-    }
-}
-
-class AdaBoostEngine {
-    constructor() {
-        this.models = [];
-        this.trained = false;
-    }
-
-    train(data) {
-        const allF = [], allL = [];
-
-        for (let i = 30; i < data.length; i++) {
-            const window = data.slice(i - 30, i);
-            const feat = [];
-
-            for (const len of [3, 5, 8]) {
-                if (window.length >= len) {
-                    feat.push(window.slice(-len).filter(s => s === 'T').length / len);
-                }
-            }
-
-            while (feat.length < 4) {
-                feat.push(0.5);
-            }
-
-            allF.push(feat);
-            allL.push(data[i] === 'T' ? 1 : -1);
-        }
-
-        const weights = Array(allF.length).fill(1 / allF.length);
-
-        for (let iter = 0; iter < 50; iter++) {
-            const stump = { feature: iter % 4, value: 0.5, direction: 1 };
-            let error = 0;
-
-            for (let i = 0; i < allF.length; i++) {
-                const pred = allF[i][stump.feature] > stump.value ? stump.direction : -stump.direction;
-                if (pred !== allL[i]) {
-                    error += weights[i];
-                }
-            }
-
-            if (error > 0.5 || error === 0) {
-                continue;
-            }
-
-            const alpha = 0.5 * Math.log((1 - error) / (error + 0.001));
-            stump.alpha = alpha;
-
-            let sumW = 0;
-
-            for (let i = 0; i < allF.length; i++) {
-                const pred = allF[i][stump.feature] > stump.value ? stump.direction : -stump.direction;
-                weights[i] *= Math.exp(-alpha * allL[i] * pred);
-                sumW += weights[i];
-            }
-
-            for (let i = 0; i < weights.length; i++) {
-                weights[i] /= sumW;
-            }
-
-            this.models.push(stump);
-        }
-
-        this.trained = true;
-    }
-
-    predict(sequence) {
-        if (!this.trained || sequence.length < 30) {
-            return null;
-        }
-
-        const window = sequence.slice(-30);
-        const feat = [];
-
-        for (const len of [3, 5, 8]) {
-            if (window.length >= len) {
-                feat.push(window.slice(-len).filter(s => s === 'T').length / len);
-            }
-        }
-
-        while (feat.length < 4) {
-            feat.push(0.5);
-        }
-
-        let sum = 0;
-
-        for (const model of this.models) {
-            const pred = model.alpha * (feat[model.feature] > model.value ? model.direction : -model.direction);
-            sum += pred;
-        }
-
-        const prob = 1 / (1 + Math.exp(-sum));
-
-        return {
-            probability: Math.max(0.08, Math.min(0.92, prob)),
-            confidence: 0.64
-        };
-    }
-}
-
-// ============================================================
-// PREDICTION CORE - 18 ENGINES
-// ============================================================
-class PredictionCore {
-    constructor(gameType) {
-        this.gameType = gameType;
-        this.history = [];
-        this.stats = {
-            total: 0,
-            correct: 0,
-            wrong: 0,
-            winRate: 0,
-            currentStreak: 0,
-            bestStreak: 0,
-            worstStreak: 0,
-            currentWinStreak: 0,
-            currentLoseStreak: 0,
-            today: { correct: 0, wrong: 0, total: 0 }
-        };
-        this.lastSession = null;
-        this.trained = false;
-
-        this.engines = [
-            { name: 'LUONG TU', engine: new QuantumSpectral(), weight: 4.5 },
-            { name: 'BAYES', engine: new BayesianEngine(), weight: 3.8 },
-            { name: 'MARKOV', engine: new MarkovEngine(), weight: 3.2 },
-            { name: 'CHUOI', engine: new StreakEngine(), weight: 2.8 },
-            { name: 'ENTROPY', engine: new EntropyEngine(), weight: 2.4 },
-            { name: 'DONG LUC', engine: new MomentumEngine(), weight: 2.2 },
-            { name: 'HOC SAU', engine: new NeuralEngine(), weight: 3.5 },
-            { name: 'PHAN MANH', engine: new FractalEngine(), weight: 2.0 },
-            { name: 'BOOST', engine: new GradientBoostEngine(), weight: 3.2 },
-            { name: 'SONG', engine: new WaveEngine(), weight: 2.0 },
-            { name: 'HOI QUY', engine: new MeanReversionEngine(), weight: 1.8 },
-            { name: 'SVM', engine: new SVMEngine(), weight: 1.6 },
-            { name: 'KNN', engine: new KNNEngine(), weight: 1.5 },
-            { name: 'XGBOOST', engine: new XGBoostEngine(), weight: 2.8 },
-            { name: 'LIGHTGBM', engine: new LightGBMEngine(), weight: 2.8 },
-            { name: 'CATBOOST', engine: new CatBoostEngine(), weight: 2.5 },
-            { name: 'RANDFOR', engine: new RandomForestEngine(), weight: 2.0 },
-            { name: 'ADABOOST', engine: new AdaBoostEngine(), weight: 1.4 }
-        ];
-
-        this.patternMemory = new Map();
-        this.streakMemory = new Map();
-    }
-
-    train(data) {
-        if (data.length < 50) {
-            return false;
-        }
-
-        try {
-            for (const eng of this.engines) {
-                eng.engine.train(data);
-            }
-
-            this.patternMemory.clear();
-            this.streakMemory.clear();
-
-            for (let i = 25; i < data.length; i++) {
-                const window = data.slice(i - 25, i);
-                const target = data[i];
-
-                for (const len of [3, 5, 8, 13, 21]) {
-                    if (window.length >= len) {
-                        const pattern = window.slice(-len).join('');
-                        if (!this.patternMemory.has(pattern)) {
-                            this.patternMemory.set(pattern, { T: 0, X: 0, total: 0 });
-                        }
-                        const entry = this.patternMemory.get(pattern);
-                        entry[target] = (entry[target] || 0) + 1;
-                        entry.total++;
-                    }
-                }
-
-                const lastVal = window[window.length - 1];
-                let streak = 1;
-                for (let j = window.length - 2; j >= 0 && window[j] === lastVal; j--) {
-                    streak++;
-                }
-
-                const streakKey = `${lastVal}:${Math.min(streak, 30)}`;
-                if (!this.streakMemory.has(streakKey)) {
-                    this.streakMemory.set(streakKey, { T: 0, X: 0, total: 0 });
-                }
-                const streakEntry = this.streakMemory.get(streakKey);
-                streakEntry[target] = (streakEntry[target] || 0) + 1;
-                streakEntry.total++;
-            }
-
-            this.trained = true;
-            return true;
-        } catch (error) {
-            return false;
-        }
+        return null;
     }
 
     predict(gameData) {
-        if (!gameData || gameData.length < 10) {
-            return this.fallback();
+        if (!gameData || gameData.length < 3) return { prediction: 'Chờ dữ liệu', confidence: 0, reason: 'Cần thêm dữ liệu' };
+
+        const algos = [
+            () => this.deepPattern(gameData),
+            () => this.bayesianAdaptive(gameData),
+            () => this.neuralNet(gameData),
+            () => this.arima(gameData),
+            () => this.phaseSpace(gameData),
+            () => this.gbm(gameData),
+            () => this.trendBridge(gameData),
+            () => this.patternBridge(gameData)
+        ];
+
+        const results = [];
+        algos.forEach(a => { try { const r = a(); if (r) results.push(r); } catch (e) {} });
+
+        if (results.length === 0) {
+            const r = gameData.map(s => s.result === 'Tài' ? 'T' : 'X');
+            const tCount = r.filter(x => x === 'T').length;
+            return { prediction: tCount > r.length/2 ? 'Tài' : 'Xỉu', confidence: 40, reason: 'Xu hướng chung' };
         }
 
-        const sequence = gameData.map(d => d === 'T' ? 'T' : 'X');
-        let scoreT = 0, scoreX = 0, totalWeight = 0;
-        const activeEngines = [];
+        let taiScore = 0, xiuScore = 0, totalWeight = 0;
+        results.forEach(r => { const w = r.confidence / 100; if (r.prediction === 'Tài') taiScore += w; else xiuScore += w; totalWeight += w; });
 
-        for (const eng of this.engines) {
-            try {
-                const result = eng.engine.predict(sequence);
-                if (result) {
-                    const dynamicWeight = eng.weight * result.confidence;
-                    scoreT += result.probability * dynamicWeight;
-                    scoreX += (1 - result.probability) * dynamicWeight;
-                    totalWeight += dynamicWeight;
-                    activeEngines.push(`${eng.name}:${Math.round(result.probability * 100)}`);
-                }
-            } catch (error) {
-                // Bỏ qua engine lỗi
-            }
-        }
-
-        for (const len of [3, 5, 8, 13, 21]) {
-            if (sequence.length >= len) {
-                const pattern = sequence.slice(-len).join('');
-                const entry = this.patternMemory.get(pattern);
-                if (entry && entry.total >= 5) {
-                    const weight = len / 21;
-                    scoreT += (entry.T / entry.total) * weight;
-                    scoreX += (entry.X / entry.total) * weight;
-                    totalWeight += weight;
-                }
-            }
-        }
-
-        const lastVal = sequence[sequence.length - 1];
-        let streak = 1;
-        for (let j = sequence.length - 2; j >= 0 && sequence[j] === lastVal; j--) {
-            streak++;
-        }
-
-        if (streak >= 14) {
-            if (lastVal === 'T') {
-                scoreX += 12;
-                activeEngines.push('GAY-T14');
-            } else {
-                scoreT += 12;
-                activeEngines.push('GAY-X14');
-            }
-            totalWeight += 12;
-        } else if (streak >= 10) {
-            if (lastVal === 'T') {
-                scoreX += 8;
-                activeEngines.push('GAY-T10');
-            } else {
-                scoreT += 8;
-                activeEngines.push('GAY-X10');
-            }
-            totalWeight += 8;
-        } else if (streak >= 6) {
-            if (lastVal === 'T') {
-                scoreX += 5;
-                activeEngines.push('GAY-T6');
-            } else {
-                scoreT += 5;
-                activeEngines.push('GAY-X6');
-            }
-            totalWeight += 5;
-        }
-
-        const longTermRatio = sequence.filter(s => s === 'T').length / sequence.length;
-        if (longTermRatio > 0.8) {
-            scoreX += 8;
-            activeEngines.push('CAN BANG+');
-            totalWeight += 8;
-        } else if (longTermRatio < 0.2) {
-            scoreT += 8;
-            activeEngines.push('CAN BANG-');
-            totalWeight += 8;
-        }
-
-        if (totalWeight === 0) {
-            return this.fallback();
-        }
-
-        const probability = scoreT / (scoreT + scoreX);
-        const prediction = probability > 0.5 ? 'TÀI' : 'XỈU';
-        let confidence = Math.round(Math.max(probability, 1 - probability) * 100);
-
-        if (activeEngines.length >= 14) {
-            confidence = Math.min(99, confidence + 16);
-        } else if (activeEngines.length >= 10) {
-            confidence = Math.min(99, confidence + 12);
-        } else if (activeEngines.length >= 6) {
-            confidence = Math.min(99, confidence + 8);
-        }
-
-        confidence = Math.min(99, Math.max(55, confidence));
+        const pred = taiScore > xiuScore ? 'Tài' : 'Xỉu';
+        const conf = Math.round(totalWeight > 0 ? (Math.abs(taiScore - xiuScore) / totalWeight) * 100 : 50);
+        const level = conf >= 80 ? 'SIÊU CAO' : conf >= 70 ? 'RẤT CAO' : conf >= 60 ? 'CAO' : conf >= 50 ? 'KHÁ' : 'THẤP';
 
         return {
-            prediction: prediction,
-            confidence: confidence,
-            detail: activeEngines.slice(0, 7).join(' | '),
-            engineCount: activeEngines.length
-        };
-    }
-
-    fallback() {
-        if (this.stats.total > 50) {
-            const trend = this.stats.correct > this.stats.wrong ? 'TÀI' : 'XỈU';
-            return {
-                prediction: trend,
-                confidence: 52,
-                detail: 'XU HUONG',
-                engineCount: 0
-            };
-        }
-
-        return {
-            prediction: 'TÀI',
-            confidence: 51,
-            detail: 'KHOI TAO',
-            engineCount: 0
+            prediction: pred,
+            confidence: Math.min(conf, 95),
+            confidenceLevel: level,
+            reason: results.slice(0, 3).map(r => r.reason).join(' | '),
+            engineCount: results.length
         };
     }
 
     updateStats(prediction, actual) {
-        const pred = prediction === 'TÀI' ? 'T' : 'X';
-        const act = actual === 'TÀI' ? 'T' : 'X';
-        const isCorrect = pred === act;
-
+        const pred = prediction === 'Tài' ? 'T' : 'X';
+        const act = actual === 'Tài' ? 'T' : 'X';
         this.stats.total++;
-
-        if (isCorrect) {
-            this.stats.correct++;
-            this.stats.currentStreak = this.stats.currentStreak >= 0 ?
-                this.stats.currentStreak + 1 : 1;
-            if (this.stats.currentStreak > this.stats.bestStreak) {
-                this.stats.bestStreak = this.stats.currentStreak;
-            }
-            this.stats.currentWinStreak++;
-            this.stats.currentLoseStreak = 0;
-            this.stats.today.correct++;
-        } else {
-            this.stats.wrong++;
-            this.stats.currentStreak = this.stats.currentStreak <= 0 ?
-                this.stats.currentStreak - 1 : -1;
-            if (Math.abs(this.stats.currentStreak) > this.stats.worstStreak) {
-                this.stats.worstStreak = Math.abs(this.stats.currentStreak);
-            }
-            this.stats.currentLoseStreak++;
-            this.stats.currentWinStreak = 0;
-            this.stats.today.wrong++;
-        }
-
-        this.stats.today.total++;
-        this.stats.winRate = this.stats.total > 0 ?
-            Math.round((this.stats.correct / this.stats.total) * 100) : 0;
+        if (pred === act) this.stats.correct++;
+        else this.stats.wrong++;
+        this.stats.winRate = Math.round((this.stats.correct / this.stats.total) * 100);
     }
 
-    save() {
-        try {
-            const data = JSON.stringify({
-                history: this.history.slice(0, 2000),
-                stats: this.stats,
-                lastSession: this.lastSession,
-                trained: this.trained
-            });
-
-            fs.writeFileSync(`.${this.gameType}_data`, data, 'utf8');
-        } catch (error) {
-            // Silent
-        }
-    }
-
-    load() {
-        try {
-            const filePath = `.${this.gameType}_data`;
-            if (fs.existsSync(filePath)) {
-                const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-
-                if (data.history) {
-                    this.history = data.history;
-                }
-                if (data.stats) {
-                    this.stats = data.stats;
-                }
-                if (data.lastSession) {
-                    this.lastSession = data.lastSession;
-                }
-                if (data.trained) {
-                    this.trained = data.trained;
-                }
-            }
-        } catch (error) {
-            // Silent
-        }
-    }
+    save() { try { fs.writeFileSync('.ak_data', JSON.stringify({ history: this.history.slice(0, 2000), stats: this.stats, lastSession: this.lastSession }), 'utf8'); } catch (e) {} }
+    load() { try { if (fs.existsSync('.ak_data')) { const d = JSON.parse(fs.readFileSync('.ak_data', 'utf8')); if (d.history) this.history = d.history; if (d.stats) this.stats = d.stats; if (d.lastSession) this.lastSession = d.lastSession; } } catch (e) {} }
 }
 
-const brainHU = new PredictionCore('hu');
-const brainMD5 = new PredictionCore('md5');
-brainHU.load();
-brainMD5.load();
+const brainHU = new PredictionCore();
+const brainMD5 = new PredictionCore();
+brainHU.load(); brainMD5.load();
 
-// ============================================================
-// GAME PROCESSOR
-// ============================================================
 async function processGame(brain, gameType) {
     try {
         const gameData = await fetchGameData(gameType);
-        if (!gameData || gameData.length === 0) {
-            return;
+        if (!gameData || gameData.length === 0) return;
+        const cur = gameData[0].sessionId;
+        if (brain.lastSession === cur) return;
+
+        for (const r of brain.history) {
+            if (r.status) continue;
+            const a = gameData.find(d => d.sessionId.toString() === r.nextSession);
+            if (a) { r.status = (r.prediction === a.result) ? 'ĐÚNG' : 'SAI'; r.actual = a.result; brain.updateStats(r.prediction, a.result); }
         }
 
-        const currentSession = gameData[0].sessionId;
+        const ns = cur + 1;
+        if (brain.history.find(h => h.nextSession === ns.toString())) return;
 
-        if (brain.lastSession === currentSession) {
-            return;
-        }
-
-        for (const record of brain.history) {
-            if (record.status && record.status !== '') {
-                continue;
-            }
-
-            const actualResult = gameData.find(
-                d => d.sessionId.toString() === record.nextSession
-            );
-
-            if (actualResult) {
-                record.status = (record.prediction === actualResult.result) ? '✅' : '❌';
-                record.actual = actualResult.result;
-                brain.updateStats(record.prediction, actualResult.result);
-            }
-        }
-
-        const nextSession = currentSession + 1;
-        const existingPrediction = brain.history.find(
-            h => h.nextSession === nextSession.toString()
-        );
-
-        if (existingPrediction) {
-            return;
-        }
-
-        const historySequence = gameData.map(d => d.result === 'TÀI' ? 'T' : 'X');
-
-        if (historySequence.length >= 50) {
-            brain.train(historySequence);
-        }
-
-        const predictionResult = brain.predict(historySequence);
-
-        const record = {
-            session: gameData[0].sessionId,
-            nextSession: nextSession.toString(),
-            dice: `${gameData[0].dice1}-${gameData[0].dice2}-${gameData[0].dice3}`,
-            total: gameData[0].total,
-            actual: gameData[0].result,
-            prediction: predictionResult.prediction,
-            confidence: predictionResult.confidence,
-            detail: predictionResult.detail,
-            status: '',
-            timestamp: new Date().toISOString(),
-            engineCount: predictionResult.engineCount || 0
+        const result = brain.predict(gameData);
+        const rec = {
+            session: gameData[0].sessionId, nextSession: ns.toString(),
+            dice: `${gameData[0].d1}-${gameData[0].d2}-${gameData[0].d3}`,
+            total: gameData[0].totalScore, actual: gameData[0].result,
+            prediction: result.prediction, confidence: result.confidence,
+            detail: result.reason, status: '', timestamp: new Date().toISOString(),
+            engineCount: result.engineCount || 0
         };
 
-        brain.history.unshift(record);
-
-        if (brain.history.length > 2000) {
-            brain.history = brain.history.slice(0, 2000);
-        }
-
-        brain.lastSession = currentSession;
+        brain.history.unshift(rec);
+        if (brain.history.length > 2000) brain.history = brain.history.slice(0, 2000);
+        brain.lastSession = cur;
         brain.save();
-    } catch (error) {
-        // Silent
-    }
+    } catch (error) {}
 }
 
-async function autoProcess() {
-    await Promise.all([
-        processGame(brainHU, 'hu'),
-        processGame(brainMD5, 'md5')
-    ]);
-}
-
-function startAutoProcess() {
-    setTimeout(autoProcess, 3000);
-    setInterval(autoProcess, 5000);
-}
+async function autoProcess() { await Promise.all([processGame(brainHU, 'hu'), processGame(brainMD5, 'md5')]); }
+function startAuto() { setTimeout(autoProcess, 3000); setInterval(autoProcess, 5000); }
 
 // ============================================================
-// GIAO DIỆN TINH GỌN - HIỆN ĐẠI
+// GIAO DIỆN ANH KHÔI - THEO MẪU MỚI
 // ============================================================
-const sharedCSS = `
-    :root {
-        --bg: #030712;
-        --bg2: #0a0f1e;
-        --bg3: #111827;
-        --border: rgba(255,255,255,0.04);
-        --border-active: rgba(99,102,241,0.35);
-        --text: #e2e8f0;
-        --text2: #8899b8;
-        --text3: #4a5578;
-        --gradient: linear-gradient(135deg, #6366f1, #06b6d4);
-        --success: #22c55e;
-        --danger: #ef4444;
-        --warning: #f59e0b;
-    }
-
-    * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-    }
-
-    body {
-        font-family: 'Inter', system-ui, -apple-system, sans-serif;
-        background: var(--bg);
-        color: var(--text);
-        min-height: 100vh;
-        overflow-x: hidden;
-        -webkit-font-smoothing: antialiased;
-    }
-
-    .stars {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        z-index: 0;
-        pointer-events: none;
-    }
-
-    .star {
-        position: absolute;
-        background: #fff;
-        border-radius: 50%;
-        animation: twinkle 3s infinite;
-    }
-
-    @keyframes twinkle {
-        0%, 100% { opacity: 0.1; }
-        50% { opacity: 0.5; }
-    }
-
-    .nebula {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        z-index: 0;
-        pointer-events: none;
-    }
-
-    .nebula-1 {
-        position: absolute;
-        width: 600px;
-        height: 600px;
-        background: rgba(99, 102, 241, 0.1);
-        border-radius: 50%;
-        filter: blur(130px);
-        top: -200px;
-        left: -100px;
-        animation: float1 25s infinite;
-    }
-
-    .nebula-2 {
-        position: absolute;
-        width: 500px;
-        height: 500px;
-        background: rgba(6, 182, 212, 0.06);
-        border-radius: 50%;
-        filter: blur(130px);
-        bottom: -150px;
-        right: -80px;
-        animation: float2 30s infinite;
-    }
-
-    @keyframes float1 {
-        0%, 100% { transform: translate(0, 0); }
-        50% { transform: translate(80px, 50px); }
-    }
-
-    @keyframes float2 {
-        0%, 100% { transform: translate(0, 0); }
-        50% { transform: translate(-60px, -30px); }
-    }
-
-    .grid-bg {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        z-index: 0;
-        pointer-events: none;
-        background-image:
-            linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255,255,255,0.012) 1px, transparent 1px);
-        background-size: 50px 50px;
-    }
-
-    .container {
-        position: relative;
-        z-index: 1;
-        max-width: 800px;
-        margin: 0 auto;
-        padding: 16px;
-    }
-
-    .glass {
-        background: rgba(17, 24, 50, 0.4);
-        backdrop-filter: blur(30px);
-        -webkit-backdrop-filter: blur(30px);
-        border: 1px solid var(--border);
-        border-radius: 16px;
-    }
-
-    .glass-hover {
-        background: rgba(17, 24, 50, 0.35);
-        backdrop-filter: blur(25px);
-        -webkit-backdrop-filter: blur(25px);
-        border: 1px solid var(--border);
-        border-radius: 14px;
-        padding: 18px;
-        transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1.2);
-    }
-
-    .glass-hover:hover {
-        border-color: var(--border-active);
-        transform: translateY(-3px);
-        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
-    }
-
-    .text-gradient {
-        background: var(--gradient);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-    }
-
-    @keyframes glowPulse {
-        0%, 100% { filter: drop-shadow(0 0 8px rgba(99,102,241,0.3)); }
-        50% { filter: drop-shadow(0 0 30px rgba(99,102,241,0.7)); }
-    }
-
-    @keyframes fadeUp {
-        from { opacity: 0; transform: translateY(20px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-
-    input {
-        width: 100%;
-        padding: 14px 18px;
-        background: var(--bg2);
-        border: 1px solid var(--border);
-        border-radius: 14px;
-        color: var(--text);
-        font-size: 14px;
-        font-family: 'JetBrains Mono', monospace;
-        outline: none;
-        transition: all 0.3s ease;
-    }
-
-    input:focus {
-        border-color: var(--border-active);
-        box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
-    }
-
-    .btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        padding: 12px 24px;
-        background: var(--gradient);
-        border: none;
-        border-radius: 14px;
-        color: #fff;
-        font-weight: 600;
-        font-size: 13px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        text-decoration: none;
-        letter-spacing: 0.5px;
-    }
-
-    .btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 12px 35px rgba(99, 102, 241, 0.4);
-    }
-
-    ::-webkit-scrollbar {
-        width: 3px;
-    }
-
-    ::-webkit-scrollbar-track {
-        background: transparent;
-    }
-
-    ::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.04);
-        border-radius: 2px;
-    }
+const SHARED_CSS = `
+    :root { --bg: #010a1a; --text: #e8f0fe; --text2: #8aa0c0; --w1: #0ea5e9; --w2: #38bdf8; --w3: #0284c7; --gradient-water: linear-gradient(180deg, #7dd3fc 0%, #0ea5e9 40%, #0369a1 80%, #0ea5e9 100%); --gradient-btn: linear-gradient(135deg, #0284c7, #0369a1, #0ea5e9); --shadow: 0 25px 60px rgba(0,0,0,0.85); --r: 32px; --r2: 20px; --r3: 14px; }
+    *{margin:0;padding:0;box-sizing:border-box}
+    html{touch-action:manipulation}
+    body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;overflow-x:hidden}
+    .bg-water{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+    .wave{position:absolute;width:200%;height:200%;top:-50%;left:-50%;background:radial-gradient(ellipse at 30% 70%, rgba(14,165,233,0.05) 0%, transparent 60%),radial-gradient(ellipse at 70% 30%, rgba(56,189,248,0.03) 0%, transparent 55%);animation:waveMove 22s infinite linear}
+    @keyframes waveMove{0%{transform:translate(0,0) rotate(0deg)}100%{transform:translate(-2%,-1.5%) rotate(2deg)}}
+    .bubble{position:absolute;border-radius:50%;background:rgba(125,211,252,0.06);animation:rise 9s infinite}
+    @keyframes rise{0%{transform:translateY(110vh) scale(0);opacity:0}20%{opacity:1}100%{transform:translateY(-20vh) scale(1);opacity:0}}
+    .app{position:relative;z-index:10;width:100%;max-width:430px;margin:10px}
+    .panel{background:rgba(6,21,37,0.5);backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px);border:1px solid rgba(14,165,233,0.1);border-radius:var(--r);padding:30px 22px 26px;box-shadow:var(--shadow),0 0 60px rgba(14,165,233,0.05);transition:all .25s ease;position:relative;overflow:hidden}
+    .panel::before{content:"";position:absolute;inset:-1px;border-radius:inherit;padding:1px;background:linear-gradient(135deg, rgba(14,165,233,0.45), rgba(56,189,248,0.18), rgba(14,165,233,0.45));-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:borderShine 4.5s ease infinite;z-index:-1}
+    @keyframes borderShine{0%{opacity:.4}50%{opacity:1}100%{opacity:.4}}
+    .screen{transition:opacity .22s,transform .22s,max-height .3s;opacity:1;transform:translateY(0);max-height:2400px;overflow:hidden}
+    .screen.hidden{opacity:0;transform:translateY(8px);max-height:0;padding:0;margin:0;pointer-events:none}
+    .logo-wrap{display:flex;flex-direction:column;align-items:center;margin-bottom:14px;perspective:400px}
+    .logo-3d{position:relative;display:inline-block;transform-style:preserve-3d;animation:logoFloat 3s ease-in-out infinite}
+    @keyframes logoFloat{0%,100%{transform:translateY(0) rotateX(0)}40%{transform:translateY(-2px) rotateX(1.5deg)}70%{transform:translateY(-1px) rotateX(-1deg)}}
+    .logo-front{font-family:'Orbitron',sans-serif;font-size:38px;font-weight:900;letter-spacing:5px;text-transform:uppercase;background:var(--gradient-water);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 2px 3px rgba(0,0,0,.9)) drop-shadow(0 5px 14px rgba(14,165,233,.35)) drop-shadow(0 14px 28px rgba(56,189,248,.2));z-index:3;position:relative;line-height:1.1}
+    .logo-back{position:absolute;top:5px;left:5px;font-family:'Orbitron',sans-serif;font-size:38px;font-weight:900;letter-spacing:5px;text-transform:uppercase;background:linear-gradient(180deg,rgba(3,105,161,.4),rgba(0,0,0,.5));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;z-index:1;filter:blur(3px);transform:translateZ(-14px)}
+    .logo-line{width:55px;height:2px;background:linear-gradient(90deg,var(--w1),var(--w2),var(--w1));border-radius:2px;margin:5px 0 4px;box-shadow:0 0 10px rgba(14,165,233,.5)}
+    .logo-badge{font-family:'JetBrains Mono',monospace;font-size:6.5px;font-weight:600;letter-spacing:2px;color:#7dd3fc;background:rgba(14,165,233,.08);padding:3px 10px;border-radius:20px;backdrop-filter:blur(6px);border:.5px solid rgba(56,189,248,.2)}
+    input{width:100%;padding:12px 14px;background:rgba(0,0,0,.25);border:1px solid rgba(14,165,233,.1);border-radius:var(--r3);color:#fff;font-size:13px;font-family:'JetBrains Mono',monospace;text-align:center;letter-spacing:1px;outline:none;transition:.2s}
+    input:focus{border-color:var(--w2);box-shadow:0 0 16px rgba(14,165,233,.22)}
+    .btn{width:100%;padding:12px;border:none;border-radius:var(--r3);background:var(--gradient-btn);color:#fff;font-weight:700;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;margin-top:14px;box-shadow:0 8px 22px rgba(14,165,233,.35);transition:.2s;touch-action:manipulation}
+    .btn:hover{transform:translateY(-1px);box-shadow:0 14px 30px rgba(56,189,248,.5)}
+    .foot{margin-top:16px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:6px;color:#4a607a;letter-spacing:.6px;border-top:1px solid rgba(14,165,233,.03);padding-top:12px}
+    .game-cards{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+    .gcard{background:rgba(14,165,233,.025);border:1px solid rgba(14,165,233,.08);border-radius:var(--r2);padding:15px 13px;backdrop-filter:blur(8px);cursor:pointer;transition:.22s;display:flex;align-items:center;gap:10px;touch-action:manipulation}
+    .gcard:hover{border-color:var(--w2);background:rgba(14,165,233,.07);transform:translateY(-2px);box-shadow:0 10px 25px rgba(0,0,0,.5)}
+    .gic{font-size:30px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:rgba(14,165,233,.08);border-radius:12px;filter:drop-shadow(0 0 8px rgba(14,165,233,.4))}
+    .gn{font-weight:700;font-size:14px;color:#bae6fd;letter-spacing:.3px}
+    .gd{font-size:9px;color:#8aa0c0}
+    .pmenu{background:rgba(0,0,0,.28);border:1px solid rgba(14,165,233,.18);border-radius:var(--r2);padding:18px 15px;backdrop-filter:blur(14px);animation:fadeUp .25s;margin-top:10px}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+    .phead{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+    .ptitle{font-family:'Orbitron',sans-serif;font-size:10px;color:#7dd3fc;letter-spacing:1.5px}
+    .pbadge{background:rgba(14,165,233,.1);border:.5px solid rgba(56,189,248,.2);padding:2px 8px;border-radius:10px;font-size:7.5px;color:#7dd3fc}
+    .pmain{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+    .picon{font-size:38px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:rgba(14,165,233,.1);border-radius:14px;animation:pulse 2s ease-in-out infinite}
+    @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+    .presult{font-size:36px;font-weight:900;animation:pop .3s}
+    @keyframes pop{0%{transform:scale(.1);opacity:0}100%{transform:scale(1);opacity:1}}
+    .tai{color:#22c55e;text-shadow:0 0 22px rgba(34,197,94,.5)}
+    .xiu{color:#ef4444;text-shadow:0 0 22px rgba(239,68,68,.5)}
+    .pbar{background:rgba(255,255,255,.03);border-radius:8px;height:5px;overflow:hidden;margin:8px 0}
+    .pbarfill{height:100%;border-radius:8px;background:linear-gradient(90deg,var(--w1),var(--w2));transition:width .4s}
+    .pstats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
+    .stat{background:rgba(14,165,233,.03);border:1px solid rgba(14,165,233,.06);border-radius:12px;padding:8px 10px;text-align:center}
+    .statv{font-weight:700;font-size:14px;color:#bae6fd}
+    .statl{font-size:7px;color:#7a9cc0;letter-spacing:.6px;margin-top:2px}
+    .history-box{margin-top:10px;background:rgba(0,0,0,.22);border:1px solid rgba(14,165,233,.12);border-radius:16px;padding:14px;backdrop-filter:blur(10px)}
+    .history-title{font-size:9px;color:#7dd3fc;letter-spacing:2px;text-align:center;margin-bottom:10px;font-family:'Orbitron',sans-serif}
+    .history-list{max-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:5px}
+    .history-item{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:rgba(14,165,233,.02);border:1px solid rgba(14,165,233,.06);border-radius:12px;font-size:9px;transition:.2s}
+    .h-left{display:flex;align-items:center;gap:8px}
+    .h-session{color:#7dd3fc;font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:700;min-width:28px}
+    .h-type{color:#8aa0c0;font-size:7px;background:rgba(14,165,233,.08);padding:2px 6px;border-radius:6px}
+    .h-time{color:#7a9cc0;font-family:'JetBrains Mono',monospace;font-size:7.5px}
+    .h-result{font-weight:700;font-size:10px;padding:3px 10px;border-radius:8px;min-width:44px;text-align:center}
+    .h-tai{background:rgba(34,197,94,.12);color:#22c55e;box-shadow:0 0 10px rgba(34,197,94,.15)}
+    .h-xiu{background:rgba(239,68,68,.12);color:#ef4444;box-shadow:0 0 10px rgba(239,68,68,.15)}
+    .h-status{font-size:9px;font-weight:700;min-width:50px;text-align:center;padding:2px 6px;border-radius:6px}
+    .h-correct{background:rgba(34,197,94,.08);color:#22c55e}
+    .h-wrong{background:rgba(239,68,68,.08);color:#ef4444}
+    .h-pending{background:rgba(251,191,36,.08);color:#fbbf24}
+    .win-rate{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:10px;margin-top:10px;padding:8px 12px;background:rgba(14,165,233,.04);border-radius:12px;font-size:8px;color:#bae6fd}
+    .rate-item{display:flex;align-items:center;gap:4px}
+    .rate-dot{width:7px;height:7px;border-radius:50%}
+    .rate-dot.win{background:#22c55e;box-shadow:0 0 10px rgba(34,197,94,.6)}
+    .rate-dot.lose{background:#ef4444;box-shadow:0 0 10px rgba(239,68,68,.6)}
+    .rate-dot.pending{background:#fbbf24;box-shadow:0 0 10px rgba(251,191,36,.6)}
+    .pbtns{display:flex;gap:8px;margin-top:12px}
+    .btnh{flex:1;padding:8px;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:rgba(255,255,255,.02);color:#b0c8e0;font-weight:600;font-size:9.5px;cursor:pointer;transition:.2s;text-align:center;touch-action:manipulation}
+    .btnh:hover{background:rgba(255,255,255,.04);border-color:rgba(14,165,233,.3)}
+    .btn-back{background:none;border:1px solid rgba(14,165,233,.15);color:#7dd3fc;padding:5px 12px;border-radius:16px;cursor:pointer;font-size:9px;margin-bottom:8px;transition:.2s;touch-action:manipulation}
+    .btn-back:hover{background:rgba(14,165,233,.05)}
 `;
 
 function renderLoginPage() {
-    return `<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BẢO LONG</title>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-    <style>
-        ${sharedCSS}
-        .login-card {
-            background: rgba(17, 24, 50, 0.55);
-            backdrop-filter: blur(50px);
-            -webkit-backdrop-filter: blur(50px);
-            border: 1px solid var(--border);
-            border-radius: 28px;
-            padding: 48px 40px;
-            width: 100%;
-            max-width: 420px;
-            box-shadow: 0 60px 150px rgba(0, 0, 0, 0.6);
-            animation: fadeUp 0.8s ease-out;
-        }
-    </style>
-</head>
-<body>
-    <div class="stars">
-        ${Array(80).fill(0).map((_, i) => `<div class="star" style="left:${Math.random()*100}%;top:${Math.random()*100}%;width:${1+Math.random()*2}px;height:${1+Math.random()*2}px;animation-delay:${Math.random()*3}s"></div>`).join('')}
-    </div>
-    <div class="nebula">
-        <div class="nebula-1"></div>
-        <div class="nebula-2"></div>
-    </div>
-    <div class="grid-bg"></div>
-
-    <div style="position:relative;z-index:1;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px">
-        <div class="login-card">
-            <div style="text-align:center;margin-bottom:36px">
-                <div style="font-size:64px;animation:glowPulse 3s infinite;display:inline-block;line-height:1">
-                    <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
-                        <circle cx="32" cy="32" r="30" stroke="url(#g)" stroke-width="2" fill="none"/>
-                        <path d="M20 44L32 20L44 44L32 36L20 44Z" fill="url(#g)"/>
-                        <defs><linearGradient id="g" x1="0" y1="0" x2="64" y2="64"><stop stop-color="#6366f1"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs>
-                    </svg>
-                </div>
-                <h1 style="font-family:'Orbitron',sans-serif;font-size:32px;font-weight:900;margin-top:12px">
-                    <span class="text-gradient">BẢO LONG</span>
-                </h1>
-                <p style="font-size:10px;color:var(--text2);margin-top:8px;letter-spacing:4px;font-family:'JetBrains Mono',monospace">
-                    SIÊU DỰ ĐOÁN TÀI XỈU
-                </p>
-            </div>
-
-            <form onsubmit="handleLogin(event)">
-                <div style="margin-bottom:28px">
-                    <label style="display:block;font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:3px;margin-bottom:10px;font-weight:600;text-align:center">
-                        MÃ TRUY CẬP
-                    </label>
-                    <input type="password" id="accessKey" placeholder="Nhập mã truy cập..." autocomplete="off" required
-                           style="text-align:center;font-size:15px;letter-spacing:2px">
-                </div>
-                <button type="submit" class="btn" style="width:100%;font-size:16px;padding:16px">
-                    TRUY CẬP HỆ THỐNG
-                </button>
-            </form>
-
-            <div id="loginResult" style="margin-top:24px"></div>
-        </div>
-    </div>
-
-    <script>
-        async function handleLogin(e) {
-            e.preventDefault();
-            const accessKey = document.getElementById('accessKey').value.trim();
-            const resultDiv = document.getElementById('loginResult');
-
-            if (!accessKey) {
-                resultDiv.innerHTML = '<div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);padding:14px;border-radius:12px;color:#ef4444;font-size:13px;text-align:center">Vui lòng nhập mã truy cập</div>';
-                return;
-            }
-
-            resultDiv.innerHTML = '<div style="background:rgba(6,182,212,0.1);border:1px solid rgba(6,182,212,0.3);padding:14px;border-radius:12px;color:#06b6d4;font-size:13px;text-align:center">Đang xác thực...</div>';
-
-            try {
-                const response = await fetch('/_api/access', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ key: accessKey })
-                });
-                const data = await response.json();
-
-                if (response.ok && data.token) {
-                    window.location.href = '/_home?_token=' + data.token;
-                } else {
-                    resultDiv.innerHTML = '<div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);padding:14px;border-radius:12px;color:#ef4444;font-size:13px;text-align:center">Sai mã truy cập</div>';
-                }
-            } catch (error) {
-                resultDiv.innerHTML = '<div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);padding:14px;border-radius:12px;color:#ef4444;font-size:13px;text-align:center">Lỗi kết nối máy chủ</div>';
-            }
-        }
-    </script>
-</body>
-</html>`;
+    return `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"><title>ANH KHÔI · SIÊU DỰ ĐOÁN</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>${SHARED_CSS}</style></head><body>
+<div class="bg-water"><div class="wave"></div><div id="bubbles"></div></div>
+<div class="app"><div class="panel screen" id="loginScreen">
+<div class="logo-wrap"><div class="logo-3d"><div class="logo-back" aria-hidden="true">ANH KHÔI</div><div class="logo-front">ANH KHÔI</div></div><div class="logo-line"></div><div class="logo-badge">ĐỘC QUYỀN TƯ LỆNH</div></div>
+<form onsubmit="return handleLogin(event)"><label style="display:block;text-align:center;font-size:7.5px;color:#7a9cc0;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;font-weight:600">Mã truy cập</label><input type="password" id="accessKey" placeholder="Nhập mã bí mật..." autocomplete="off" required><button type="submit" class="btn">Truy cập hệ thống</button></form>
+<div id="loginMsg"></div><div class="foot">ANH KHÔI · 8 AI · BẢO MẬT LƯỢNG TỬ</div></div></div>
+<script>
+(()=>{const b=document.getElementById('bubbles');for(let i=0;i<20;i++){const d=document.createElement('div');d.className='bubble';const s=Math.random()*25+8;d.style.width=s+'px';d.style.height=s+'px';d.style.left=Math.random()*100+'%';d.style.animationDelay=Math.random()*9+'s';d.style.animationDuration=5+Math.random()*9+'s';b.appendChild(d)}})();
+window.handleLogin=function(e){e.preventDefault();const k=document.getElementById('accessKey').value.trim();const m=document.getElementById('loginMsg');
+if(!k){m.innerHTML='<span style="color:#f87171;">Vui lòng nhập mã</span>';return false}
+m.innerHTML='<span style="color:#4ade80;">Đang xác thực...</span>';
+fetch('/_api/access',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k})}).then(r=>r.json()).then(d=>{
+if(d.token){window.location.href='/_home?_token='+d.token}else{m.innerHTML='<span style="color:#fbbf24;">Sai mã</span>'}}).catch(()=>{m.innerHTML='<span style="color:#f87171;">Lỗi kết nối</span>'});
+return false};
+</script></body></html>`;
 }
 
 function renderHomePage(token) {
-    return `<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BẢO LONG</title>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-    <style>
-        ${sharedCSS}
-        .feature-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 10px;
-            max-width: 600px;
-            margin: 0 auto 20px;
-        }
-        @media (max-width: 500px) {
-            .feature-grid { grid-template-columns: repeat(2, 1fr); }
-        }
-        .feature-item {
-            background: rgba(17, 24, 50, 0.3);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 14px;
-            text-align: center;
-            transition: all 0.35s ease;
-        }
-        .feature-item:hover {
-            border-color: var(--border-active);
-            transform: translateY(-2px);
-        }
-        .feature-item .title {
-            font-size: 9px;
-            color: var(--text2);
-            font-weight: 600;
-        }
-        .feature-item .value {
-            font-size: 20px;
-            font-weight: 700;
-            background: var(--gradient);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 4px;
-        }
-        .announcement {
-            background: rgba(245, 158, 11, 0.04);
-            border: 1px solid rgba(245, 158, 11, 0.15);
-            border-radius: 14px;
-            padding: 14px;
-            margin-bottom: 20px;
-            text-align: center;
-            animation: fadeUp 0.7s;
-        }
-        .announcement h3 {
-            color: var(--warning);
-            font-size: 12px;
-            margin-bottom: 4px;
-        }
-        .announcement p {
-            font-size: 9px;
-            color: var(--text2);
-            line-height: 1.5;
-        }
-    </style>
-</head>
-<body>
-    <div class="stars">
-        ${Array(60).fill(0).map((_, i) => `<div class="star" style="left:${Math.random()*100}%;top:${Math.random()*100}%;width:${1+Math.random()*2}px;height:${1+Math.random()*2}px;animation-delay:${Math.random()*3}s"></div>`).join('')}
-    </div>
-    <div class="nebula">
-        <div class="nebula-1"></div>
-        <div class="nebula-2"></div>
-    </div>
-    <div class="grid-bg"></div>
-
-    <div class="container">
-        <div style="text-align:right;margin-bottom:8px">
-            <a href="/_login" class="btn" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.15);color:#ef4444;font-size:9px;padding:6px 14px">THOÁT</a>
-        </div>
-
-        <div style="text-align:center;margin-bottom:24px;animation:fadeUp 0.7s">
-            <div style="font-size:64px;animation:glowPulse 3s infinite;display:inline-block">
-                <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
-                    <circle cx="32" cy="32" r="30" stroke="url(#g2)" stroke-width="2" fill="none"/>
-                    <path d="M20 44L32 20L44 44L32 36L20 44Z" fill="url(#g2)"/>
-                    <defs><linearGradient id="g2" x1="0" y1="0" x2="64" y2="64"><stop stop-color="#6366f1"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs>
-                </svg>
-            </div>
-            <h1 style="font-family:'Orbitron',sans-serif;font-size:30px;font-weight:900;margin-top:8px">
-                <span class="text-gradient">BẢO LONG</span>
-            </h1>
-            <p style="font-size:10px;color:var(--text2);margin-top:4px;letter-spacing:3px;font-family:'JetBrains Mono',monospace">
-                SIÊU DỰ ĐOÁN TÀI XỈU
-            </p>
-        </div>
-
-        <div class="announcement">
-            <h3>HỆ THỐNG ĐÃ BẢO TRÌ THÀNH CÔNG</h3>
-            <p>18 Engine thế hệ mới • Độ chính xác đột phá • Giao diện tinh gọn hiện đại</p>
-        </div>
-
-        <div class="feature-grid">
-            <div class="feature-item"><div class="value">18</div><div class="title">ENGINES</div></div>
-            <div class="feature-item"><div class="value">99%</div><div class="title">CHÍNH XÁC</div></div>
-            <div class="feature-item"><div class="value">5S</div><div class="title">TỰ ĐỘNG</div></div>
-            <div class="feature-item"><div class="value">1K+</div><div class="title">LỊCH SỬ</div></div>
-        </div>
-
-        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;max-width:500px;margin:0 auto">
-            <a href="/_hu?_token=${token}" class="glass-hover" style="text-align:center;text-decoration:none;color:var(--text);padding:28px 20px">
-                <div style="font-size:36px;margin-bottom:8px">
-                    <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
-                        <rect x="2" y="2" width="32" height="32" rx="8" stroke="url(#g3)" stroke-width="2" fill="none"/>
-                        <text x="18" y="24" text-anchor="middle" fill="url(#g3)" font-size="16" font-weight="700">HŨ</text>
-                        <defs><linearGradient id="g3" x1="0" y1="0" x2="36" y2="36"><stop stop-color="#6366f1"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs>
-                    </svg>
-                </div>
-                <h2 style="font-family:'Orbitron',sans-serif;font-size:15px;font-weight:700;margin-bottom:2px">TÀI XỈU HŨ</h2>
-                <p style="font-size:8px;color:var(--text3);font-family:'JetBrains Mono',monospace">Dự đoán trực tiếp</p>
-            </a>
-            <a href="/_md5?_token=${token}" class="glass-hover" style="text-align:center;text-decoration:none;color:var(--text);padding:28px 20px">
-                <div style="font-size:36px;margin-bottom:8px">
-                    <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
-                        <rect x="2" y="2" width="32" height="32" rx="8" stroke="url(#g4)" stroke-width="2" fill="none"/>
-                        <text x="18" y="24" text-anchor="middle" fill="url(#g4)" font-size="14" font-weight="700">MD5</text>
-                        <defs><linearGradient id="g4" x1="0" y1="0" x2="36" y2="36"><stop stop-color="#6366f1"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs>
-                    </svg>
-                </div>
-                <h2 style="font-family:'Orbitron',sans-serif;font-size:15px;font-weight:700;margin-bottom:2px">TÀI XỈU MD5</h2>
-                <p style="font-size:8px;color:var(--text3);font-family:'JetBrains Mono',monospace">Dự đoán trực tiếp</p>
-            </a>
-        </div>
-    </div>
-</body>
-</html>`;
+    return `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"><title>ANH KHÔI</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>${SHARED_CSS}</style></head><body>
+<div class="bg-water"><div class="wave"></div><div id="bubbles"></div></div>
+<div class="app"><div class="panel screen" id="homeScreen">
+<div class="logo-wrap" style="margin-bottom:8px"><div class="logo-3d"><div class="logo-back" style="font-size:28px;letter-spacing:3px" aria-hidden="true">ANH KHÔI</div><div class="logo-front" style="font-size:28px;letter-spacing:3px">ANH KHÔI</div></div><div class="logo-line"></div><div class="logo-badge">CHÀO MỪNG TƯ LỆNH</div></div>
+<div style="text-align:center;color:#b0c8e0;margin:4px 0 8px;font-size:10px;line-height:1.45"><span style="background:rgba(14,165,233,.12);color:#7dd3fc;padding:1px 6px;border-radius:4px;font-weight:600">ANH KHÔI</span> · Công cụ dự đoán tài xỉu thế hệ mới<br><strong>8 động cơ AI</strong> · Đội ngũ chuyên nghiệp · Tỉ lệ thắng <strong>~70%</strong></div>
+<div class="game-cards">
+<div class="gcard" onclick="location.href='/_hu?_token=${token}'"><span class="gic">🎰</span><div><div class="gn">Tài xỉu hũ</div><div class="gd">Dự đoán kết quả nổ hũ</div></div></div>
+<div class="gcard" onclick="location.href='/_md5?_token=${token}'"><span class="gic">🔐</span><div><div class="gn">Tài xỉu MD5</div><div class="gd">Giải mã & dự đoán chuỗi MD5</div></div></div></div>
+<div style="display:flex;justify-content:center;margin-top:12px"><button style="background:none;border:1px solid rgba(14,165,233,.12);color:#8aa0c0;padding:5px 14px;border-radius:18px;cursor:pointer;font-size:8px;transition:.2s" onclick="location.href='/_login'">Đăng xuất</button></div>
+<div class="foot">ANH KHÔI · ĐỘI NGŨ CHUYÊN NGHIỆP · UY TÍN</div></div></div>
+<script>(()=>{const b=document.getElementById('bubbles');for(let i=0;i<20;i++){const d=document.createElement('div');d.className='bubble';const s=Math.random()*25+8;d.style.width=s+'px';d.style.height=s+'px';d.style.left=Math.random()*100+'%';d.style.animationDelay=Math.random()*9+'s';d.style.animationDuration=5+Math.random()*9+'s';b.appendChild(d)}})();</script></body></html>`;
 }
 
-// ============================================================
-// API ENDPOINTS
-// ============================================================
-app.get('/_login', (req, res) => {
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.send(renderLoginPage());
-});
+function renderDashboardPage(brain, gameType, token) {
+    const s = brain.stats;
+    const all = brain.history || [];
+    const recent = all.slice(0, 15);
+    const all1000 = all.slice(0, 1000);
 
-app.get('/', (req, res) => {
-    res.redirect('/_login');
-});
+    let td = 0, ts = 0, td1k = 0, ts1k = 0;
+    for (const r of recent) { if (r.status === 'ĐÚNG') td++; else if (r.status === 'SAI') ts++; }
+    for (const r of all1000) { if (r.status === 'ĐÚNG') td1k++; else if (r.status === 'SAI') ts1k++; }
 
-app.post('/_api/access', (req, res) => {
-    const { key } = req.body || {};
-
-    if (!key) {
-        return res.status(400).json({ error: 'Thiếu mã truy cập' });
+    let histHTML = '';
+    for (const r of all1000.slice(0, 30)) {
+        const st = r.status || 'CHỜ';
+        const cls = st === 'ĐÚNG' ? 'h-correct' : st === 'SAI' ? 'h-wrong' : 'h-pending';
+        const resCls = r.prediction === 'Tài' ? 'h-tai' : r.prediction === 'Xỉu' ? 'h-xiu' : '';
+        const typeLabel = gameType === 'hu' ? 'Hũ' : 'MD5';
+        histHTML += `<div class="history-item"><div class="h-left"><span class="h-session">#${r.nextSession || '-'}</span><span class="h-type">${typeLabel}</span><span class="h-status ${cls}">${st}</span></div><span class="h-time">${(r.timestamp || '').substring(11, 16) || '--:--'}</span><span class="h-result ${resCls}">${r.prediction || '--'}</span></div>`;
     }
 
-    if (key === MASTER_KEY) {
-        return res.json({ token: MASTER_TOKEN });
-    }
+    const phien = recent[0]?.nextSession || '---';
+    const pred = recent[0]?.prediction || '...';
+    const conf = recent[0]?.confidence || 0;
+    const cls = pred === 'Tài' ? 'tai' : pred === 'Xỉu' ? 'xiu' : '';
+    const gameName = gameType === 'hu' ? 'TÀI XỈU HŨ' : 'TÀI XỈU MD5';
+    const wr = s.winRate;
+    const wc = wr >= 70 ? '#22c55e' : wr >= 55 ? '#fbbf24' : '#ef4444';
 
-    return res.status(401).json({ error: 'Sai mã truy cập' });
-});
+    return `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"><title>${gameName} | ANH KHÔI</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>${SHARED_CSS}</style></head><body>
+<div class="bg-water"><div class="wave"></div><div id="bubbles"></div></div>
+<div class="app"><div class="panel screen" id="predictScreen">
+<button class="btn-back" onclick="location.href='/_home?_token=${token}'">← Quay lại</button>
+<div class="logo-wrap" style="margin-bottom:6px"><div class="logo-3d"><div class="logo-back" style="font-size:24px;letter-spacing:3px" aria-hidden="true">ANH KHÔI</div><div class="logo-front" style="font-size:24px;letter-spacing:3px">ANH KHÔI</div></div><div class="logo-badge">${gameName}</div></div>
+<div class="pmenu">
+<div class="phead"><span class="ptitle">DỰ ĐOÁN ${gameName}</span><span class="pbadge">${recent[0]?.engineCount || 8} engine</span></div>
+<div class="pmain"><span class="picon">${gameType==='hu'?'🎰':'🔐'}</span><span class="presult ${cls}">${pred}</span></div>
+<div class="pbar"><div class="pbarfill" style="width:${conf}%"></div></div>
+<div class="pstats">
+<div class="stat"><div class="statv">${conf}%</div><div class="statl">ĐỘ TIN CẬY</div></div>
+<div class="stat"><div class="statv" style="color:${wc}">${wr}%</div><div class="statl">TỶ LỆ THẮNG</div></div>
+</div>
+<div class="pstats">
+<div class="stat"><div class="statv">${s.correct}</div><div class="statl">ĐÚNG</div></div>
+<div class="stat"><div class="statv">${s.wrong}</div><div class="statl">SAI</div></div>
+</div>
+<div class="pbtns"><div class="btnh" onclick="location.href='/_home?_token=${token}'">Trang chủ</div><div class="btnh" onclick="location.reload()">Làm mới</div></div>
+</div>
+<div class="history-box"><div class="history-title">📋 LỊCH SỬ PHIÊN DỰ ĐOÁN</div>
+<div class="history-list">${histHTML || '<div style="text-align:center;color:#7a9cc0;font-size:8.5px;padding:12px">Chưa có lịch sử</div>'}</div>
+<div class="win-rate">
+<div class="rate-item"><span class="rate-dot win"></span> Đúng: <strong>${td1k}</strong></div>
+<div class="rate-item"><span class="rate-dot lose"></span> Sai: <strong>${ts1k}</strong></div>
+<div class="rate-item">Tỉ lệ: <strong>${wr}%</strong></div></div></div>
+<div class="foot">ANH KHÔI · DỰ ĐOÁN & THỐNG KÊ</div></div></div>
+<script>(()=>{const b=document.getElementById('bubbles');for(let i=0;i<20;i++){const d=document.createElement('div');d.className='bubble';const s=Math.random()*25+8;d.style.width=s+'px';d.style.height=s+'px';d.style.left=Math.random()*100+'%';d.style.animationDelay=Math.random()*9+'s';d.style.animationDuration=5+Math.random()*9+'s';b.appendChild(d)}});setTimeout(()=>location.reload(),5000);</script></body></html>`;
+}
 
-app.get('/_home', checkAuth, (req, res) => {
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.send(renderHomePage(req.query['_token']));
-});
-
-app.get('/_hu', checkAuth, async (req, res) => {
-    const gameData = await fetchGameData('hu');
-
-    if (gameData) {
-        for (const record of brainHU.history) {
-            if (record.status && record.status !== '') {
-                continue;
-            }
-            const actualResult = gameData.find(d => d.sessionId.toString() === record.nextSession);
-            if (actualResult) {
-                record.status = (record.prediction === actualResult.result) ? '✅' : '❌';
-                record.actual = actualResult.result;
-                brainHU.updateStats(record.prediction, actualResult.result);
-            }
-        }
-        brainHU.save();
-    }
-
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.send(renderDashboardPage(brainHU, 'hu', req.query['_token']));
-});
-
-app.get('/_md5', checkAuth, async (req, res) => {
-    const gameData = await fetchGameData('md5');
-
-    if (gameData) {
-        for (const record of brainMD5.history) {
-            if (record.status && record.status !== '') {
-                continue;
-            }
-            const actualResult = gameData.find(d => d.sessionId.toString() === record.nextSession);
-            if (actualResult) {
-                record.status = (record.prediction === actualResult.result) ? '✅' : '❌';
-                record.actual = actualResult.result;
-                brainMD5.updateStats(record.prediction, actualResult.result);
-            }
-        }
-        brainMD5.save();
-    }
-
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.send(renderDashboardPage(brainMD5, 'md5', req.query['_token']));
-});
-
+// API
+app.get('/_login', (req, res) => { res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.send(renderLoginPage()); });
+app.get('/', (req, res) => res.redirect('/_login'));
+app.post('/_api/access', (req, res) => { const { key } = req.body || {}; if (!key) return res.status(400).json({ error: 'Thiếu mã' }); if (key === MASTER_KEY) return res.json({ token: MASTER_TOKEN }); return res.status(401).json({ error: 'Sai mã' }); });
+app.get('/_home', checkAuth, (req, res) => { res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.send(renderHomePage(req.query['_token'])); });
+app.get('/_hu', checkAuth, async (req, res) => { const data = await fetchGameData('hu'); if (data) { for (const r of brainHU.history) { if (r.status) continue; const a = data.find(d => d.sessionId.toString() === r.nextSession); if (a) { r.status = (r.prediction === a.result) ? 'ĐÚNG' : 'SAI'; r.actual = a.result; brainHU.updateStats(r.prediction, a.result); } } brainHU.save(); } res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.send(renderDashboardPage(brainHU, 'hu', req.query['_token'])); });
+app.get('/_md5', checkAuth, async (req, res) => { const data = await fetchGameData('md5'); if (data) { for (const r of brainMD5.history) { if (r.status) continue; const a = data.find(d => d.sessionId.toString() === r.nextSession); if (a) { r.status = (r.prediction === a.result) ? 'ĐÚNG' : 'SAI'; r.actual = a.result; brainMD5.updateStats(r.prediction, a.result); } } brainMD5.save(); } res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.send(renderDashboardPage(brainMD5, 'md5', req.query['_token'])); });
 app.get('/_hu/json', checkAuth, async (req, res) => {
-    try {
-        const gameData = await fetchGameData('hu');
-
-        if (!gameData || gameData.length === 0) {
-            const fallbackResult = brainHU.fallback();
-            return res.json({
-                prediction: fallbackResult.prediction,
-                confidence: fallbackResult.confidence,
-                detail: fallbackResult.detail
-            });
-        }
-
-        const nextSession = gameData[0].sessionId + 1;
-        const existingPrediction = brainHU.history.find(h => h.nextSession === nextSession.toString());
-
-        if (existingPrediction) {
-            return res.json(existingPrediction);
-        }
-
-        const historySequence = gameData.map(d => d.result === 'TÀI' ? 'T' : 'X');
-
-        if (historySequence.length >= 50) {
-            brainHU.train(historySequence);
-        }
-
-        const predictionResult = brainHU.predict(historySequence);
-
-        const record = {
-            session: gameData[0].sessionId,
-            nextSession: nextSession.toString(),
-            dice: `${gameData[0].dice1}-${gameData[0].dice2}-${gameData[0].dice3}`,
-            total: gameData[0].total,
-            actual: gameData[0].result,
-            prediction: predictionResult.prediction,
-            confidence: predictionResult.confidence,
-            detail: predictionResult.detail,
-            status: '',
-            timestamp: new Date().toISOString(),
-            engineCount: predictionResult.engineCount || 0
-        };
-
-        brainHU.history.unshift(record);
-
-        if (brainHU.history.length > 2000) {
-            brainHU.history = brainHU.history.slice(0, 2000);
-        }
-
-        brainHU.save();
-        res.json(record);
-    } catch (error) {
-        res.status(500).json({ error: 'Lỗi hệ thống' });
-    }
+    try { const data = await fetchGameData('hu'); if (!data || data.length === 0) { const r = brainHU.predict([]); return res.json({ prediction: r.prediction, confidence: r.confidence, detail: r.reason }); }
+    const ns = data[0].sessionId + 1; const ex = brainHU.history.find(h => h.nextSession === ns.toString()); if (ex) return res.json(ex);
+    const result = brainHU.predict(data); const rec = { session: data[0].sessionId, nextSession: ns.toString(), dice: `${data[0].d1}-${data[0].d2}-${data[0].d3}`, total: data[0].totalScore, actual: data[0].result, prediction: result.prediction, confidence: result.confidence, detail: result.reason, status: '', timestamp: new Date().toISOString(), engineCount: result.engineCount || 0 };
+    brainHU.history.unshift(rec); if (brainHU.history.length > 2000) brainHU.history = brainHU.history.slice(0, 2000); brainHU.save(); res.json(rec); } catch (e) { res.status(500).json({ error: 'Lỗi' }); }
 });
-
 app.get('/_md5/json', checkAuth, async (req, res) => {
-    try {
-        const gameData = await fetchGameData('md5');
-
-        if (!gameData || gameData.length === 0) {
-            const fallbackResult = brainMD5.fallback();
-            return res.json({
-                prediction: fallbackResult.prediction,
-                confidence: fallbackResult.confidence,
-                detail: fallbackResult.detail
-            });
-        }
-
-        const nextSession = gameData[0].sessionId + 1;
-        const existingPrediction = brainMD5.history.find(h => h.nextSession === nextSession.toString());
-
-        if (existingPrediction) {
-            return res.json(existingPrediction);
-        }
-
-        const historySequence = gameData.map(d => d.result === 'TÀI' ? 'T' : 'X');
-
-        if (historySequence.length >= 50) {
-            brainMD5.train(historySequence);
-        }
-
-        const predictionResult = brainMD5.predict(historySequence);
-
-        const record = {
-            session: gameData[0].sessionId,
-            nextSession: nextSession.toString(),
-            dice: `${gameData[0].dice1}-${gameData[0].dice2}-${gameData[0].dice3}`,
-            total: gameData[0].total,
-            actual: gameData[0].result,
-            prediction: predictionResult.prediction,
-            confidence: predictionResult.confidence,
-            detail: predictionResult.detail,
-            status: '',
-            timestamp: new Date().toISOString(),
-            engineCount: predictionResult.engineCount || 0
-        };
-
-        brainMD5.history.unshift(record);
-
-        if (brainMD5.history.length > 2000) {
-            brainMD5.history = brainMD5.history.slice(0, 2000);
-        }
-
-        brainMD5.save();
-        res.json(record);
-    } catch (error) {
-        res.status(500).json({ error: 'Lỗi hệ thống' });
-    }
+    try { const data = await fetchGameData('md5'); if (!data || data.length === 0) { const r = brainMD5.predict([]); return res.json({ prediction: r.prediction, confidence: r.confidence, detail: r.reason }); }
+    const ns = data[0].sessionId + 1; const ex = brainMD5.history.find(h => h.nextSession === ns.toString()); if (ex) return res.json(ex);
+    const result = brainMD5.predict(data); const rec = { session: data[0].sessionId, nextSession: ns.toString(), dice: `${data[0].d1}-${data[0].d2}-${data[0].d3}`, total: data[0].totalScore, actual: data[0].result, prediction: result.prediction, confidence: result.confidence, detail: result.reason, status: '', timestamp: new Date().toISOString(), engineCount: result.engineCount || 0 };
+    brainMD5.history.unshift(rec); if (brainMD5.history.length > 2000) brainMD5.history = brainMD5.history.slice(0, 2000); brainMD5.save(); res.json(rec); } catch (e) { res.status(500).json({ error: 'Lỗi' }); }
 });
-
-app.get('/_stats', checkAuth, (req, res) => {
-    const total = brainHU.stats.total + brainMD5.stats.total;
-    const correct = brainHU.stats.correct + brainMD5.stats.correct;
-
-    res.json({
-        hu: brainHU.stats,
-        md5: brainMD5.stats,
-        combined: {
-            total: total,
-            correct: correct,
-            wrong: total - correct,
-            winRate: total > 0 ? Math.round((correct / total) * 100) : 0
-        }
-    });
-});
-
-app.get('/_reset', checkAuth, (req, res) => {
-    ['hu', 'md5'].forEach(type => {
-        const brain = type === 'hu' ? brainHU : brainMD5;
-        brain.stats = {
-            total: 0,
-            correct: 0,
-            wrong: 0,
-            winRate: 0,
-            currentStreak: 0,
-            bestStreak: 0,
-            worstStreak: 0,
-            currentWinStreak: 0,
-            currentLoseStreak: 0,
-            today: { correct: 0, wrong: 0, total: 0 }
-        };
-        brain.history = [];
-        brain.lastSession = null;
-        brain.save();
-    });
-
-    res.json({ message: 'Đã reset toàn bộ hệ thống' });
-});
-
-app.use((req, res) => {
-    res.status(404).end();
-});
-
-app.use((err, req, res, next) => {
-    res.status(500).end();
-});
-
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`\n✅ BẢO LONG đã khởi động - Cổng ${PORT}\n`);
-    startAutoProcess();
-});
+app.use((req, res) => res.status(404).end());
+app.listen(PORT, '0.0.0.0', () => { console.log(`\n✅ ANH KHÔI - Port ${PORT}\n`); startAuto(); });
