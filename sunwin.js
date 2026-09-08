@@ -66,22 +66,29 @@ const MAX_HISTORY = 1000;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 50;
 
-// ============ CẤU HÌNH WEBSOCKET GEMWIN ============
-let CURRENT_WEBSOCKET_URL = "wss://websocket.azhkthg1.net/wsbinary?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJnZW5kZXIiOjAsImNhblZpZXdTdGF0IjpmYWxzZSwiZGlzcGxheU5hbWUiOiJlbWFuaGxhbW9zcyIsImJvdCI6MCwiaXNNZXJjaGFudCI6ZmFsc2UsInZlcmlmaWVkQmFua0FjY291bnQiOmZhbHNlLCJwbGF5RXZlbnRMb2JieSI6ZmFsc2UsImN1c3RvbWVySWQiOjM2Mzk5OTk1OCwiYWZmSWQiOiJ6b3dpbiIsImJhbm5lZCI6ZmFsc2UsImJyYW5kIjoiem8ud2luIiwiZW1haWwiOiIiLCJ0aW1lc3RhbXAiOjE3ODczNzc5NzAyOTUsImxvY2tHYW1lcyI6W10sImFtb3VudCI6MCwibG9ja0NoYXQiOmZhbHNlLCJwaG9uZVZlcmlmaWVkIjpmYWxzZSwiaXBBZGRyZXNzIjoiMTEzLjE2Ny4yNDEuMjQ2IiwibXV0ZSI6ZmFsc2UsImF2YXRhciI6Imh0dHBzOi8vaW1hZ2VzLnN3aW5zaG9wLm5ldC9pbWFnZXMvYXZhdGFyL2F2YXRhcl8xOS5wbmciLCJwbGF0Zm9ybUlkIjo0LCJ1c2VySWQiOiIxODgwYmNkYS1jYjA5LTQ3MGItODY4Yi1kMjVkYjEzOTU1MGYiLCJlbWFpbFZlcmlmaWVkIjpudWxsLCJyZWdUaW1lIjoxNzg3Mzc3OTI3MjY2LCJwaG9uZSI6IiIsImRlcG9zaXQiOmZhbHNlLCJ1c2VybmFtZSI6Ilo4X2RpdGNvbm1lbWF5bmd1dmNsIn0.udnmW2Aop5TrS-f_SeHyO8GmZK0KqRPqPx7rn8PSFz8";
+// ============ CẤU HÌNH WEBSOCKET SUNWIN ============
+// Token + signature mới nhất (cập nhật 08/09/2026)
+const WS_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJnZW5kZXIiOjAsImNhblZpZXdTdGF0IjpmYWxzZSwiZGlzcGxheU5hbWUiOiJ0YW9sYXZ1YXR4MjgwOSIsImJvdCI6MCwiaXNNZXJjaGFudCI6ZmFsc2UsInZlcmlmaWVkQmFua0FjY291bnQiOmZhbHNlLCJwbGF5RXZlbnRMb2JieSI6ZmFsc2UsImN1c3RvbWVySWQiOjMzMTAwMDE4MiwiYWZmSWQiOiJjMTE4NWMxOGM5ZjFlYzQ5NjQ5MDdmNjA1MzA4MjU2MiIsImJhbm5lZCI6ZmFsc2UsImJyYW5kIjoic3VuLndpbiIsImVtYWlsIjoiIiwidGltZXN0YW1wIjoxNzg4ODQyNDIwNzA4LCJsb2NrR2FtZXMiOltdLCJhbW91bnQiOjAsImxvY2tDaGF0Ijp0cnVlLCJwaG9uZVZlcmlmaWVkIjpmYWxzZSwiaXBBZGRyZXNzIjoiMjQwNTo0ODAyOmE2M2Q6YWQxMDpjOGY3OjNjODI6ODc3Yzo0YmIiLCJtdXRlIjp0cnVlLCJhdmF0YXIiOiJodHRwczovL2ltYWdlcy5zd2luc2hvcC5uZXQvaW1hZ2VzL2F2YXRhci9hdmF0YXJfMDYucG5nIiwicGxhdGZvcm1JZCI6NSwidXNlcklkIjoiNzgyZWViZDUtZjgzMi00MzJhLWJmNGUtNDc1ODM4MTg3NTY2IiwiZW1haWxWZXJpZmllZCI6bnVsbCwicmVnVGltZSI6MTc2NjExOTYzNzMxNCwicGhvbmUiOiIiLCJkZXBvc2l0IjpmYWxzZSwidXNlcm5hbWUiOiJTQ19waGFtbWluaGxvbmcyMDEzIn0.kgQ2HjLygw1mpDpbPQzWq1gSHfrxJtWZV63k_2ETxJQ";
+
+let CURRENT_WEBSOCKET_URL = `wss://ws-lby.azhkthg1.net/wsbinary?token=${WS_TOKEN}`;
 
 const WS_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-    "Origin": "https://web.sunwin.jetzt",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Origin": "https://play.sun.win",
     "Sec-WebSocket-Protocol": "binary"
 };
 
 const initialMessages = [
+    // Login packet đầy đủ (info + signature) — channel "Simms"
     [1, "MiniGame", "GM_56dtybiuijn", "", {
-            "info": "{\"ipAddress\":\"14.247.165.71\",\"wsToken\":\"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJnZW5kZXIiOjAsImNhblZpZXdTdGF0IjpmYWxzZSwiZGlzcGxheU5hbWUiOiJxMndlenJzZmRjIiwiYm90IjowLCJpc01lcmNoYW50IjpmYWxzZSwidmVyaWZpZWRCYW5rQWNjb3VudCI6ZmFsc2UsInBsYXlFdmVudExvYmJ5IjpmYWxzZSwiY3VzdG9tZXJJZCI6MzYyMDYwNzYxLCJhZmZJZCI6IkdFTVdJTiIsImJhbm5lZCI6ZmFsc2UsImJyYW5kIjoiZ2VtIiwiZW1haWwiOiIiLCJ0aW1lc3RhbXAiOjE3ODY0MzI4NDMxMjUsImxvY2tHYW1lcyI6W10sImFtb3VudCI6MCwibG9ja0NoYXQiOmZhbHNlLCJwaG9uZVZlcmlmaWVkIjpmYWxzZSwiaXBBZGRyZXNzIjoiMTQuMjQ3LjE2NS43MSIsIm11dGUiOmZhbHNlLCJhdmF0YXIiOiJodHRwczovL2ltYWdlcy5zd2luc2hvcC5uZXQvaW1hZ2VzL2F2YXRhci9hdmF0YXJfMTkucG5nIiwicGxhdGZvcm1JZCI6NCwidXNlcklkIjoiNDlhYTExY2ItZTc4Yi00MjRhLWJjMzQtM2U4NTFlY2JhYzI0IiwiZW1haWxWZXJpZmllZCI6bnVsbCwicmVnVGltZSI6MTc4NjQzMjYzMjQwMCwicGhvbmUiOiIiLCJkZXBvc2l0IjpmYWxzZSwidXNlcm5hbWUiOiJHTV81NmR0eWJpdWlqbiJ9.Vttddm7WuMkEJNdSfkHkJDcoWgOt2LDka6vJGw8U0dI\",\"locale\":\"vi\",\"userId\":\"49aa11cb-e78b-424a-bc34-3e851ecbac24\",\"username\":\"GM_56dtybiuijn\",\"timestamp\":1786432843136,\"refreshToken\":\"cb2f293c26fa4f4a8450e4b5778f03bc.3e5ebc6c99a847239b05effa79337171\"}",
-            "signature": "3F57D00BC5848F36BDE971952AE5016329C88149DF0362BC951B9588C9FF3B37D813A70F270E07702D36D5E6E27A7D8E04799B08222F2E0745E2BE5B028B660AFCBEA04501AF71B24F00CBBDFC272005EED13E884AF036C0A3727D4E3D24F9177981DB653877194FF8DDBB36B0AA659B1557CA9AAD8D0CDCEED56678A7F1A5A8"
-        }
-    ],
+        "info": "{\"ipAddress\":\"2405:4802:a63d:ad10:c8f7:3c82:877c:4bb\",\"wsToken\":\"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJnZW5kZXIiOjAsImNhblZpZXdTdGF0IjpmYWxzZSwiZGlzcGxheU5hbWUiOiJ0YW9sYXZ1YXR4MjgwOSIsImJvdCI6MCwiaXNNZXJjaGFudCI6ZmFsc2UsInZlcmlmaWVkQmFua0FjY291bnQiOmZhbHNlLCJwbGF5RXZlbnRMb2JieSI6ZmFsc2UsImN1c3RvbWVySWQiOjMzMTAwMDE4MiwiYWZmSWQiOiJjMTE4NWMxOGM5ZjFlYzQ5NjQ5MDdmNjA1MzA4MjU2MiIsImJhbm5lZCI6ZmFsc2UsImJyYW5kIjoic3VuLndpbiIsImVtYWlsIjoiIiwidGltZXN0YW1wIjoxNzg4ODQyNDIwNzA4LCJsb2NrR2FtZXMiOltdLCJhbW91bnQiOjAsImxvY2tDaGF0Ijp0cnVlLCJwaG9uZVZlcmlmaWVkIjpmYWxzZSwiaXBBZGRyZXNzIjoiMjQwNTo0ODAyOmE2M2Q6YWQxMDpjOGY3OjNjODI6ODc3Yzo0YmIiLCJtdXRlIjp0cnVlLCJhdmF0YXIiOiJodHRwczovL2ltYWdlcy5zd2luc2hvcC5uZXQvaW1hZ2VzL2F2YXRhci9hdmF0YXJfMDYucG5nIiwicGxhdGZvcm1JZCI6NSwidXNlcklkIjoiNzgyZWViZDUtZjgzMi00MzJhLWJmNGUtNDc1ODM4MTg3NTY2IiwiZW1haWxWZXJpZmllZCI6bnVsbCwicmVnVGltZSI6MTc2NjExOTYzNzMxNCwicGhvbmUiOiIiLCJkZXBvc2l0IjpmYWxzZSwidXNlcm5hbWUiOiJTQ19waGFtbWluaGxvbmcyMDEzIn0.kgQ2HjLygw1mpDpbPQzWq1gSHfrxJtWZV63k_2ETxJQ\",\"locale\":\"vi\",\"userId\":\"782eebd5-f832-432a-bf4e-475838187566\",\"username\":\"SC_phamminhlong2013\",\"timestamp\":1788842420720,\"refreshToken\":\"9252158e0fb04d7e983141a57039e491.a9ca13cdfdbf4e3a9c6d5c3f7216b702\"}",
+        "signature": "328A7A57902ADA305443A30F8FF5FACCF578E27FE28036C0656FFC40E90652311FD04C093C4F5BF1C3636DDD89901367F84A482B52B5861F8E2C92634A3316E5AD09C29E715ADAC60DC8F612C7FE77EA25D9BB787B4A0D07EED36AD7AFEAEF15D9AA14F2D95385A7E729E393A202233B8D4837A052F60BD30137581D199E2515",
+        "pid": 5,
+        "subi": true
+    }],
+    // Subscribe Tài Xỉu
     [6, "MiniGame", "taixiuPlugin", { cmd: 1005 }],
+    // Subscribe Lobby
     [6, "MiniGame", "lobbyPlugin", { cmd: 10001 }]
 ];
 
@@ -108,18 +115,24 @@ function connectWebSocket() {
     }
 
     ws.on('open', () => {
+        console.log('[✅] WebSocket đã kết nối thành công!');
         reconnectAttempts = 0;
         initialMessages.forEach((msg, i) => {
             setTimeout(() => {
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     const packed = msgpack ? msgpack.encode(msg) : JSON.stringify(msg);
                     ws.send(packed);
+                    console.log('[📤] Đã gửi:', JSON.stringify(msg).slice(0, 80) + '...');
                 }
-            }, i * 50);
+            }, i * 80);
         });
 
         clearInterval(pingInterval);
-        pingInterval = setInterval(() => { if (ws && ws.readyState === WebSocket.OPEN) { try { ws.ping(); } catch (_) {} } }, 10000);
+        pingInterval = setInterval(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                try { ws.ping(); } catch (_) {}
+            }
+        }, 10000);
 
         clearInterval(heartbeatInterval);
         heartbeatInterval = setInterval(() => {
@@ -130,39 +143,76 @@ function connectWebSocket() {
                     ws.send(packed);
                 } catch (_) {}
             }
-        }, 3000);
+        }, 5000);
     });
 
     ws.on('message', (rawMessage) => {
         let data;
         try {
-            if (msgpack && Buffer.isBuffer(rawMessage)) data = msgpack.decode(rawMessage);
-            else data = JSON.parse(rawMessage.toString('utf8'));
-        } catch (err) { return; }
+            if (msgpack && Buffer.isBuffer(rawMessage)) {
+                data = msgpack.decode(rawMessage);
+            } else {
+                data = JSON.parse(rawMessage.toString('utf8'));
+            }
+        } catch (err) {
+            return;
+        }
 
         if (!data) return;
 
-        let payloads = [];
-        if (Array.isArray(data)) payloads = data.filter(item => typeof item === 'object' && item !== null);
-        else if (typeof data === 'object') payloads = [data];
+        // Log raw data để debug (chỉ log object có dữ liệu quan trọng)
+        const dataStr = JSON.stringify(data);
+        if (dataStr.includes('sid') || dataStr.includes('d1') || dataStr.includes('cmd')) {
+            console.log('[📥] Nhận:', dataStr.slice(0, 300));
+        }
 
-        for (const payload of payloads) {
-            const { sid, d1, d2, d3 } = payload;
-            if (sid !== undefined && d1 === undefined) {
-                if (currentSessionId !== sid) currentSessionId = sid;
+        // Chuẩn hóa payload
+        let items = [];
+        if (Array.isArray(data)) {
+            // Có thể là [cmd, channel, plugin, payload] hoặc mảng object
+            for (const item of data) {
+                if (item && typeof item === 'object' && !Array.isArray(item)) {
+                    items.push(item);
+                } else if (Array.isArray(item) && item.length >= 4 && typeof item[3] === 'object') {
+                    items.push(item[3]);
+                }
+            }
+            // Trường hợp data là mảng protocol dạng [6, "MiniGame", "taixiuPlugin", {...}]
+            if (data.length >= 4 && typeof data[3] === 'object') {
+                items.push(data[3]);
+            }
+        } else if (typeof data === 'object') {
+            items.push(data);
+        }
+
+        for (const payload of items) {
+            if (!payload || typeof payload !== 'object') continue;
+
+            // Lấy sid (phiên)
+            if (payload.sid !== undefined && payload.d1 === undefined) {
+                if (currentSessionId !== payload.sid) {
+                    currentSessionId = payload.sid;
+                    console.log('[🎲] Phiên mới:', currentSessionId);
+                }
             }
 
+            // Lấy xúc xắc
+            const d1 = payload.d1 ?? payload.dice1 ?? payload.xx1;
+            const d2 = payload.d2 ?? payload.dice2 ?? payload.xx2;
+            const d3 = payload.d3 ?? payload.dice3 ?? payload.xx3;
+
             if (d1 !== undefined && d2 !== undefined && d3 !== undefined) {
-                const targetSid = sid || currentSessionId;
+                const targetSid = payload.sid || currentSessionId;
                 if (targetSid && apiResponseData.phien !== targetSid) {
-                    const total = d1 + d2 + d3;
-                    const result = (total > 10) ? "Tài" : "Xỉu";
+                    const total = Number(d1) + Number(d2) + Number(d3);
+                    const result = total >= 11 ? "Tài" : "Xỉu";
+
                     const newSession = {
                         id: "@emhancute",
                         phien: targetSid,
-                        xuc_xac1: d1,
-                        xuc_xac2: d2,
-                        xuc_xac3: d3,
+                        xuc_xac1: Number(d1),
+                        xuc_xac2: Number(d2),
+                        xuc_xac3: Number(d3),
                         tong: total,
                         ket_qua: result,
                         server_time: new Date().toISOString(),
@@ -173,12 +223,15 @@ function connectWebSocket() {
                     if (history.length > MAX_HISTORY) history.pop();
                     apiResponseData = newSession;
                     currentSessionId = null;
+
+                    console.log(`[🎯] Kết quả phiên ${targetSid}: ${d1}-${d2}-${d3} = ${total} → ${result}`);
                 }
             }
         }
     });
 
-    ws.on('close', () => {
+    ws.on('close', (code, reason) => {
+        console.log(`[❌] WebSocket đóng. Code: ${code}`);
         clearInterval(pingInterval);
         clearInterval(heartbeatInterval);
         if (!isManualClose) scheduleReconnect();
