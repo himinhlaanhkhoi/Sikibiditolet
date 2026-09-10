@@ -31,12 +31,19 @@ const similarity = (a, b) => {
   return m / a.length;
 };
 
-class SeiuEngine {
+export class SeiuEngineV16 {
   constructor() {
     this.weights = {};
     this.perfHistory = {};
     this.emaAlpha = 0.08;
     this.minWeight = 0.0001;
+    
+    this.diceStats = { 
+      pos: [{}, {}, {}],
+      pairs: {},
+      triples: {},
+      totalCount: 0
+    };
     
     this.algs = [
       { id: 'freq_rebalance', fn: this.algo1.bind(this) },
@@ -47,13 +54,13 @@ class SeiuEngine {
       { id: 'transformer', fn: this.algo6.bind(this) },
       { id: 'run_length', fn: this.algo7.bind(this) },
       { id: 'bayesian', fn: this.algo8.bind(this) },
-      { id: 'dice_position', fn: this.algo9.bind(this) },
+      { id: 'dice_pattern_learning', fn: this.algoDicePattern.bind(this) },
+      { id: 'adaptive_bridge', fn: this.algoBridge.bind(this) },
       { id: 'regime_detector', fn: this.algo10.bind(this) },
       { id: 'gradient_cascade', fn: this.algo11.bind(this) },
       { id: 'quantum_superposition', fn: this.algo12.bind(this) },
       { id: 'phase_lock', fn: this.algo13.bind(this) },
-      { id: 'vector_momentum', fn: this.algo14.bind(this) },
-      { id: 'chaos_index', fn: this.algo15.bind(this) }
+      { id: 'vector_momentum', fn: this.algo14.bind(this) }
     ];
 
     for (const a of this.algs) {
@@ -70,12 +77,54 @@ class SeiuEngine {
 
     return sorted.map(item => {
       const total = item.score ?? 0;
-      const tx = total >= 4 && total <= 10 ? 'X' : total >= 11 && total <= 17 ? 'T' : total === 3 || total === 18 ? 'B' : 'N';
-      const result = tx === 'X' ? 'XIU' : tx === 'T' ? 'TAI' : tx === 'B' ? 'BAO' : 'UNKNOWN';
-      const dice = Array.isArray(item.facesList) ? item.facesList : (typeof item.keyR === 'string' ? item.keyR.split('-').map(Number) : [0, 0, 0]);
+      let tx, result;
+      
+      if (total >= 3 && total <= 10) {
+        tx = 'X';
+        result = 'XIU';
+      } else if (total >= 11 && total <= 18) {
+        tx = 'T';
+        result = 'TAI';
+      } else {
+        tx = 'B';
+        result = 'BAO';
+      }
+      
+      const dice = Array.isArray(item.facesList) ? item.facesList : 
+                   (typeof item.keyR === 'string' ? item.keyR.split('-').map(Number) : [0, 0, 0]);
 
       return { session: parseInt(item.gameNum.slice(1)), dice, total, result, tx };
     }).sort((a, b) => a.session - b.session);
+  }
+
+  updateDiceStats(record) {
+    if (record.tx === 'B') return;
+    
+    this.diceStats.totalCount++;
+    
+    for (let i = 0; i < 3; i++) {
+      const d = record.dice[i];
+      this.diceStats.pos[i][d] = (this.diceStats.pos[i][d] || 0) + 1;
+    }
+
+    const pairKey = `${record.dice[0]}-${record.dice[1]}`;
+    this.diceStats.pairs[pairKey] = (this.diceStats.pairs[pairKey] || 0) + 1;
+
+    const tripleKey = record.dice.join('-');
+    this.diceStats.triples[tripleKey] = (this.diceStats.triples[tripleKey] || 0) + 1;
+  }
+
+  getDiceStats() {
+    const stats = {};
+    for (let i = 0; i < 3; i++) {
+      const dist = this.diceStats.pos[i];
+      const freq = Object.values(dist);
+      stats[`pos_${i}`] = {
+        mean: avg(freq.map((f, idx) => (idx + 1) * f / sum(freq))),
+        entropy: entropy(freq)
+      };
+    }
+    return stats;
   }
 
   extractFeatures(hist) {
@@ -98,6 +147,74 @@ class SeiuEngine {
       stdTotal: std(totals),
       entropy: entropy(tx)
     };
+  }
+
+  algoDicePattern(hist) {
+    if (hist.length < 50) return null;
+    
+    const filtered = hist.filter(h => h.tx !== 'B');
+    const recent = filtered.slice(-20);
+    
+    let sumDice = [0, 0, 0];
+    for (const r of recent) {
+      for (let i = 0; i < 3; i++) {
+        sumDice[i] += r.dice[i];
+      }
+    }
+    
+    const avgDice = sumDice.map(s => s / recent.length);
+    const predictedTotal = avg(avgDice) * 3;
+    
+    if (predictedTotal < 7) return 'X';
+    if (predictedTotal > 14) return 'T';
+    
+    const histTotals = filtered.slice(-30).map(r => r.total);
+    const volTotal = std(histTotals);
+    
+    if (volTotal < 2 && predictedTotal < 10.5) return 'X';
+    if (volTotal < 2 && predictedTotal > 11.5) return 'T';
+    
+    return null;
+  }
+
+  algoBridge(hist) {
+    if (hist.length < 20) return null;
+    
+    const filtered = hist.filter(h => h.tx !== 'B');
+    const tx = filtered.map(h => h.tx);
+    
+    let runs = [], cur = tx[0], len = 1;
+    for (let i = 1; i < tx.length; i++) {
+      if (tx[i] === cur) len++;
+      else { runs.push({ val: cur, len }); cur = tx[i]; len = 1; }
+    }
+    if (tx.length) runs.push({ val: cur, len });
+    
+    if (runs.length < 2) return null;
+    
+    const last = runs.at(-1);
+    const prev = runs.at(-2);
+    const recent = runs.slice(-5);
+    
+    const avgLen = avg(recent.map(r => r.len));
+    const maxLen = Math.max(...recent.map(r => r.len));
+    
+    if (last.len >= maxLen && last.len >= 3) {
+      return last.val;
+    }
+    
+    if (last.len === 1 && prev?.len >= 2) {
+      const alternation = recent.filter((r, i) => i === 0 || r.val !== recent[i - 1].val).length;
+      if (alternation >= 4) {
+        return last.val === 'T' ? 'X' : 'T';
+      }
+    }
+    
+    if (last.len < avgLen * 0.5 && prev?.len > avgLen * 1.5) {
+      return prev.val;
+    }
+    
+    return null;
   }
 
   algo1(hist) {
@@ -170,8 +287,8 @@ class SeiuEngine {
     const feat = this.extractFeatures(hist);
     const { totals, meanTotal, entropy: ent } = feat;
     const recent = avg(totals.slice(-30));
-    if (recent > 13.5 && meanTotal > 11.5) return 'X';
-    if (recent < 7.5 && meanTotal < 10.5) return 'T';
+    if (recent > 14 && meanTotal > 11.5) return 'X';
+    if (recent < 7 && meanTotal < 10.5) return 'T';
     if (ent > 0.99) return feat.tx.at(-1) === 'T' ? 'X' : 'T';
     if (ent < 0.3) return feat.tx.at(-1) === 'T' ? 'T' : 'X';
     return null;
@@ -218,22 +335,6 @@ class SeiuEngine {
     const posteriorX = (freqRecent['X'] || 0) / 10;
     if (Math.abs(posteriorT - posteriorX) > 0.1) return posteriorT > posteriorX ? 'T' : 'X';
     return null;
-  }
-
-  algo9(hist) {
-    if (hist.length < 50) return null;
-    const filtered = hist.filter(h => h.tx !== 'B');
-    const dicePos = [{}, {}, {}];
-    for (const r of filtered) {
-      for (let i = 0; i < 3; i++) dicePos[i][r.dice[i]] = (dicePos[i][r.dice[i]] || 0) + 1;
-    }
-    let predicted = 0;
-    for (let i = 0; i < 3; i++) {
-      const pos = dicePos[i];
-      const mean = avg(Object.keys(pos).map(k => parseInt(k) * pos[k] / sum(Object.values(pos))));
-      predicted += mean || 3.5;
-    }
-    return predicted < 8.5 ? 'X' : predicted > 12.5 ? 'T' : null;
   }
 
   algo10(hist) {
@@ -311,18 +412,6 @@ class SeiuEngine {
     return null;
   }
 
-  algo15(hist) {
-    const { tx, entropy: ent } = this.extractFeatures(hist);
-    if (tx.length < 30) return null;
-    const maxEnt = Math.log2(2);
-    const chaos = ent / maxEnt;
-    const recent = tx.slice(-5).reduce((a, v) => ({ ...a, [v]: (a[v] || 0) + 1 }), {});
-    if (chaos > 0.9 && recent['T'] !== recent['X']) {
-      return recent['T'] > recent['X'] ? 'T' : 'X';
-    }
-    return null;
-  }
-
   fitInitial(hist) {
     const window = lastN(hist.filter(h => h.tx !== 'B'), 500);
     if (window.length < 10) return;
@@ -368,8 +457,11 @@ class SeiuEngine {
   }
 
   predictScores(hist, tx) {
-    const scores = tx === 'T' ? [11, 12, 13, 14, 15, 16, 17] : [4, 5, 6, 7, 8, 9, 10];
+    if (hist.length < 30) return tx === 'T' ? [13, 14, 15] : [6, 7, 8];
+    
+    const scores = tx === 'T' ? [11, 12, 13, 14, 15, 16, 17, 18] : [3, 4, 5, 6, 7, 8, 9, 10];
     let counts = {};
+    let matchCount = 0;
     const lookback = Math.min(hist.length, 150);
 
     for (let i = hist.length - 2; i >= hist.length - lookback && i >= 0; i--) {
@@ -377,18 +469,29 @@ class SeiuEngine {
         const age = hist.length - 1 - i;
         const decay = 1.0 - (age / (lookback + 1));
         counts[hist[i + 1].total] = (counts[hist[i + 1].total] || 0) + decay;
+        matchCount++;
       }
     }
 
-    const sorted = Object.keys(counts).sort((a, b) => counts[b] - counts[a]).map(Number).slice(0, 3);
+    if (matchCount < 3) {
+      const center = avg(scores);
+      return scores.slice(0, 3).sort((a, b) => Math.abs(a - center) - Math.abs(b - center));
+    }
+
+    const sorted = Object.keys(counts)
+      .sort((a, b) => counts[b] - counts[a])
+      .map(Number)
+      .slice(0, 3);
+
     while (sorted.length < 3) {
       const used = new Set(sorted);
       const remaining = scores.filter(s => !used.has(s));
-      const center = (scores[0] + scores[scores.length - 1]) / 2;
+      const center = avg(scores);
       remaining.sort((a, b) => Math.abs(a - center) - Math.abs(b - center));
       if (remaining.length) sorted.push(remaining.shift());
       else break;
     }
+
     return sorted.length >= 3 ? sorted : scores.slice(0, 3);
   }
 
@@ -396,7 +499,10 @@ class SeiuEngine {
     const votes = {}, votedBy = [];
     for (const a of this.algs) {
       const pred = a.fn(hist);
-      if (pred) { votes[pred] = (votes[pred] || 0) + (this.weights[a.id] || 0); votedBy.push(a.id); }
+      if (pred) { 
+        votes[pred] = (votes[pred] || 0) + (this.weights[a.id] || 0); 
+        votedBy.push(a.id); 
+      }
     }
 
     let best, confidence;
@@ -412,15 +518,22 @@ class SeiuEngine {
 
     const feat = this.extractFeatures(hist);
     const regime = feat.entropy > 0.98 ? 'high_entropy' : feat.entropy < 0.4 ? 'low_entropy' : 'neutral';
+    
+    const diceTrend = this.algoDicePattern(hist) || 'neutral';
+    const bridgeStatus = this.algoBridge(hist) ? 'active' : 'idle';
+    
     const scorePred = this.predictScores(hist, best);
 
     return {
       prediction: best === 'T' ? 'tài' : 'xỉu',
       confidence,
       scorePrediction: scorePred,
-      meta: { regime, votedBy: [...new Set(votedBy)] }
+      meta: { 
+        regime, 
+        votedBy: [...new Set(votedBy)],
+        diceTrend,
+        bridgeStatus
+      }
     };
   }
 }
-
-export { SeiuEngine };
