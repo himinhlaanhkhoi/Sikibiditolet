@@ -1,44 +1,77 @@
 const sum = a => a.reduce((x, y) => x + y, 0);
 const avg = a => a.length ? sum(a) / a.length : 0;
-const std = a => { if (!a.length) return 0; const m = avg(a); return Math.sqrt(avg(a.map(v => (v - m) ** 2))); };
+const med = a => a.length ? (a.sort((x, y) => x - y)[Math.floor(a.length / 2)]) : 0;
+const std = a => a.length ? Math.sqrt(avg(a.map(v => (v - avg(a)) ** 2))) : 0;
+const variance = a => a.length ? avg(a.map(v => (v - avg(a)) ** 2)) : 0;
 const entropy = a => {
   if (!a.length) return 0;
   const f = a.reduce((o, v) => ((o[v] = (o[v] || 0) + 1), o), {});
   let e = 0;
-  for (const k in f) { const p = f[k] / a.length; e -= p * Math.log2(p); }
+  for (const k in f) {
+    const p = f[k] / a.length;
+    e -= p * Math.log2(p);
+  }
   return e;
 };
-const majority = o => { let k = null, v = -Infinity; for (const key in o) if (o[key] > v) { v = o[key]; k = key; } return { key: k, val: v }; };
-const similarity = (a, b) => { if (a.length !== b.length) return 0; let m = 0; for (let i = 0; i < a.length; i++) if (a[i] === b[i]) m++; return m / a.length; };
+const majority = o => {
+  let k = null, v = -Infinity;
+  for (const key in o) if (o[key] > v) { v = o[key]; k = key; }
+  return { key: k, val: v };
+};
+const similarity = (a, b) => {
+  if (a.length !== b.length) return 0;
+  let m = 0;
+  for (let i = 0; i < a.length; i++) if (a[i] === b[i]) m++;
+  return m / a.length;
+};
 const lastN = (a, n) => a.slice(Math.max(0, a.length - n));
+const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
 
-export class SeiuEngineV17 {
+export class SeiuEngineV18 {
   constructor() {
     this.weights = {};
-    this.emaAlpha = 0.08;
+    this.perfHistory = {};
+    this.emaAlpha = 0.12;
     this.minWeight = 0.0001;
-    this.diceStats = { pos: [{}, {}, {}], pairs: {}, triples: {}, totalCount: 0 };
+    this.learningRate = 0.0015;
+    
+    this.stats = {
+      dicePos: [{}, {}, {}],
+      pairs: {},
+      triples: {},
+      scores: { 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0, 15: 0, 16: 0, 17: 0, 18: 0 },
+      totalCount: 0,
+      taiCount: 0,
+      xiuCount: 0
+    };
 
     this.algs = [
-      { id: 'freq_rebalance', fn: this.a1.bind(this) },
-      { id: 'markov_adaptive', fn: this.a2.bind(this) },
-      { id: 'ngram_weighted', fn: this.a3.bind(this) },
-      { id: 'neo_pattern', fn: this.a4.bind(this) },
-      { id: 'entropy_deep', fn: this.a5.bind(this) },
-      { id: 'transformer', fn: this.a6.bind(this) },
-      { id: 'run_length', fn: this.a7.bind(this) },
-      { id: 'bayesian', fn: this.a8.bind(this) },
-      { id: 'dice_pattern_learning', fn: this.aDice.bind(this) },
-      { id: 'adaptive_bridge', fn: this.aBridge.bind(this) },
-      { id: 'regime_detector', fn: this.a10.bind(this) },
-      { id: 'gradient_cascade', fn: this.a11.bind(this) },
-      { id: 'quantum_vote', fn: this.a12.bind(this) },
-      { id: 'phase_lock', fn: this.a13.bind(this) },
-      { id: 'momentum', fn: this.a14.bind(this) },
-      { id: 'dice_sum_regression', fn: this.aDiceSum.bind(this) },
-      { id: 'bridge_break_detector', fn: this.aBridgeBreak.bind(this) }
+      { id: 'freq_basic', fn: this.freq.bind(this), weight: 0.8 },
+      { id: 'markov_2order', fn: this.markov2.bind(this), weight: 1.0 },
+      { id: 'markov_3order', fn: this.markov3.bind(this), weight: 1.2 },
+      { id: 'ngram_similarity', fn: this.ngramSim.bind(this), weight: 0.9 },
+      { id: 'pattern_match', fn: this.patternMatch.bind(this), weight: 1.1 },
+      { id: 'entropy_analysis', fn: this.entropyAnalysis.bind(this), weight: 0.95 },
+      { id: 'transformer_seq', fn: this.transformer.bind(this), weight: 1.05 },
+      { id: 'run_detect', fn: this.runDetect.bind(this), weight: 0.85 },
+      { id: 'bayesian_inference', fn: this.bayesian.bind(this), weight: 1.15 },
+      { id: 'dice_sum_model', fn: this.diceSumModel.bind(this), weight: 1.1 },
+      { id: 'dice_dist_learning', fn: this.diceDistLearning.bind(this), weight: 1.0 },
+      { id: 'bridge_adaptive', fn: this.bridgeAdaptive.bind(this), weight: 1.2 },
+      { id: 'regime_shift', fn: this.regimeShift.bind(this), weight: 0.9 },
+      { id: 'momentum_trend', fn: this.momentumTrend.bind(this), weight: 0.95 },
+      { id: 'quantum_ensemble', fn: this.quantumEnsemble.bind(this), weight: 1.05 },
+      { id: 'phase_detector', fn: this.phaseDetector.bind(this), weight: 0.85 },
+      { id: 'decay_weighted', fn: this.decayWeighted.bind(this), weight: 1.0 },
+      { id: 'volatility_model', fn: this.volatilityModel.bind(this), weight: 0.9 },
+      { id: 'score_regression', fn: this.scoreRegression.bind(this), weight: 1.08 },
+      { id: 'break_detector', fn: this.breakDetector.bind(this), weight: 1.02 }
     ];
-    for (const a of this.algs) this.weights[a.id] = 1;
+
+    for (const a of this.algs) {
+      this.weights[a.id] = 1.0;
+      this.perfHistory[a.id] = [];
+    }
   }
 
   parseLines(data) {
@@ -56,236 +89,259 @@ export class SeiuEngineV17 {
     }).sort((a, b) => a.session - b.session);
   }
 
-  updateDiceStats(r) {
+  updateStats(r) {
     if (r.tx === 'B') return;
-    this.diceStats.totalCount++;
-    for (let i = 0; i < 3; i++) this.diceStats.pos[i][r.dice[i]] = (this.diceStats.pos[i][r.dice[i]] || 0) + 1;
+    this.stats.totalCount++;
+    r.tx === 'T' ? this.stats.taiCount++ : this.stats.xiuCount++;
+    this.stats.scores[r.total]++;
+    for (let i = 0; i < 3; i++) this.stats.dicePos[i][r.dice[i]] = (this.stats.dicePos[i][r.dice[i]] || 0) + 1;
     const pk = `${r.dice[0]}-${r.dice[1]}`;
-    this.diceStats.pairs[pk] = (this.diceStats.pairs[pk] || 0) + 1;
+    this.stats.pairs[pk] = (this.stats.pairs[pk] || 0) + 1;
     const tk = r.dice.join('-');
-    this.diceStats.triples[tk] = (this.diceStats.triples[tk] || 0) + 1;
+    this.stats.triples[tk] = (this.stats.triples[tk] || 0) + 1;
   }
 
-  getDiceStats() {
-    const out = {};
-    for (let i = 0; i < 3; i++) {
-      const dist = this.diceStats.pos[i];
-      const vals = Object.values(dist);
-      out[`pos_${i}`] = { entropy: entropy(vals), samples: sum(vals) };
+  extractTx(hist) {
+    return hist.filter(h => h.tx !== 'B').map(h => h.tx);
+  }
+
+  extractTotals(hist) {
+    return hist.filter(h => h.tx !== 'B').map(h => h.total);
+  }
+
+  freq(hist) {
+    const tx = this.extractTx(hist);
+    if (tx.length < 5) return null;
+    const f = tx.reduce((o, v) => ((o[v] = (o[v] || 0) + 1), o), {});
+    if ((f['T'] || 0) > (f['X'] || 0) + 3) return 'X';
+    if ((f['X'] || 0) > (f['T'] || 0) + 3) return 'T';
+    return null;
+  }
+
+  markov2(hist) {
+    const tx = this.extractTx(hist);
+    if (tx.length < 3) return null;
+    const trans = {};
+    for (let i = 0; i <= tx.length - 3; i++) {
+      const key = tx[i] + tx[i + 1];
+      trans[key] = trans[key] || { t: 0, x: 0 };
+      trans[key][tx[i + 2].toLowerCase()]++;
     }
-    return out;
+    const lastKey = tx.at(-2) + tx.at(-1);
+    const c = trans[lastKey];
+    return c && (c.t || c.x) ? (c.t > c.x ? 'T' : 'X') : null;
   }
 
-  extractFeatures(hist) {
-    const filtered = hist.filter(h => h.tx !== 'B');
-    const tx = filtered.map(h => h.tx);
-    const totals = filtered.map(h => h.total);
+  markov3(hist) {
+    const tx = this.extractTx(hist);
+    if (tx.length < 4) return null;
+    const trans = {};
+    for (let i = 0; i <= tx.length - 4; i++) {
+      const key = tx[i] + tx[i + 1] + tx[i + 2];
+      trans[key] = trans[key] || { t: 0, x: 0 };
+      trans[key][tx[i + 3].toLowerCase()]++;
+    }
+    const lastKey = tx.at(-3) + tx.at(-2) + tx.at(-1);
+    const c = trans[lastKey];
+    return c && (c.t || c.x) ? (c.t > c.x ? 'T' : 'X') : null;
+  }
+
+  ngramSim(hist) {
+    const tx = this.extractTx(hist);
+    if (tx.length < 6) return null;
+    for (const k of [3, 4, 5, 6]) {
+      if (tx.length < k + 1) continue;
+      const target = tx.slice(-k).join('');
+      let c = { t: 0, x: 0 }, m = 0;
+      for (let i = 0; i <= tx.length - k - 1; i++) {
+        const s = similarity(tx.slice(i, i + k).join(''), target);
+        if (s >= 0.75) { c[tx[i + k].toLowerCase()] += s; m++; }
+      }
+      if (m >= 2 && c.t !== c.x) return c.t > c.x ? 'T' : 'X';
+    }
+    return null;
+  }
+
+  patternMatch(hist) {
+    const tx = this.extractTx(hist);
+    if (tx.length < 15) return null;
+    const patterns = {};
+    for (let len = 4; len <= 8; len++) {
+      for (let i = 0; i <= tx.length - len - 1; i++) {
+        const pat = tx.slice(i, i + len).join('');
+        const next = tx[i + len];
+        patterns[pat] = patterns[pat] || { t: 0, x: 0 };
+        patterns[pat][next.toLowerCase()]++;
+      }
+    }
+    const recent = tx.slice(-6).join('');
+    let best = null, bestScore = 0;
+    for (const pat in patterns) {
+      const s = similarity(pat, recent);
+      if (s > 0.6) {
+        const score = patterns[pat].t + patterns[pat].x;
+        if (score > bestScore) {
+          bestScore = score;
+          best = patterns[pat].t > patterns[pat].x ? 'T' : 'X';
+        }
+      }
+    }
+    return best;
+  }
+
+  entropyAnalysis(hist) {
+    if (hist.length < 40) return null;
+    const tx = this.extractTx(hist);
+    const ent = entropy(tx);
+    const recent20 = entropy(tx.slice(-20));
+    const ratio = recent20 / (ent || 1);
+    if (ratio > 1.2 && tx.at(-1) === 'T') return 'X';
+    if (ratio > 1.2 && tx.at(-1) === 'X') return 'T';
+    if (ratio < 0.8 && tx.at(-1) === 'T') return 'T';
+    if (ratio < 0.8 && tx.at(-1) === 'X') return 'X';
+    return null;
+  }
+
+  transformer(hist) {
+    const tx = this.extractTx(hist);
+    if (tx.length < 80) return null;
+    const target = tx.slice(-15).join('');
+    let c = { t: 0, x: 0 }, w = 0;
+    for (let i = 0; i <= tx.length - 16; i++) {
+      const s = similarity(tx.slice(i, i + 15).join(''), target);
+      if (s > 0.65) {
+        const ww = s * (i + 1) / tx.length;
+        c[tx[i + 15].toLowerCase()] = (c[tx[i + 15].toLowerCase()] || 0) + ww;
+        w += ww;
+      }
+    }
+    return w > 0 && c.t !== c.x ? (c.t > c.x ? 'T' : 'X') : null;
+  }
+
+  runDetect(hist) {
+    const tx = this.extractTx(hist);
+    if (tx.length < 15) return null;
     let runs = [], cur = tx[0], len = 1;
     for (let i = 1; i < tx.length; i++) {
       if (tx[i] === cur) len++; else { runs.push({ val: cur, len }); cur = tx[i]; len = 1; }
     }
     if (tx.length) runs.push({ val: cur, len });
-    return {
-      tx, totals, runs,
-      maxRun: runs.reduce((m, r) => Math.max(m, r.len), 0) || 0,
-      meanTotal: avg(totals), stdTotal: std(totals), entropy: entropy(tx)
-    };
-  }
-
-  // ---- Xúc xắc: học phân phối thật từ API, không random ----
-  aDice(hist) {
-    if (hist.length < 40) return null;
-    const filtered = hist.filter(h => h.tx !== 'B');
-    const recent = filtered.slice(-25);
-    let s = [0, 0, 0];
-    for (const r of recent) for (let i = 0; i < 3; i++) s[i] += r.dice[i];
-    const avgDice = s.map(v => v / recent.length);
-    const predictedTotal = sum(avgDice);
-    const vol = std(filtered.slice(-30).map(r => r.total));
-    if (predictedTotal < 9 && vol < 3) return 'X';
-    if (predictedTotal > 12.5 && vol < 3) return 'T';
-    return null;
-  }
-
-  aDiceSum(hist) {
-    if (hist.length < 60) return null;
-    const filtered = hist.filter(h => h.tx !== 'B');
-    const totals = filtered.slice(-40).map(r => r.total);
-    const mean = avg(totals);
-    const recent5 = avg(totals.slice(-5));
-    const regressionTarget = mean * 0.6 + recent5 * 0.4;
-    if (regressionTarget <= 9.5) return 'X';
-    if (regressionTarget >= 11.5) return 'T';
-    return null;
-  }
-
-  // ---- Cầu thích nghi ----
-  aBridge(hist) {
-    if (hist.length < 20) return null;
-    const { runs } = this.extractFeatures(hist);
-    if (runs.length < 2) return null;
-    const last = runs.at(-1), prev = runs.at(-2);
-    const recent = runs.slice(-6);
-    const avgLen = avg(recent.map(r => r.len));
-    const maxLen = Math.max(...recent.map(r => r.len));
-    if (last.len >= maxLen && last.len >= 3) return last.val;
-    if (last.len === 1 && prev?.len >= 2) {
-      const alt = recent.filter((r, i) => i === 0 || r.val !== recent[i - 1].val).length;
+    const last = runs.at(-1);
+    const recent = runs.slice(-8).map(r => r.len);
+    const avgLen = avg(recent), stdLen = std(recent);
+    if (last.len >= avgLen + stdLen) return last.val;
+    if (last.len === 1 && runs.length >= 4) {
+      const alt = runs.slice(-6).filter((r, i) => i === 0 || r.val !== runs[runs.length - 6 + i - 1].val).length;
       if (alt >= 4) return last.val === 'T' ? 'X' : 'T';
     }
-    if (last.len < avgLen * 0.5 && prev?.len > avgLen * 1.5) return prev.val;
     return null;
   }
 
-  aBridgeBreak(hist) {
-    if (hist.length < 30) return null;
-    const { runs } = this.extractFeatures(hist);
-    if (runs.length < 5) return null;
-    const lens = runs.slice(-8).map(r => r.len);
-    const meanLen = avg(lens), stdLen = std(lens);
-    const last = runs.at(-1);
-    // cầu đang bị "bẻ" liên tục (nhiều run ngắn bất thường) => dự đoán đảo chiều
-    if (last.len === 1 && stdLen > 1.4 && meanLen < 2.4) {
-      return last.val === 'T' ? 'X' : 'T';
-    }
-    // cầu bệt dài bất thường so với lịch sử => tiếp tục theo cầu
-    if (last.len > meanLen + stdLen * 1.5) return last.val;
+  bayesian(hist) {
+    const tx = this.extractTx(hist);
+    if (tx.length < 25) return null;
+    const priorT = this.stats.taiCount / (this.stats.totalCount || 1);
+    const priorX = this.stats.xiuCount / (this.stats.totalCount || 1);
+    const recent10 = tx.slice(-10);
+    const freqRecent = recent10.reduce((o, v) => ((o[v] = (o[v] || 0) + 1), o), {});
+    const likelihoodT = (freqRecent['T'] || 0) / 10;
+    const likelihoodX = (freqRecent['X'] || 0) / 10;
+    const denom = likelihoodT * priorT + likelihoodX * priorX || 1;
+    const posteriorT = (likelihoodT * priorT) / denom;
+    const posteriorX = (likelihoodX * priorX) / denom;
+    if (Math.abs(posteriorT - posteriorX) > 0.12) return posteriorT > posteriorX ? 'T' : 'X';
     return null;
   }
 
-  a1(hist) {
-    const { tx } = this.extractFeatures(hist);
-    const f = tx.reduce((o, v) => ((o[v] = (o[v] || 0) + 1), o), {});
-    if ((f['T'] || 0) > (f['X'] || 0) + 2) return 'X';
-    if ((f['X'] || 0) > (f['T'] || 0) + 2) return 'T';
+  diceSumModel(hist) {
+    if (hist.length < 50) return null;
+    const filtered = hist.filter(h => h.tx !== 'B');
+    const recent = filtered.slice(-30);
+    const meanSum = avg(recent.map(r => r.total));
+    const stdSum = std(recent.map(r => r.total));
+    if (meanSum > 12.5 && stdSum < 2.8) return 'T';
+    if (meanSum < 8.5 && stdSum < 2.8) return 'X';
     return null;
   }
 
-  a2(hist) {
-    const { tx } = this.extractFeatures(hist);
-    for (let order = 3; order >= 2; order--) {
-      if (tx.length < order + 1) continue;
-      const trans = {};
-      for (let i = 0; i <= tx.length - order - 1; i++) {
-        const key = tx.slice(i, i + order).join('');
-        trans[key] = trans[key] || { t: 0, x: 0 };
-        trans[key][tx[i + order].toLowerCase()]++;
+  diceDistLearning(hist) {
+    if (hist.length < 60 || this.stats.totalCount < 30) return null;
+    let sumPos = [0, 0, 0];
+    for (let i = 0; i < 3; i++) {
+      const dist = this.stats.dicePos[i];
+      let totalVal = 0, totalCount = 0;
+      for (const d in dist) {
+        totalVal += parseInt(d) * dist[d];
+        totalCount += dist[d];
       }
-      const c = trans[tx.slice(-order).join('')];
-      if (c && (c.t || c.x)) return c.t > c.x ? 'T' : 'X';
+      sumPos[i] = totalCount ? totalVal / totalCount : 3.5;
     }
+    const predictedSum = sumPos[0] + sumPos[1] + sumPos[2];
+    if (predictedSum <= 8.5) return 'X';
+    if (predictedSum >= 11.5) return 'T';
     return null;
   }
 
-  a3(hist) {
-    const { tx } = this.extractFeatures(hist);
-    if (tx.length < 5) return null;
-    for (const k of [3, 4, 5]) {
-      if (tx.length < k + 1) continue;
-      const target = tx.slice(-k).join('');
-      let c = { t: 0, x: 0 }, m = 0;
-      for (let i = 0; i <= tx.length - k - 1; i++) {
-        if (similarity(tx.slice(i, i + k).join(''), target) >= 0.8) { c[tx[i + k].toLowerCase()]++; m++; }
-      }
-      if (m > 2 && c.t !== c.x) return c.t > c.x ? 'T' : 'X';
-    }
-    return null;
-  }
-
-  a4(hist) {
-    const { tx } = this.extractFeatures(hist);
+  bridgeAdaptive(hist) {
+    const tx = this.extractTx(hist);
     if (tx.length < 20) return null;
-    for (const p of [4, 6, 8]) {
-      if (tx.length < p * 2 + 1) continue;
-      const target = tx.slice(-p).join('');
-      let c = { t: 0, x: 0 }, m = 0;
-      for (let i = 0; i <= tx.length - p - 1; i++) {
-        const sc = similarity(tx.slice(i, i + p).join(''), target);
-        if (sc >= 0.75) { c[tx[i + p].toLowerCase()] += sc; m++; }
-      }
-      if (m > 0 && c.t !== c.x) return c.t > c.x ? 'T' : 'X';
+    let runs = [], cur = tx[0], len = 1;
+    for (let i = 1; i < tx.length; i++) {
+      if (tx[i] === cur) len++; else { runs.push({ val: cur, len }); cur = tx[i]; len = 1; }
     }
-    return null;
-  }
-
-  a5(hist) {
-    if (hist.length < 70) return null;
-    const f = this.extractFeatures(hist);
-    const recent = avg(f.totals.slice(-30));
-    if (recent > 14 && f.meanTotal > 11.5) return 'X';
-    if (recent < 7 && f.meanTotal < 10.5) return 'T';
-    if (f.entropy > 0.99) return f.tx.at(-1) === 'T' ? 'X' : 'T';
-    if (f.entropy < 0.3) return f.tx.at(-1) === 'T' ? 'T' : 'X';
-    return null;
-  }
-
-  a6(hist) {
-    const { tx } = this.extractFeatures(hist);
-    if (tx.length < 100) return null;
-    const target = tx.slice(-10).join('');
-    let c = { t: 0, x: 0 }, w = 0;
-    for (let i = 0; i <= tx.length - 11; i++) {
-      const sc = similarity(tx.slice(i, i + 10).join(''), target);
-      if (sc > 0.6) { const ww = sc * (i + 1) / tx.length; c[tx[i + 10].toLowerCase()] = (c[tx[i + 10].toLowerCase()] || 0) + ww; w += ww; }
+    if (tx.length) runs.push({ val: cur, len });
+    if (runs.length < 3) return null;
+    const last = runs.at(-1), prev = runs.at(-2);
+    const recent = runs.slice(-7);
+    const lengths = recent.map(r => r.len);
+    const avgLen = avg(lengths), maxLen = Math.max(...lengths);
+    if (last.len > maxLen && last.len >= 4) return last.val;
+    if (last.len === 1 && prev?.len >= 3 && runs.length >= 5) {
+      const alt = recent.filter((r, i) => i === 0 || r.val !== recent[i - 1].val).length;
+      if (alt >= 5) return last.val === 'T' ? 'X' : 'T';
     }
-    return w > 0 && c.t !== c.x ? (c.t > c.x ? 'T' : 'X') : null;
-  }
-
-  a7(hist) {
-    const { runs } = this.extractFeatures(hist);
-    if (runs.length < 2) return null;
-    const last = runs.at(-1);
-    const recent = runs.slice(-5).map(r => r.len);
-    if (last.len > avg(recent) + std(recent)) return last.val;
-    if (last.len === 1 && runs.length >= 3) {
-      const alt = runs.slice(-5).filter((r, i) => i === 0 || r.val !== runs[runs.length - 5 + i - 1].val).length;
-      if (alt >= 3) return last.val === 'T' ? 'X' : 'T';
-    }
+    if (last.len < avgLen * 0.4 && prev?.len > avgLen * 1.8 && runs.length >= 4) return prev.val;
     return null;
   }
 
-  a8(hist) {
-    const { tx } = this.extractFeatures(hist);
-    if (tx.length < 20) return null;
-    const r = tx.slice(-10).reduce((o, v) => ((o[v] = (o[v] || 0) + 1), o), {});
-    const pt = (r['T'] || 0) / 10, px = (r['X'] || 0) / 10;
-    return Math.abs(pt - px) > 0.1 ? (pt > px ? 'T' : 'X') : null;
-  }
-
-  a10(hist) {
-    const f = this.extractFeatures(hist);
-    if (f.tx.length < 30) return null;
-    const ratio = entropy(f.tx.slice(-30)) / (f.entropy || 1);
-    if (ratio > 1.15 && f.maxRun < 4) return f.tx.at(-1) === 'T' ? 'X' : 'T';
-    if (ratio < 0.85 && f.maxRun >= 3) return f.runs.at(-1)?.val || null;
+  regimeShift(hist) {
+    if (hist.length < 50) return null;
+    const tx = this.extractTx(hist);
+    const ent = entropy(tx);
+    const recent30 = entropy(tx.slice(-30));
+    const ratio = recent30 / (ent || 1);
+    const vol = std(this.extractTotals(hist).slice(-30));
+    if (ratio > 1.25 && vol < 1.8) return tx.at(-1) === 'T' ? 'X' : 'T';
+    if (ratio < 0.75 && vol > 2.5) return tx.at(-1);
     return null;
   }
 
-  a11(hist) {
-    const { tx } = this.extractFeatures(hist);
+  momentumTrend(hist) {
+    const tx = this.extractTx(hist);
     if (tx.length < 40) return null;
-    const seg = Math.floor(tx.length / 5);
-    const first = tx.slice(0, seg), last = tx.slice(-seg);
-    const rf = first.filter(v => v === 'T').length / first.length;
-    const rl = last.filter(v => v === 'T').length / last.length;
-    const trend = rl - rf;
-    if (trend > 0.15) return 'X';
-    if (trend < -0.15) return 'T';
+    const seg1 = tx.slice(-40, -20), seg2 = tx.slice(-20);
+    const m1 = seg1.filter(v => v === 'T').length - seg1.filter(v => v === 'X').length;
+    const m2 = seg2.filter(v => v === 'T').length - seg2.filter(v => v === 'X').length;
+    if (m1 !== 0 && m2 !== 0 && Math.sign(m1) === Math.sign(m2)) {
+      if (Math.abs(m2) > Math.abs(m1)) return m2 > 0 ? 'T' : 'X';
+    }
     return null;
   }
 
-  a12(hist) {
-    const { tx } = this.extractFeatures(hist);
+  quantumEnsemble(hist) {
+    const tx = this.extractTx(hist);
     if (tx.length < 50) return null;
-    const recent = tx.slice(-20);
-    const tCount = recent.filter(x => x === 'T').length;
-    const votes = [tCount > 10 ? 'X' : 'T'];
-    const cyc = 4;
-    if (tx.length > cyc * 3) {
-      const out = [];
-      for (let i = (tx.length - 1) % cyc; i < tx.length; i += cyc) if (i + 1 < tx.length) out.push(tx[i + 1]);
-      if (out.length) {
-        const f = out.reduce((o, v) => ((o[v] = (o[v] || 0) + 1), o), {});
+    const recent = tx.slice(-25);
+    const votes = [];
+    votes.push(recent.filter(v => v === 'T').length > 12 ? 'X' : 'T');
+    const cycle = 5;
+    if (tx.length > cycle * 4) {
+      const outcomes = [];
+      for (let i = (tx.length - 1) % cycle; i < tx.length; i += cycle) {
+        if (i + 1 < tx.length) outcomes.push(tx[i + 1]);
+      }
+      if (outcomes.length >= 2) {
+        const f = outcomes.reduce((o, v) => ((o[v] = (o[v] || 0) + 1), o), {});
         votes.push((f['T'] || 0) > (f['X'] || 0) ? 'T' : 'X');
       }
     }
@@ -293,35 +349,91 @@ export class SeiuEngineV17 {
     return (f['T'] || 0) > (f['X'] || 0) ? 'T' : 'X';
   }
 
-  a13(hist) {
-    const { runs } = this.extractFeatures(hist);
-    if (runs.length < 3) return null;
-    const period = Math.round(avg(runs.map(r => r.len)));
-    if (period < 2 || period > 10) return null;
-    return (runs.length % period === 0) ? runs.at(-1).val : (runs.at(-2)?.val || null);
+  phaseDetector(hist) {
+    const tx = this.extractTx(hist);
+    if (tx.length < 35) return null;
+    let runs = [], cur = tx[0], len = 1;
+    for (let i = 1; i < tx.length; i++) {
+      if (tx[i] === cur) len++; else { runs.push({ val: cur, len }); cur = tx[i]; len = 1; }
+    }
+    if (tx.length) runs.push({ val: cur, len });
+    const lens = runs.map(r => r.len);
+    const period = Math.round(avg(lens));
+    if (period < 2 || period > 12) return null;
+    const phase = runs.length % period;
+    return phase === 0 ? runs.at(-1)?.val : (runs.at(-2)?.val || null);
   }
 
-  a14(hist) {
-    const { tx } = this.extractFeatures(hist);
-    if (tx.length < 40) return null;
-    const s1 = tx.slice(-40, -20), s2 = tx.slice(-20);
-    const m1 = s1.filter(v => v === 'T').length - s1.filter(v => v === 'X').length;
-    const m2 = s2.filter(v => v === 'T').length - s2.filter(v => v === 'X').length;
-    return (Math.sign(m1) === Math.sign(m2) && m2 !== 0) ? (m2 > 0 ? 'T' : 'X') : null;
+  decayWeighted(hist) {
+    if (hist.length < 30) return null;
+    const tx = this.extractTx(hist);
+    let c = { t: 0, x: 0 };
+    const window = Math.min(tx.length, 100);
+    for (let i = tx.length - window; i < tx.length; i++) {
+      const age = tx.length - i;
+      const decay = 1 - (age / (window + 1));
+      c[tx[i].toLowerCase()] = (c[tx[i].toLowerCase()] || 0) + decay;
+    }
+    if (c.t === c.x) return null;
+    return c.t > c.x ? 'T' : 'X';
+  }
+
+  volatilityModel(hist) {
+    const totals = this.extractTotals(hist);
+    if (totals.length < 50) return null;
+    const recent = totals.slice(-35);
+    const vol = std(recent);
+    const mean = avg(recent);
+    if (vol < 1.6 && mean > 13) return 'T';
+    if (vol < 1.6 && mean < 8) return 'X';
+    if (vol > 3.2) return null;
+    return null;
+  }
+
+  scoreRegression(hist) {
+    const totals = this.extractTotals(hist);
+    if (totals.length < 60) return null;
+    const recent40 = totals.slice(-40);
+    const mean = avg(recent40);
+    const trend = med(recent40.slice(-20)) - med(recent40.slice(0, 20));
+    const target = mean * 0.5 + med(recent40) * 0.5 + trend * 0.2;
+    if (target <= 9) return 'X';
+    if (target >= 12) return 'T';
+    return null;
+  }
+
+  breakDetector(hist) {
+    const tx = this.extractTx(hist);
+    if (tx.length < 30) return null;
+    let runs = [], cur = tx[0], len = 1;
+    for (let i = 1; i < tx.length; i++) {
+      if (tx[i] === cur) len++; else { runs.push({ val: cur, len }); cur = tx[i]; len = 1; }
+    }
+    if (tx.length) runs.push({ val: cur, len });
+    const recent = runs.slice(-10);
+    const lens = recent.map(r => r.len);
+    const mean = avg(lens), std_val = std(lens);
+    const last = runs.at(-1);
+    if (last.len < mean * 0.3 && std_val > 1.5) return last.val === 'T' ? 'X' : 'T';
+    return null;
   }
 
   fitInitial(hist) {
     const window = lastN(hist.filter(h => h.tx !== 'B'), 500);
-    if (window.length < 10) return;
+    if (window.length < 12) return;
     const scores = {};
     for (const a of this.algs) scores[a.id] = 0;
-    for (let i = 3; i < window.length; i++) {
+    for (let i = 4; i < window.length; i++) {
       const prefix = window.slice(0, i);
       const actual = window[i].tx;
       for (const a of this.algs) if (a.fn(prefix) === actual) scores[a.id]++;
     }
     let total = 0;
-    for (const id in scores) { const w = (scores[id] || 0) + 0.5; this.weights[id] = w; total += w; }
+    for (const id in scores) {
+      const w = (scores[id] || 0) + 1.5;
+      this.weights[id] = w;
+      total += w;
+    }
     for (const id in this.weights) this.weights[id] = Math.max(this.minWeight, this.weights[id] / total);
   }
 
@@ -330,27 +442,30 @@ export class SeiuEngineV17 {
     for (const a of this.algs) {
       const correct = a.fn(prefix) === actual ? 1 : 0;
       const curr = this.weights[a.id] || this.minWeight;
-      const reward = correct ? 1.08 : 0.92;
-      this.weights[a.id] = Math.max(this.minWeight, this.emaAlpha * (curr * reward) + (1 - this.emaAlpha) * curr);
+      const reward = correct ? (1 + this.learningRate * 8) : (1 - this.learningRate * 3);
+      const newW = this.emaAlpha * (curr * reward) + (1 - this.emaAlpha) * curr;
+      this.weights[a.id] = Math.max(this.minWeight, newW);
+      this.perfHistory[a.id].push(correct);
+      if (this.perfHistory[a.id].length > 300) this.perfHistory[a.id].shift();
     }
     const s = Object.values(this.weights).reduce((a, b) => a + b, 0) || 1;
     for (const id in this.weights) this.weights[id] /= s;
   }
 
   predictScores(hist, tx) {
-    if (hist.length < 30) return tx === 'T' ? [13, 14, 15] : [6, 7, 8];
+    if (hist.length < 40) return tx === 'T' ? [13, 14, 15] : [6, 7, 8];
     const scores = tx === 'T' ? [11, 12, 13, 14, 15, 16, 17, 18] : [3, 4, 5, 6, 7, 8, 9, 10];
-    let counts = {}, matchCount = 0;
-    const lookback = Math.min(hist.length, 150);
+    let counts = {}, match = 0;
+    const lookback = Math.min(hist.length, 200);
     for (let i = hist.length - 2; i >= hist.length - lookback && i >= 0; i--) {
       if (hist[i].tx === tx && scores.includes(hist[i + 1].total)) {
         const age = hist.length - 1 - i;
-        const decay = 1.0 - age / (lookback + 1);
+        const decay = 1 - (age / (lookback + 1)) ** 1.3;
         counts[hist[i + 1].total] = (counts[hist[i + 1].total] || 0) + decay;
-        matchCount++;
+        match++;
       }
     }
-    if (matchCount < 3) {
+    if (match < 5) {
       const c = avg(scores);
       return scores.slice(0, 3).sort((a, b) => Math.abs(a - c) - Math.abs(b - c));
     }
@@ -360,34 +475,40 @@ export class SeiuEngineV17 {
       const rem = scores.filter(s => !used.has(s));
       const c = avg(scores);
       rem.sort((a, b) => Math.abs(a - c) - Math.abs(b - c));
-      if (rem.length) sorted.push(rem.shift()); else break;
+      if (rem.length) sorted.push(rem.shift());
+      else break;
     }
     return sorted.length >= 3 ? sorted : scores.slice(0, 3);
   }
 
   predict(hist) {
+    if (hist.length < 4) return { prediction: 'chưa có dữ liệu', confidence: 0, scorePrediction: [], meta: {} };
     const votes = {}, votedBy = [];
     for (const a of this.algs) {
       const p = a.fn(hist);
-      if (p) { votes[p] = (votes[p] || 0) + (this.weights[a.id] || 0); votedBy.push(a.id); }
+      if (p) {
+        votes[p] = (votes[p] || 0) + (this.weights[a.id] || 0) * a.weight;
+        votedBy.push(a.id);
+      }
     }
-    let best, confidence;
-    if (!votes['T'] && !votes['X']) { best = this.a1(hist) || 'T'; confidence = 0.5; }
-    else {
+    let best, conf;
+    if (!votes['T'] && !votes['X']) {
+      best = this.freq(hist) || 'T';
+      conf = 0.45;
+    } else {
       const res = majority(votes);
       best = res.key;
       const total = Object.values(votes).reduce((a, b) => a + b, 0);
-      confidence = Math.min(0.99, Math.max(0.51, total > 0 ? res.val / total : 0.51));
+      conf = clamp(total > 0 ? res.val / total : 0.5, 0.45, 0.99);
     }
-    const feat = this.extractFeatures(hist);
-    const regime = feat.entropy > 0.98 ? 'high_entropy' : feat.entropy < 0.4 ? 'low_entropy' : 'neutral';
-    const diceTrend = this.aDice(hist) || 'neutral';
-    const bridgeStatus = this.aBridge(hist) ? 'active' : 'idle';
+    const tx = this.extractTx(hist);
+    const ent = entropy(tx);
+    const regime = ent > 0.95 ? 'high_entropy' : ent < 0.35 ? 'low_entropy' : 'neutral';
     return {
-      prediction: best === 'T' ? 'tài' : 'xỉu',
-      confidence,
+      prediction: best === 'T' ? 'TÀI' : 'XỈU',
+      confidence: conf,
       scorePrediction: this.predictScores(hist, best),
-      meta: { regime, votedBy: [...new Set(votedBy)], diceTrend, bridgeStatus }
+      meta: { regime, votedBy: [...new Set(votedBy)].length }
     };
   }
 }
