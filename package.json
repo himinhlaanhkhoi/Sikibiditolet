@@ -1,18 +1,15 @@
 {
-  "name": "seiu-ai-v18-toilabeak",
-  "version": "18.0.0",
-  "type": "module",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
+  "name":"anh-khoi-core-v20",
+  "version":"20.0.0",
+  "private":true,
+  "type":"module",
+  "main":"server.js",
+  "scripts":{"start":"node server.js"},
+  "dependencies":{
+    "fastify":"^4.28.1",
+    "@fastify/cors":"^9.0.1",
+    "@fastify/static":"^6.12.0",
+    "node-fetch":"^2.7.0"
   },
-  "dependencies": {
-    "fastify": "^4.28.1",
-    "@fastify/cors": "^9.0.1",
-    "@fastify/static": "^6.12.0",
-    "node-fetch": "^2.7.0"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  }
+  "engines":{"node":">=18.0.0"}
 }
