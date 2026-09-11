@@ -1,9 +1,9 @@
 {
-  "name": "anh-khoi-sicbo-core-v21",
-  "version": "21.0.0",
-  "private": true,
-  "type": "module",
-  "main": "server.js",
-  "scripts": { "start": "node server.js" },
-  "engines": { "node": ">=18.18.0" }
+  "name":"anh-khoi-sicbo-core-v22",
+  "version":"22.0.0",
+  "private":true,
+  "type":"module",
+  "main":"server.js",
+  "scripts":{"start":"node server.js"},
+  "engines":{"node":">=18.18.0"}
 }
