@@ -1,5 +1,5 @@
 /**
- * ANH KHÔI CORE — Production Server v19 (zero external runtime deps beyond Node 18+)
+ * ANH KHÔI CORE — Production Server v21 — SEIU full + lag+1 (zero external runtime deps beyond Node 18+)
  * - Exact dashboard UI served from public/index.html
  * - Live API matching dashboard contract
  * - Prediction memory + win/loss settle (persisted)
@@ -129,7 +129,11 @@ async function fetchAndUpdate() {
         settlePrediction(r.session, r.tx, r.result);
         history.push(r);
         engine.updateStats(r);
-        engine.updateOutcome(history.slice(0, -1), r.tx);
+        const prefix = history.slice(0, -1);
+        engine.updateOutcome(prefix, r.tx);
+        if (typeof engine.updateOnline === "function") {
+          try { engine.updateOnline(prefix, r.tx, r.dice); } catch (e) { console.error("[updateOnline]", e.message); }
+        }
       }
       if (history.length > 600) history = history.slice(-600);
       currentSessionId = last.session;
@@ -277,6 +281,8 @@ function handleSicboSunwin(res) {
         reason: pred.meta?.reason || "",
         regime: pred.meta?.regime,
         votedBy: pred.meta?.votedBy,
+        lag: 1,
+        targetSession: targetSession,
         storedPrediction: stored?.prediction || null,
       },
     });
@@ -339,7 +345,7 @@ function handleHealth(res) {
   sendJson(res, 200, {
     ok: true,
     brand: "ANH KHÔI CORE",
-    version: "19.0.0",
+    version: "21.0.0",
     sessions: history.length,
     sourceOk,
     lastError,
@@ -411,7 +417,7 @@ async function boot() {
   setInterval(savePredictions, 25000);
 
   server.listen(PORT, "0.0.0.0", () => {
-    console.log(`🚀 ANH KHÔI CORE v19 → http://0.0.0.0:${PORT}`);
+    console.log(`🚀 ANH KHÔI CORE v21 → http://0.0.0.0:${PORT}`);
   });
 }
 
