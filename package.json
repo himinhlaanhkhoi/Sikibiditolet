@@ -1,12 +1,12 @@
 {
-  "name": "anh-khoi-core",
-  "version": "19.0.0",
-  "type": "module",
-  "main": "server.js",
+  "name": "anhkhoi-sunwin",
+  "version": "4.0.0",
+  "private": true,
+  "main": "anhkhoi_sunwin_v4.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node anhkhoi_sunwin_v4.js"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20 <25"
   }
 }
