@@ -1,13 +1,13 @@
 /**
- * server.js — Công Nghệ Vip PAK
- * Dice Signal Analyzer
+ * server.js — Công Nghệ Vip PAK 2026
+ * Dice Signal Analyzer — Full Blue Modern Edition
  * Developer: Anh Khôi
  *
  * Nguồn: https://sunwin-taixiu-dulieu.onrender.com/data
  *
- * Lưu ý kỹ thuật: dữ liệu xúc xắc là ngẫu nhiên độc lập.
- * Engine này tổng hợp nhiều heuristic và log hit-rate thật.
- * Không có cam kết thắng.
+ * Lưu ý: dữ liệu xúc xắc ngẫu nhiên độc lập.
+ * Engine tổng hợp nhiều heuristic + log hit-rate thật.
+ * Không cam kết thắng.
  */
 
 'use strict';
@@ -68,12 +68,10 @@ function parseRecord(r) {
 }
 
 /* ============================================================
- * SIGNALS
- * Mỗi signal trả { side, w, tag, info } hoặc null.
- * w ∈ (0, 1] — độ tin cậy tương đối. Tổng hợp bằng weighted vote.
+ * SIGNALS (giữ nguyên + bổ sung nhẹ)
  * ============================================================ */
 
-/** Bệt ngắn 2–4: theo bệt, weight giảm dần khi bệt dài ra. */
+/** Bệt ngắn 2–4 */
 function sigBetNgan(arr) {
     if (arr.length < 2) return null;
     const head = arr[0];
@@ -88,7 +86,7 @@ function sigBetNgan(arr) {
     };
 }
 
-/** Bệt dài ≥ 6: bẻ sang đối diện, weight tăng nhẹ theo độ dài (mean reversion yếu). */
+/** Bệt dài ≥ 6 → bẻ */
 function sigBeBet(arr) {
     if (arr.length < 6) return null;
     const head = arr[0];
@@ -105,14 +103,14 @@ function sigBeBet(arr) {
     };
 }
 
-/** Cầu 1-1: 6 phần tử đầu xen kẽ ABABAB → dự A. */
+/** Cầu 1-1 */
 function sigCau11(arr) {
     if (arr.length < 6) return null;
     for (let i = 0; i < 5; i++) if (arr[i] === arr[i + 1]) return null;
     return { side: arr[0], w: 0.42, tag: 'Cầu 1-1', info: 'ABABAB' };
 }
 
-/** Cầu 2-2: AABB → dự B. */
+/** Cầu 2-2 */
 function sigCau22(arr) {
     if (arr.length < 4) return null;
     if (arr[0] === arr[1] && arr[2] === arr[3] && arr[0] !== arr[2]) {
@@ -121,7 +119,7 @@ function sigCau22(arr) {
     return null;
 }
 
-/** Cầu 3-3: AAABBB → dự B. */
+/** Cầu 3-3 */
 function sigCau33(arr) {
     if (arr.length < 6) return null;
     if (arr[0] === arr[1] && arr[1] === arr[2] &&
@@ -132,7 +130,7 @@ function sigCau33(arr) {
     return null;
 }
 
-/** Gãy 3-2: AAABB → dự B. */
+/** Gãy 3-2 */
 function sigGay32(arr) {
     if (arr.length < 5) return null;
     if (arr[0] === arr[1] && arr[1] === arr[2] &&
@@ -142,7 +140,7 @@ function sigGay32(arr) {
     return null;
 }
 
-/** Vị cực trị: tổng rất cao/rất thấp → hồi. */
+/** Vị cực trị */
 function sigViCucTri(history) {
     if (history.length < 2) return null;
     const t = history[0].tong;
@@ -151,7 +149,7 @@ function sigViCucTri(history) {
     return null;
 }
 
-/** Mean reversion 10 phiên: avg > 11.5 → Xỉu, avg < 9.5 → Tài. */
+/** Mean reversion 10 phiên */
 function sigMeanRevert(history) {
     if (history.length < 10) return null;
     const s = history.slice(0, 10).map(h => h.tong);
@@ -161,10 +159,7 @@ function sigMeanRevert(history) {
     return null;
 }
 
-/**
- * Pattern repeat: tìm subsequence độ dài L (3..7) ở 40 phiên gần nhất
- * khớp với subsequence mới nhất, dự đoán theo phần tử kế tiếp của lần khớp cũ.
- */
+/** Pattern repeat L=3..7 */
 function sigPatternRepeat(arr) {
     if (arr.length < 15) return null;
     const W = arr.slice(0, 40);
@@ -188,6 +183,28 @@ function sigPatternRepeat(arr) {
     return null;
 }
 
+/** Bias gần đây (20 phiên) */
+function sigRecentBias(arr) {
+    if (arr.length < 12) return null;
+    const win = arr.slice(0, 20);
+    let tai = 0, xiu = 0;
+    for (const s of win) {
+        if (s === 'TAI') tai++;
+        else xiu++;
+    }
+    const total = tai + xiu;
+    if (total < 12) return null;
+    const ratio = Math.max(tai, xiu) / total;
+    if (ratio < 0.62) return null;
+    const side = tai > xiu ? 'TAI' : 'XIU';
+    return {
+        side,
+        w: 0.28 + (ratio - 0.62) * 0.8,
+        tag: 'Bias 20',
+        info: `T:${tai} X:${xiu} (${(ratio * 100).toFixed(0)}%)`,
+    };
+}
+
 const SIGNALS = [
     { fn: sigBetNgan,        needs: 'arr' },
     { fn: sigBeBet,          needs: 'arr' },
@@ -198,10 +215,11 @@ const SIGNALS = [
     { fn: sigViCucTri,       needs: 'hist' },
     { fn: sigMeanRevert,     needs: 'hist' },
     { fn: sigPatternRepeat,  needs: 'arr' },
+    { fn: sigRecentBias,     needs: 'arr' },
 ];
 
 /* ============================================================
- * ENGINE — weighted vote, contrarian when streak thua
+ * ENGINE
  * ============================================================ */
 class PAKEngine {
     constructor() {
@@ -252,7 +270,7 @@ class PAKEngine {
 
         const signalFactor = Math.min(fired.length / 6, 1);
         let conf = Math.round(45 + agree * 35 + signalFactor * 12);
-        conf = Math.max(50, Math.min(88, conf));
+        conf = Math.max(50, Math.min(90, conf));
 
         return {
             side,
@@ -271,7 +289,7 @@ class PAKEngine {
         return {
             ...decision,
             side: opp,
-            confidence: Math.min(88, decision.confidence + 8),
+            confidence: Math.min(90, decision.confidence + 8),
             tag: '[CONTRA] ' + decision.tag,
             info: `Chuỗi ${this.errorStreak} sai → đảo | ${decision.info}`,
         };
@@ -419,31 +437,37 @@ process.on('unhandledRejection', (r) => console.error('[UNHANDLED]', r));
 process.on('uncaughtException', (e) => console.error('[UNCAUGHT]', e));
 
 /* ============================================================
- * UI
+ * UI — Super Modern Full Blue 2026
  * ============================================================ */
 const HTML = String.raw`<!DOCTYPE html>
 <html lang="vi">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Công Nghệ Vip PAK</title>
+<title>Công Nghệ Vip PAK 2026</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #08090f;
-    --surface: #0e1018;
-    --surface-2: #14161f;
-    --line: rgba(255,255,255,0.07);
-    --line-2: rgba(255,255,255,0.12);
-    --txt: #eef0f6;
-    --dim: #8b91a8;
-    --mute: #565c72;
-    --tai: #22c55e;
-    --xiu: #ef4444;
-    --acc: #3b82f6;
-    --warn: #f59e0b;
+    --bg: #020617;
+    --surface: rgba(15, 23, 42, 0.75);
+    --surface-2: rgba(30, 41, 59, 0.6);
+    --surface-3: rgba(51, 65, 85, 0.45);
+    --line: rgba(59, 130, 246, 0.15);
+    --line-2: rgba(96, 165, 250, 0.25);
+    --txt: #f1f5f9;
+    --dim: #94a3b8;
+    --mute: #64748b;
+    --blue: #3b82f6;
+    --blue-bright: #60a5fa;
+    --blue-glow: #38bdf8;
+    --blue-deep: #1d4ed8;
+    --tai: #22d3ee;
+    --xiu: #818cf8;
+    --ok: #34d399;
+    --bad: #f87171;
+    --warn: #fbbf24;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -452,172 +476,218 @@ const HTML = String.raw`<!DOCTYPE html>
     color: var(--txt);
     min-height: 100vh;
     -webkit-font-smoothing: antialiased;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 20% -20%, rgba(59,130,246,0.18), transparent),
+      radial-gradient(ellipse 60% 40% at 90% 10%, rgba(56,189,248,0.12), transparent),
+      radial-gradient(ellipse 50% 30% at 50% 100%, rgba(29,78,216,0.15), transparent);
   }
-  .wrap { max-width: 1160px; margin: 0 auto; padding: 28px 20px 60px; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 28px 20px 70px; }
 
   header {
     display: flex; align-items: center; justify-content: space-between;
     gap: 16px; flex-wrap: wrap;
-    padding-bottom: 22px; margin-bottom: 24px;
+    padding-bottom: 24px; margin-bottom: 28px;
     border-bottom: 1px solid var(--line);
   }
-  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand { display: flex; align-items: center; gap: 14px; }
   .brand-logo {
-    width: 40px; height: 40px; border-radius: 10px;
-    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    width: 48px; height: 48px; border-radius: 14px;
+    background: linear-gradient(135deg, #2563eb, #0ea5e9, #38bdf8);
     display: grid; place-items: center;
     font-family: 'JetBrains Mono', monospace;
-    font-weight: 700; font-size: 13px; color: #fff;
+    font-weight: 800; font-size: 15px; color: #fff;
     letter-spacing: -0.5px;
+    box-shadow: 0 0 24px rgba(59,130,246,0.45), 0 0 60px rgba(56,189,248,0.2);
+    position: relative;
+  }
+  .brand-logo::after {
+    content: '';
+    position: absolute; inset: -2px; border-radius: 16px;
+    background: linear-gradient(135deg, #3b82f6, #22d3ee);
+    z-index: -1; opacity: 0.5; filter: blur(8px);
   }
   .brand h1 {
-    font-size: 17px; font-weight: 700; letter-spacing: -0.01em;
+    font-size: 20px; font-weight: 800; letter-spacing: -0.02em;
+    background: linear-gradient(90deg, #e0f2fe, #7dd3fc, #38bdf8);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
   }
   .brand small {
     display: block;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 10.5px; color: var(--mute);
-    letter-spacing: 0.05em; margin-top: 2px;
+    font-size: 11px; color: var(--mute);
+    letter-spacing: 0.08em; margin-top: 3px;
   }
   .status {
-    display: inline-flex; align-items: center; gap: 7px;
-    padding: 6px 12px;
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 16px;
     background: var(--surface);
     border: 1px solid var(--line-2);
     border-radius: 999px;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 11px; color: var(--dim);
+    font-size: 12px; color: var(--dim);
+    backdrop-filter: blur(12px);
   }
   .status .dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: var(--tai);
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--ok);
+    box-shadow: 0 0 10px var(--ok);
+    animation: pulse 2s infinite;
   }
-  .status.off .dot { background: var(--xiu); }
+  .status.off .dot { background: var(--bad); box-shadow: 0 0 10px var(--bad); animation: none; }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(0.9); }
+  }
 
-  .grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 16px; margin-bottom: 16px; }
-  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+  .grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 18px; margin-bottom: 18px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
 
   .card {
     background: var(--surface);
     border: 1px solid var(--line);
-    border-radius: 14px;
-    padding: 22px;
+    border-radius: 20px;
+    padding: 26px;
+    backdrop-filter: blur(16px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04);
+    position: relative;
+    overflow: hidden;
+  }
+  .card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(96,165,250,0.4), transparent);
   }
   .card-title {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 10.5px; color: var(--mute);
-    letter-spacing: 0.14em; text-transform: uppercase;
-    margin-bottom: 16px;
+    font-size: 11px; color: var(--blue-bright);
+    letter-spacing: 0.16em; text-transform: uppercase;
+    margin-bottom: 18px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card-title::before {
+    content: '';
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--blue-glow);
+    box-shadow: 0 0 8px var(--blue-glow);
   }
 
   .pred-side {
-    font-size: 68px; font-weight: 800; line-height: 1;
-    letter-spacing: -0.03em; margin-bottom: 10px;
+    font-size: 72px; font-weight: 800; line-height: 1;
+    letter-spacing: -0.03em; margin-bottom: 12px;
+    text-shadow: 0 0 40px currentColor;
   }
   .pred-side.tai { color: var(--tai); }
   .pred-side.xiu { color: var(--xiu); }
-  .pred-side.none { color: var(--mute); font-size: 42px; }
+  .pred-side.none { color: var(--mute); font-size: 48px; text-shadow: none; }
 
   .pred-meta {
-    display: flex; align-items: center; gap: 14px;
+    display: flex; align-items: center; gap: 18px;
     font-family: 'JetBrains Mono', monospace;
     font-size: 13px; color: var(--dim);
-    margin-bottom: 14px; flex-wrap: wrap;
+    margin-bottom: 16px; flex-wrap: wrap;
   }
   .pred-meta strong { color: var(--txt); font-weight: 600; }
 
   .pred-tag {
     display: inline-block;
-    padding: 4px 10px; border-radius: 6px;
-    background: var(--surface-2);
-    border: 1px solid var(--line-2);
+    padding: 6px 14px; border-radius: 8px;
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(14,165,233,0.1));
+    border: 1px solid rgba(96,165,250,0.3);
     font-family: 'JetBrains Mono', monospace;
-    font-size: 11px; color: var(--dim);
-    margin-bottom: 10px;
+    font-size: 12px; color: var(--blue-bright);
+    margin-bottom: 12px;
   }
   .pred-info {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 11.5px; color: var(--mute);
-    line-height: 1.7; word-break: break-word;
+    font-size: 12px; color: var(--mute);
+    line-height: 1.75; word-break: break-word;
   }
 
-  .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
   .stat {
     background: var(--surface-2);
     border: 1px solid var(--line);
-    border-radius: 10px;
-    padding: 14px;
+    border-radius: 14px;
+    padding: 16px;
+    transition: border-color 0.2s;
   }
+  .stat:hover { border-color: var(--line-2); }
   .stat-n {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 22px; font-weight: 600; letter-spacing: -0.02em;
+    font-size: 26px; font-weight: 700; letter-spacing: -0.02em;
   }
-  .stat-n.ok { color: var(--tai); }
-  .stat-n.bad { color: var(--xiu); }
-  .stat-n.acc { color: var(--acc); }
+  .stat-n.ok { color: var(--ok); }
+  .stat-n.bad { color: var(--bad); }
+  .stat-n.acc { color: var(--blue-bright); text-shadow: 0 0 20px rgba(96,165,250,0.4); }
   .stat-k {
     font-family: 'JetBrains Mono', monospace;
     font-size: 10px; color: var(--mute);
-    letter-spacing: 0.12em; text-transform: uppercase;
-    margin-top: 2px;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    margin-top: 4px;
   }
   .streak {
-    margin-top: 12px; display: flex; justify-content: space-between;
-    padding: 11px 14px;
-    background: rgba(239,68,68,0.06);
-    border: 1px solid rgba(239,68,68,0.18);
-    border-radius: 10px;
-    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    margin-top: 14px; display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 16px;
+    background: rgba(129,140,248,0.08);
+    border: 1px solid rgba(129,140,248,0.2);
+    border-radius: 12px;
+    font-family: 'JetBrains Mono', monospace; font-size: 13px;
   }
-  .streak .k { color: var(--mute); letter-spacing: 0.06em; }
-  .streak .v { color: var(--xiu); font-weight: 600; }
+  .streak .k { color: var(--mute); letter-spacing: 0.08em; }
+  .streak .v { color: var(--xiu); font-weight: 700; font-size: 16px; }
   .foot {
-    margin-top: 12px;
+    margin-top: 14px;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 10.5px; color: var(--mute);
+    font-size: 11px; color: var(--mute);
     line-height: 1.7;
   }
 
-  .tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+  .tbl-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--surface-2);
+  }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   thead th {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
-    color: var(--mute); font-weight: 500;
-    text-align: left; padding: 11px 14px;
-    background: var(--surface-2);
+    font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--blue-bright); font-weight: 500;
+    text-align: left; padding: 14px 16px;
+    background: rgba(30,41,59,0.8);
     border-bottom: 1px solid var(--line);
     white-space: nowrap;
   }
   tbody td {
-    padding: 11px 14px; border-bottom: 1px solid var(--line);
-    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    padding: 13px 16px; border-bottom: 1px solid var(--line);
+    font-family: 'JetBrains Mono', monospace; font-size: 12.5px;
   }
   tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: rgba(59,130,246,0.05); }
   .tag {
-    display: inline-block; padding: 3px 8px; border-radius: 5px;
+    display: inline-block; padding: 4px 10px; border-radius: 6px;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 11px; font-weight: 500;
+    font-size: 11.5px; font-weight: 600;
   }
-  .tag.tai { color: var(--tai); background: rgba(34,197,94,0.10); }
-  .tag.xiu { color: var(--xiu); background: rgba(239,68,68,0.10); }
-  .tag.miss { color: var(--mute); background: var(--surface-2); }
-  .r-ok { color: var(--tai); font-weight: 600; }
-  .r-bad { color: var(--xiu); font-weight: 600; }
+  .tag.tai { color: var(--tai); background: rgba(34,211,238,0.12); border: 1px solid rgba(34,211,238,0.25); }
+  .tag.xiu { color: var(--xiu); background: rgba(129,140,248,0.12); border: 1px solid rgba(129,140,248,0.25); }
+  .tag.miss { color: var(--mute); background: var(--surface-3); }
+  .r-ok { color: var(--ok); font-weight: 700; }
+  .r-bad { color: var(--bad); font-weight: 700; }
   .r-miss { color: var(--mute); }
   .empty {
-    text-align: center; padding: 28px 16px; color: var(--mute);
-    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    text-align: center; padding: 36px 16px; color: var(--mute);
+    font-family: 'JetBrains Mono', monospace; font-size: 13px;
   }
 
   footer {
-    margin-top: 32px; padding-top: 20px;
+    margin-top: 36px; padding-top: 22px;
     border-top: 1px solid var(--line);
-    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 11px; color: var(--mute);
+    font-size: 12px; color: var(--mute);
   }
-  footer strong { color: var(--dim); font-weight: 600; }
+  footer strong { color: var(--blue-bright); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -627,7 +697,7 @@ const HTML = String.raw`<!DOCTYPE html>
       <div class="brand-logo">PAK</div>
       <div>
         <h1>Công Nghệ Vip PAK</h1>
-        <small>Dice Signal Analyzer</small>
+        <small>DICE SIGNAL ANALYZER · 2026</small>
       </div>
     </div>
     <div id="status" class="status"><span class="dot"></span><span id="statusText">Đang kết nối</span></div>
@@ -646,7 +716,7 @@ const HTML = String.raw`<!DOCTYPE html>
     </div>
 
     <div class="card">
-      <div class="card-title">Thống kê</div>
+      <div class="card-title">Thống kê realtime</div>
       <div class="stats">
         <div class="stat"><div id="sTotal" class="stat-n">0</div><div class="stat-k">Tổng</div></div>
         <div class="stat"><div id="sCorrect" class="stat-n ok">0</div><div class="stat-k">Đúng</div></div>
@@ -678,7 +748,7 @@ const HTML = String.raw`<!DOCTYPE html>
   </div>
 
   <footer>
-    <div>Developer: <strong>Anh Khôi</strong></div>
+    <div>Developer: <strong>Anh Khôi</strong> · Công Nghệ Vip PAK 2026</div>
     <div id="footTime">--</div>
   </footer>
 </div>
@@ -740,6 +810,10 @@ const HTML = String.raw`<!DOCTYPE html>
       const tdTag = document.createElement('td');
       tdTag.textContent = r.tag || '';
       tdTag.style.color = 'var(--dim)';
+      tdTag.style.maxWidth = '220px';
+      tdTag.style.overflow = 'hidden';
+      tdTag.style.textOverflow = 'ellipsis';
+      tdTag.style.whiteSpace = 'nowrap';
       tr.appendChild(tdTag);
 
       const tdRes = document.createElement('td');
@@ -825,7 +899,7 @@ app.get('/api/raw', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log('[PAK] Công Nghệ Vip PAK — Dice Signal Analyzer');
+    console.log('[PAK] Công Nghệ Vip PAK 2026 — Dice Signal Analyzer');
     console.log('[PAK] Server: http://localhost:' + PORT);
     console.log('[PAK] Developer: Anh Khôi');
 });
