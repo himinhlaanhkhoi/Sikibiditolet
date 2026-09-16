@@ -1,763 +1,834 @@
 /**
- * server.js - Sunwin Tài Xỉu Analyzer (TX_GlassCore_V6)
- * Giao diện Glassmorphism đa phong cách (Dark Glass, Neon Glass, Aurora, Holographic, Minimal)
- * Tự động đồng bộ API: https://sunwin-taixiu-dulieu.onrender.com/data
+ * server.js — Công Nghệ Vip PAK
+ * Dice Signal Analyzer
  * Developer: Anh Khôi
+ *
+ * Nguồn: https://sunwin-taixiu-dulieu.onrender.com/data
+ *
+ * Lưu ý kỹ thuật: dữ liệu xúc xắc là ngẫu nhiên độc lập.
+ * Engine này tổng hợp nhiều heuristic và log hit-rate thật.
+ * Không có cam kết thắng.
  */
+
+'use strict';
 
 const express = require('express');
 const axios = require('axios');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const API_URL = 'https://sunwin-taixiu-dulieu.onrender.com/data';
-const HISTORY_LIMIT = 500;
+const API_URL = process.env.API_URL || 'https://sunwin-taixiu-dulieu.onrender.com/data';
 
-const vnNow = () => {
-    const d = new Date();
-    return new Date(d.getTime() + (7 * 60 * 60 * 1000)).toISOString();
-};
+const HISTORY_LIMIT = 400;
+const FETCH_INTERVAL_MS = 25000;
+const FETCH_TIMEOUT_MS = 12000;
+const PREDICTION_TTL_MS = 6 * 60 * 1000;
+const LOG_LIMIT = 120;
 
-let stats = {
-    total: 0,
-    correct: 0,
-    wrong: 0,
-    last_prediction: null,
-    start_time: vnNow(),
-    history: [],
-    total_predictions_made: 0,
-    prediction_started: false
-};
+/* ---------- Time ---------- */
+const VN_FMT = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+});
+function vnNow() {
+    return VN_FMT.format(new Date()).replace('T', ' ');
+}
 
-class TX_GlassCore_V6 {
+/* ---------- Normalize ---------- */
+function normalizeSide(raw) {
+    if (typeof raw !== 'string') return null;
+    const s = raw.trim().toUpperCase();
+    if (s === 'TÀI' || s === 'TAI') return 'TAI';
+    if (s === 'XỈU' || s === 'XIU') return 'XIU';
+    return null;
+}
+
+function parseRecord(r) {
+    if (!r || typeof r !== 'object') return null;
+    const phien = Number(r.phien);
+    if (!Number.isFinite(phien) || phien <= 0) return null;
+    const side = normalizeSide(r.ket_qua);
+    if (!side) return null;
+
+    const x1 = Number(r.xuc_xac_1);
+    const x2 = Number(r.xuc_xac_2);
+    const x3 = Number(r.xuc_xac_3);
+    let tong = Number(r.tong);
+    if (!Number.isFinite(tong)) tong = x1 + x2 + x3;
+
+    return {
+        phien,
+        x1, x2, x3,
+        tong,
+        side,
+        time: typeof r.thoi_gian === 'string' ? r.thoi_gian : vnNow(),
+    };
+}
+
+/* ============================================================
+ * SIGNALS
+ * Mỗi signal trả { side, w, tag, info } hoặc null.
+ * w ∈ (0, 1] — độ tin cậy tương đối. Tổng hợp bằng weighted vote.
+ * ============================================================ */
+
+/** Bệt ngắn 2–4: theo bệt, weight giảm dần khi bệt dài ra. */
+function sigBetNgan(arr) {
+    if (arr.length < 2) return null;
+    const head = arr[0];
+    let len = 1;
+    while (len < arr.length && arr[len] === head) len++;
+    if (len < 2 || len > 4) return null;
+    return {
+        side: head,
+        w: 0.55 - (len - 2) * 0.05,
+        tag: `Bệt ${len}`,
+        info: `${len} phiên ${head}`,
+    };
+}
+
+/** Bệt dài ≥ 6: bẻ sang đối diện, weight tăng nhẹ theo độ dài (mean reversion yếu). */
+function sigBeBet(arr) {
+    if (arr.length < 6) return null;
+    const head = arr[0];
+    let len = 1;
+    while (len < arr.length && arr[len] === head) len++;
+    if (len < 6) return null;
+    const opp = head === 'TAI' ? 'XIU' : 'TAI';
+    const w = Math.min(0.55, 0.35 + (len - 6) * 0.03);
+    return {
+        side: opp,
+        w,
+        tag: `Bẻ bệt ${len}`,
+        info: `${len} phiên ${head} → nghiêng ${opp}`,
+    };
+}
+
+/** Cầu 1-1: 6 phần tử đầu xen kẽ ABABAB → dự A. */
+function sigCau11(arr) {
+    if (arr.length < 6) return null;
+    for (let i = 0; i < 5; i++) if (arr[i] === arr[i + 1]) return null;
+    return { side: arr[0], w: 0.42, tag: 'Cầu 1-1', info: 'ABABAB' };
+}
+
+/** Cầu 2-2: AABB → dự B. */
+function sigCau22(arr) {
+    if (arr.length < 4) return null;
+    if (arr[0] === arr[1] && arr[2] === arr[3] && arr[0] !== arr[2]) {
+        return { side: arr[2], w: 0.42, tag: 'Cầu 2-2', info: 'AABB → B' };
+    }
+    return null;
+}
+
+/** Cầu 3-3: AAABBB → dự B. */
+function sigCau33(arr) {
+    if (arr.length < 6) return null;
+    if (arr[0] === arr[1] && arr[1] === arr[2] &&
+        arr[3] === arr[4] && arr[4] === arr[5] &&
+        arr[0] !== arr[3]) {
+        return { side: arr[3], w: 0.40, tag: 'Cầu 3-3', info: 'AAABBB → B' };
+    }
+    return null;
+}
+
+/** Gãy 3-2: AAABB → dự B. */
+function sigGay32(arr) {
+    if (arr.length < 5) return null;
+    if (arr[0] === arr[1] && arr[1] === arr[2] &&
+        arr[2] !== arr[3] && arr[3] === arr[4]) {
+        return { side: arr[3], w: 0.40, tag: 'Gãy 3-2', info: 'AAABB → B' };
+    }
+    return null;
+}
+
+/** Vị cực trị: tổng rất cao/rất thấp → hồi. */
+function sigViCucTri(history) {
+    if (history.length < 2) return null;
+    const t = history[0].tong;
+    if (t >= 16) return { side: 'XIU', w: 0.45, tag: 'Vị cao', info: `Tổng ${t}` };
+    if (t <= 5) return { side: 'TAI', w: 0.45, tag: 'Vị thấp', info: `Tổng ${t}` };
+    return null;
+}
+
+/** Mean reversion 10 phiên: avg > 11.5 → Xỉu, avg < 9.5 → Tài. */
+function sigMeanRevert(history) {
+    if (history.length < 10) return null;
+    const s = history.slice(0, 10).map(h => h.tong);
+    const avg = s.reduce((a, b) => a + b, 0) / s.length;
+    if (avg >= 11.6) return { side: 'XIU', w: 0.30, tag: 'Mean revert', info: `AVG10=${avg.toFixed(2)}` };
+    if (avg <= 9.4) return { side: 'TAI', w: 0.30, tag: 'Mean revert', info: `AVG10=${avg.toFixed(2)}` };
+    return null;
+}
+
+/**
+ * Pattern repeat: tìm subsequence độ dài L (3..7) ở 40 phiên gần nhất
+ * khớp với subsequence mới nhất, dự đoán theo phần tử kế tiếp của lần khớp cũ.
+ */
+function sigPatternRepeat(arr) {
+    if (arr.length < 15) return null;
+    const W = arr.slice(0, 40);
+    for (let L = 7; L >= 3; L--) {
+        if (W.length < L * 2 + 1) continue;
+        const head = W.slice(0, L).join('');
+        for (let i = 1; i <= W.length - L - 1; i++) {
+            const past = W.slice(i, i + L).join('');
+            if (past === head) {
+                const next = W[i - 1];
+                if (!next) continue;
+                return {
+                    side: next,
+                    w: 0.30 + Math.min(L, 7) * 0.025,
+                    tag: `Pattern ${L}`,
+                    info: `Khớp offset ${i} (L=${L})`,
+                };
+            }
+        }
+    }
+    return null;
+}
+
+const SIGNALS = [
+    { fn: sigBetNgan,        needs: 'arr' },
+    { fn: sigBeBet,          needs: 'arr' },
+    { fn: sigCau11,          needs: 'arr' },
+    { fn: sigCau22,          needs: 'arr' },
+    { fn: sigCau33,          needs: 'arr' },
+    { fn: sigGay32,          needs: 'arr' },
+    { fn: sigViCucTri,       needs: 'hist' },
+    { fn: sigMeanRevert,     needs: 'hist' },
+    { fn: sigPatternRepeat,  needs: 'arr' },
+];
+
+/* ============================================================
+ * ENGINE — weighted vote, contrarian when streak thua
+ * ============================================================ */
+class PAKEngine {
     constructor() {
-        this.error_streak = 0;
-        this.last_prediction = null;
         this.history = [];
+        this.errorStreak = 0;
+        this.correctStreak = 0;
     }
 
-    loadData(data) {
-        this.history = [...data].sort((a, b) => (b.phien || 0) - (a.phien || 0));
+    load(records) {
+        this.history = [...records].sort((a, b) => b.phien - a.phien);
     }
 
-    _arr() {
-        return this.history.map(s =>
-            (s.ket_qua || '').toUpperCase().replace('XỈU', 'XIU').replace('TÀI', 'TAI')
-        );
+    get arr() {
+        return this.history.map(h => h.side);
     }
 
-    _points() {
-        return this.history
-            .filter(s => s.tong !== undefined && s.tong !== null)
-            .map(s => Number(s.tong));
-    }
-
-    // 1. Phân tích chuỗi kết quả (Cầu bệt & Bẻ cầu)
-    phanTichCauBet(arr) {
-        if (arr.length < 2) return null;
-        let length = 1;
-        for (let i = 1; i < arr.length; i++) {
-            if (arr[i] === arr[0]) length++;
-            else break;
-        }
-        if (length >= 2 && length <= 4) {
-            return { pred: arr[0], conf: 78, loai: "Đu Cầu Bệt", lyDo: `Chuỗi ${arr[0] === 'TAI' ? 'Tài' : 'Xỉu'} đang duy trì ${length} phiên` };
-        }
-        if (length >= 5) {
-            const nextPred = arr[0] === "TAI" ? "XIU" : "TAI";
-            return { pred: nextPred, conf: 82, loai: "Bẻ Cầu Bệt", lyDo: `Chuỗi bệt dài ${length} phiên → Xác suất bẻ sang ${nextPred === 'TAI' ? 'Tài' : 'Xỉu'}` };
-        }
-        return null;
-    }
-
-    // 2. Phân tích chuỗi xen kẽ (1-1, 2-2, 3-3)
-    phanTichXenKe(arr) {
-        if (arr.length < 4) return null;
-        
-        // Nhịp 1-1
-        let is11 = true;
-        for (let i = 0; i < Math.min(5, arr.length - 1); i++) {
-            if (arr[i] === arr[i + 1]) { is11 = false; break; }
-        }
-        if (is11 && arr.length >= 4) {
-            const nextPred = arr[0] === "TAI" ? "XIU" : "TAI";
-            return { pred: nextPred, conf: 84, loai: "Cầu Nối 1-1", lyDo: "Nhịp đảo 1-1 liên tiếp ổn định" };
-        }
-
-        // Nhịp 2-2 (AABB)
-        if (arr.length >= 4 && arr[0] === arr[1] && arr[2] === arr[3] && arr[0] !== arr[2]) {
-            return { pred: arr[2], conf: 80, loai: "Cầu Nhịp 2-2", lyDo: "Mô hình AABB → Báo tín hiệu nối nhịp" };
-        }
-
-        // Nhịp 3-3 (AAABBB)
-        if (arr.length >= 6 && arr[0] === arr[1] && arr[1] === arr[2] && arr[3] === arr[4] && arr[4] === arr[5] && arr[0] !== arr[3]) {
-            return { pred: arr[3], conf: 83, loai: "Cầu Nhịp 3-3", lyDo: "Mô hình AAABBB → Tiếp diễn nhịp đôi" };
-        }
-
-        return null;
-    }
-
-    // 3. Nhận diện mẫu lặp chuỗi (Pattern Matching)
-    phanTichMauLap(arr) {
-        if (arr.length < 8) return null;
-        for (let len = 2; len <= 4; len++) {
-            const pattern = arr.slice(0, len);
-            for (let i = len; i <= arr.length - len - 1; i++) {
-                const sub = arr.slice(i, i + len);
-                if (JSON.stringify(sub) === JSON.stringify(pattern)) {
-                    const historicalNext = arr[i - 1];
-                    if (historicalNext) {
-                        return { pred: historicalNext, conf: 86, loai: "Mẫu Lặp Thuật Toán", lyDo: `Khớp mẫu lịch sử [${pattern.join('-')}] → Tiếp theo thường về ${historicalNext === 'TAI' ? 'Tài' : 'Xỉu'}` };
-                    }
-                }
-            }
-        }
-        return null;
-    }
-
-    // 4. Phân tích điểm xúc xắc (Thống kê & Trung bình động SMA)
-    phanTichXucXac() {
-        const points = this._points();
-        if (points.length < 5) return null;
-        const last = points[0];
-        const recentSlice = points.slice(0, 5);
-        const avg = recentSlice.reduce((a, b) => a + b, 0) / recentSlice.length;
-
-        // Điểm cực trị (Mean Reversion)
-        if (last >= 16) {
-            return { pred: "XIU", conf: 85, loai: "Hồi Điểm Cực Đại", lyDo: `Tổng điểm ${last} quá cao → Lực kéo về Xỉu rất lớn` };
-        }
-        if (last <= 5) {
-            return { pred: "TAI", conf: 85, loai: "Hồi Điểm Cực Tiểu", lyDo: `Tổng điểm ${last} quá thấp → Lực kéo về Tài rất lớn` };
-        }
-
-        // Động lượng điểm số
-        if (avg >= 11.8) {
-            return { pred: "XIU", conf: 72, loai: "Cân Bằng Biên Độ", lyDo: `Trung bình 5 phiên (${avg.toFixed(1)}) lệch cao nghiêng Tài` };
-        }
-        if (avg <= 9.2) {
-            return { pred: "TAI", conf: 72, loai: "Cân Bằng Biên Độ", lyDo: `Trung bình 5 phiên (${avg.toFixed(1)}) lệch thấp nghiêng Xỉu` };
-        }
-
-        return null;
-    }
-
-    // Tổng hợp thuật toán thực tế (KHÔNG tự đảo ngược khi thua)
-    tongHopDuDoan() {
-        const arr = this._arr();
+    decide() {
+        const arr = this.arr;
         if (arr.length < 2) return null;
 
-        // Ưu tiên thuật toán có độ chính xác cao nhất
-        return this.phanTichMauLap(arr) ||
-               this.phanTichXenKe(arr) ||
-               this.phanTichCauBet(arr) ||
-               this.phanTichXucXac() ||
-               { pred: arr[0], conf: 60, loai: "Theo Xu Hướng", lyDo: "Đi theo kết quả của phiên gần nhất" };
+        const fired = [];
+        for (const s of SIGNALS) {
+            const input = s.needs === 'hist' ? this.history : arr;
+            const out = s.fn(input);
+            if (out) fired.push(out);
+        }
+
+        if (fired.length === 0) {
+            return {
+                side: arr[0],
+                confidence: 50,
+                tag: 'Bám phiên',
+                info: 'Không signal nào fire',
+                fallback: true,
+                votes: [],
+            };
+        }
+
+        let taiW = 0, xiuW = 0;
+        for (const f of fired) {
+            if (f.side === 'TAI') taiW += f.w;
+            else xiuW += f.w;
+        }
+        const total = taiW + xiuW;
+        const side = taiW >= xiuW ? 'TAI' : 'XIU';
+        const winW = Math.max(taiW, xiuW);
+        const agree = total > 0 ? winW / total : 0.5;
+
+        const signalFactor = Math.min(fired.length / 6, 1);
+        let conf = Math.round(45 + agree * 35 + signalFactor * 12);
+        conf = Math.max(50, Math.min(88, conf));
+
+        return {
+            side,
+            confidence: conf,
+            tag: fired.map(f => f.tag).join(' + '),
+            info: fired.map(f => `${f.tag}:${f.side}(${f.w.toFixed(2)})`).join(' · '),
+            fallback: false,
+            votes: fired,
+        };
     }
 
-    predict(data) {
-        this.loadData(data);
-        const result = this.tongHopDuDoan() || { pred: this._arr()[0] || "TAI", conf: 50, loai: "Phân Tích Cơ Bản", lyDo: "Đang nạp dữ liệu phiên" };
-        this.last_prediction = result.pred;
-        return result;
+    applyContrarian(decision) {
+        if (!decision || decision.fallback) return decision;
+        if (this.errorStreak < 2) return decision;
+        const opp = decision.side === 'TAI' ? 'XIU' : 'TAI';
+        return {
+            ...decision,
+            side: opp,
+            confidence: Math.min(88, decision.confidence + 8),
+            tag: '[CONTRA] ' + decision.tag,
+            info: `Chuỗi ${this.errorStreak} sai → đảo | ${decision.info}`,
+        };
     }
 
-    updateStatus(actual) {
-        if (this.last_prediction) {
-            const a = actual.toUpperCase().replace('XỈU', 'XIU').replace('TÀI', 'TAI');
-            if (this.last_prediction === a) {
-                this.error_streak = 0;
-            } else {
-                this.error_streak++;
-            }
+    onResolved(correct) {
+        if (correct) {
+            this.correctStreak++;
+            this.errorStreak = 0;
+        } else {
+            this.errorStreak++;
+            this.correctStreak = 0;
         }
     }
 }
 
-const engine = new TX_GlassCore_V6();
+const engine = new PAKEngine();
+
+/* ============================================================
+ * STATE
+ * ============================================================ */
+const stats = {
+    total: 0,
+    correct: 0,
+    wrong: 0,
+    fallback_total: 0,
+    fallback_correct: 0,
+    start_time: vnNow(),
+    last_prediction: null,
+};
 
 let lastData = [];
 let lastPrediction = null;
 let predictionLog = [];
+let isFetching = false;
 
+/* ============================================================
+ * FETCH
+ * ============================================================ */
 async function fetchAndAnalyze() {
+    if (isFetching) return;
+    isFetching = true;
     try {
-        const res = await axios.get(API_URL, { timeout: 12000 });
+        const res = await axios.get(API_URL, { timeout: FETCH_TIMEOUT_MS });
         const raw = res.data;
-
-        if (!raw || !raw.data || !Array.isArray(raw.data)) {
-            console.log('API trả dữ liệu không hợp lệ');
+        if (!raw || !Array.isArray(raw.data)) {
+            console.warn('[WARN] Payload không hợp lệ');
             return;
         }
 
-        const data = raw.data
-            .filter(i => i.phien && i.ket_qua)
+        const parsed = [];
+        let invalid = 0;
+        for (const r of raw.data) {
+            const v = parseRecord(r);
+            if (v) parsed.push(v);
+            else invalid++;
+        }
+        if (invalid > 0) console.warn(`[WARN] ${invalid}/${raw.data.length} record bỏ`);
+
+        const data = parsed
             .sort((a, b) => b.phien - a.phien)
             .slice(0, HISTORY_LIMIT);
 
         lastData = data;
 
-        if (lastPrediction && data.length > 0) {
-            const newest = data[0];
-            if (newest.phien === lastPrediction.phienDuDoan) {
-                const actualRaw = newest.ket_qua;
-                const actual = actualRaw.toUpperCase().replace('XỈU', 'XIU').replace('TÀI', 'TAI');
-                const isCorrect = lastPrediction.pred === actual;
-
-                engine.updateStatus(actualRaw);
+        // Resolve
+        if (lastPrediction) {
+            const match = data.find(d => d.phien === lastPrediction.phienDuDoan);
+            if (match) {
+                const actual = match.side;
+                const isCorrect = lastPrediction.side === actual;
+                engine.onResolved(isCorrect);
 
                 predictionLog.unshift({
-                    phien: newest.phien,
-                    predict: lastPrediction.pred,
-                    actual: actual,
-                    confidence: lastPrediction.conf,
-                    loai: lastPrediction.loai,
+                    phien: match.phien,
+                    predict: lastPrediction.side,
+                    actual,
+                    confidence: lastPrediction.confidence,
+                    tag: lastPrediction.tag,
                     correct: isCorrect,
-                    time: newest.thoi_gian || vnNow()
+                    fallback: lastPrediction.fallback,
+                    time: match.time,
                 });
-                if (predictionLog.length > 100) predictionLog.pop();
+                if (predictionLog.length > LOG_LIMIT) predictionLog.pop();
 
                 stats.total++;
                 if (isCorrect) stats.correct++;
                 else stats.wrong++;
-                stats.total_predictions_made++;
-                stats.last_prediction = lastPrediction.pred;
+                if (lastPrediction.fallback) {
+                    stats.fallback_total++;
+                    if (isCorrect) stats.fallback_correct++;
+                }
+                stats.last_prediction = lastPrediction.side;
 
-                console.log(`[Phiên #${newest.phien}] Dự đoán: ${lastPrediction.pred} | Thực tế: ${actual} | Kết quả: ${isCorrect ? 'ĐÚNG' : 'SAI'} | Streak sai: ${engine.error_streak}`);
+                console.log(`[RESOLVED] #${match.phien} | ${lastPrediction.side} → ${actual} | ${isCorrect ? 'ĐÚNG' : 'SAI'} | streak ${engine.errorStreak}`);
                 lastPrediction = null;
+            } else {
+                const age = Date.now() - new Date(lastPrediction.iso).getTime();
+                if (age > PREDICTION_TTL_MS) {
+                    predictionLog.unshift({
+                        phien: lastPrediction.phienDuDoan,
+                        predict: lastPrediction.side,
+                        actual: null,
+                        confidence: lastPrediction.confidence,
+                        tag: lastPrediction.tag,
+                        correct: false,
+                        fallback: lastPrediction.fallback,
+                        miss: true,
+                        time: vnNow(),
+                    });
+                    if (predictionLog.length > LOG_LIMIT) predictionLog.pop();
+                    console.warn(`[MISS] #${lastPrediction.phienDuDoan}`);
+                    lastPrediction = null;
+                }
             }
         }
 
-        if (data.length >= 5) {
-            const result = engine.predict(data);
-            const nextPhien = data[0].phien + 1;
-            const displayPred = result.pred === 'TAI' ? 'Tài' : 'Xỉu';
+        // Predict
+        if (!lastPrediction && data.length >= 10) {
+            engine.load(data);
+            let d = engine.decide();
+            d = engine.applyContrarian(d);
 
+            const nextPhien = data[0].phien + 1;
             lastPrediction = {
                 phienDuDoan: nextPhien,
-                pred: result.pred,
-                display: displayPred,
-                conf: result.conf,
-                loai: result.loai,
-                lyDo: result.lyDo,
-                timestamp: vnNow()
+                side: d.side,
+                confidence: d.confidence,
+                tag: d.tag,
+                info: d.info,
+                fallback: !!d.fallback,
+                timestamp: vnNow(),
+                iso: new Date().toISOString(),
             };
-
-            stats.prediction_started = true;
-            console.log(`[Dự đoán mới] #${nextPhien} -> ${displayPred} (${result.conf}%) | ${result.loai}`);
+            console.log(`[PREDICT] #${nextPhien} → ${d.side} (${d.confidence}%) | ${d.tag}`);
         }
     } catch (err) {
-        console.error('Lỗi fetch API:', err.message);
+        console.error('[FETCH ERROR]', err.message);
+    } finally {
+        isFetching = false;
     }
 }
 
-fetchAndAnalyze();
-setInterval(fetchAndAnalyze, 18000);
+process.on('unhandledRejection', (r) => console.error('[UNHANDLED]', r));
+process.on('uncaughtException', (e) => console.error('[UNCAUGHT]', e));
 
-// ====================== UI GLASSMORPHISM MODERN ======================
-app.get('/', (req, res) => {
-    const html = `
-<!DOCTYPE html>
-<html lang="vi" data-theme="dark">
+/* ============================================================
+ * UI
+ * ============================================================ */
+const HTML = String.raw`<!DOCTYPE html>
+<html lang="vi">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sunwin Glassmorphic Analyzer V6</title>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <style>
-    /* Theme Variables - Dynamic Glassmorphism */
-    :root[data-theme="dark"] {
-      --bg-gradient: radial-gradient(circle at 50% 0%, #181d28 0%, #080a0f 100%);
-      --glass-bg: rgba(20, 26, 38, 0.55);
-      --glass-border: rgba(255, 255, 255, 0.12);
-      --glass-highlight: rgba(255, 255, 255, 0.05);
-      --glass-glow: rgba(0, 0, 0, 0.5);
-      --accent: #3b82f6;
-      --text-main: #f8fafc;
-      --text-sub: #94a3b8;
-      --theme-name: "Dark Glass";
-    }
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Công Nghệ Vip PAK</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #08090f;
+    --surface: #0e1018;
+    --surface-2: #14161f;
+    --line: rgba(255,255,255,0.07);
+    --line-2: rgba(255,255,255,0.12);
+    --txt: #eef0f6;
+    --dim: #8b91a8;
+    --mute: #565c72;
+    --tai: #22c55e;
+    --xiu: #ef4444;
+    --acc: #3b82f6;
+    --warn: #f59e0b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--txt);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1160px; margin: 0 auto; padding: 28px 20px 60px; }
 
-    :root[data-theme="neon"] {
-      --bg-gradient: radial-gradient(circle at 20% 20%, #15002b 0%, #030008 100%);
-      --glass-bg: rgba(25, 10, 40, 0.6);
-      --glass-border: rgba(0, 240, 255, 0.3);
-      --glass-highlight: rgba(0, 240, 255, 0.1);
-      --glass-glow: rgba(0, 240, 255, 0.25);
-      --accent: #00f0ff;
-      --text-main: #ffffff;
-      --text-sub: #c084fc;
-      --theme-name: "Neon Cyber Glass";
-    }
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap;
+    padding-bottom: 22px; margin-bottom: 24px;
+    border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-logo {
+    width: 40px; height: 40px; border-radius: 10px;
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    display: grid; place-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700; font-size: 13px; color: #fff;
+    letter-spacing: -0.5px;
+  }
+  .brand h1 {
+    font-size: 17px; font-weight: 700; letter-spacing: -0.01em;
+  }
+  .brand small {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px; color: var(--mute);
+    letter-spacing: 0.05em; margin-top: 2px;
+  }
+  .status {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 6px 12px;
+    background: var(--surface);
+    border: 1px solid var(--line-2);
+    border-radius: 999px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--dim);
+  }
+  .status .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--tai);
+  }
+  .status.off .dot { background: var(--xiu); }
 
-    :root[data-theme="aurora"] {
-      --bg-gradient: radial-gradient(circle at 80% 20%, #0d302a 0%, #020b0a 100%);
-      --glass-bg: rgba(12, 38, 34, 0.55);
-      --glass-border: rgba(52, 211, 153, 0.25);
-      --glass-highlight: rgba(52, 211, 153, 0.1);
-      --glass-glow: rgba(16, 185, 129, 0.2);
-      --accent: #10b981;
-      --text-main: #ecfdf5;
-      --text-sub: #6ee7b7;
-      --theme-name: "Aurora Glass";
-    }
+  .grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 16px; margin-bottom: 16px; }
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
 
-    :root[data-theme="holo"] {
-      --bg-gradient: radial-gradient(circle at 50% 30%, #320a40 0%, #09020f 100%);
-      --glass-bg: rgba(45, 15, 60, 0.55);
-      --glass-border: rgba(244, 114, 182, 0.3);
-      --glass-highlight: rgba(244, 114, 182, 0.12);
-      --glass-glow: rgba(236, 72, 153, 0.25);
-      --accent: #f472b6;
-      --text-main: #fdf2f8;
-      --text-sub: #fbcfe8;
-      --theme-name: "Holographic UI";
-    }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 22px;
+  }
+  .card-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px; color: var(--mute);
+    letter-spacing: 0.14em; text-transform: uppercase;
+    margin-bottom: 16px;
+  }
 
-    :root[data-theme="minimal"] {
-      --bg-gradient: radial-gradient(circle at 50% 0%, #1e293b 0%, #0f172a 100%);
-      --glass-bg: rgba(255, 255, 255, 0.05);
-      --glass-border: rgba(255, 255, 255, 0.15);
-      --glass-highlight: rgba(255, 255, 255, 0.08);
-      --glass-glow: rgba(0, 0, 0, 0.2);
-      --accent: #e2e8f0;
-      --text-main: #ffffff;
-      --text-sub: #cbd5e1;
-      --theme-name: "Minimal Frosted";
-    }
+  .pred-side {
+    font-size: 68px; font-weight: 800; line-height: 1;
+    letter-spacing: -0.03em; margin-bottom: 10px;
+  }
+  .pred-side.tai { color: var(--tai); }
+  .pred-side.xiu { color: var(--xiu); }
+  .pred-side.none { color: var(--mute); font-size: 42px; }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+  .pred-meta {
+    display: flex; align-items: center; gap: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px; color: var(--dim);
+    margin-bottom: 14px; flex-wrap: wrap;
+  }
+  .pred-meta strong { color: var(--txt); font-weight: 600; }
 
-    body {
-      background: var(--bg-gradient);
-      color: var(--text-main);
-      min-height: 100vh;
-      padding: 30px 16px 60px;
-      overflow-x: hidden;
-      transition: background 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-    }
+  .pred-tag {
+    display: inline-block;
+    padding: 4px 10px; border-radius: 6px;
+    background: var(--surface-2);
+    border: 1px solid var(--line-2);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--dim);
+    margin-bottom: 10px;
+  }
+  .pred-info {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px; color: var(--mute);
+    line-height: 1.7; word-break: break-word;
+  }
 
-    .container {
-      max-width: 1060px;
-      margin: 0 auto;
-    }
+  .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .stat {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px;
+  }
+  .stat-n {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 22px; font-weight: 600; letter-spacing: -0.02em;
+  }
+  .stat-n.ok { color: var(--tai); }
+  .stat-n.bad { color: var(--xiu); }
+  .stat-n.acc { color: var(--acc); }
+  .stat-k {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: var(--mute);
+    letter-spacing: 0.12em; text-transform: uppercase;
+    margin-top: 2px;
+  }
+  .streak {
+    margin-top: 12px; display: flex; justify-content: space-between;
+    padding: 11px 14px;
+    background: rgba(239,68,68,0.06);
+    border: 1px solid rgba(239,68,68,0.18);
+    border-radius: 10px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  }
+  .streak .k { color: var(--mute); letter-spacing: 0.06em; }
+  .streak .v { color: var(--xiu); font-weight: 600; }
+  .foot {
+    margin-top: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px; color: var(--mute);
+    line-height: 1.7;
+  }
 
-    /* Floating Color Switcher Bubble (Cục đổi màu nhỏ ở góc phải) */
-    .color-switcher-bubble {
-      position: fixed;
-      top: 24px;
-      right: 24px;
-      z-index: 9999;
-      width: 48px;
-      height: 48px;
-      border-radius: 50%;
-      background: var(--glass-bg);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid var(--glass-border);
-      box-shadow: 0 10px 25px var(--glass-glow), inset 0 1px 1px var(--glass-highlight);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: transform 0.3s ease, box-shadow 0.3s ease;
-    }
+  .tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--mute); font-weight: 500;
+    text-align: left; padding: 11px 14px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: 11px 14px; border-bottom: 1px solid var(--line);
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  .tag {
+    display: inline-block; padding: 3px 8px; border-radius: 5px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 500;
+  }
+  .tag.tai { color: var(--tai); background: rgba(34,197,94,0.10); }
+  .tag.xiu { color: var(--xiu); background: rgba(239,68,68,0.10); }
+  .tag.miss { color: var(--mute); background: var(--surface-2); }
+  .r-ok { color: var(--tai); font-weight: 600; }
+  .r-bad { color: var(--xiu); font-weight: 600; }
+  .r-miss { color: var(--mute); }
+  .empty {
+    text-align: center; padding: 28px 16px; color: var(--mute);
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  }
 
-    .color-switcher-bubble:hover {
-      transform: scale(1.12) rotate(15deg);
-    }
-
-    .color-switcher-bubble:active {
-      transform: scale(0.95);
-    }
-
-    .bubble-dot {
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #00f0ff 0%, #f472b6 50%, #10b981 100%);
-      box-shadow: 0 0 12px rgba(255, 255, 255, 0.6);
-    }
-
-    /* Card Wrapper với Glassmorphism Premium */
-    .glass-panel {
-      background: var(--glass-bg);
-      backdrop-filter: blur(25px);
-      -webkit-backdrop-filter: blur(25px);
-      border: 1px solid var(--glass-border);
-      border-radius: 24px;
-      padding: 26px;
-      margin-bottom: 22px;
-      box-shadow: 0 20px 40px var(--glass-glow), inset 0 1px 0 var(--glass-highlight);
-      transition: background 0.5s ease, border 0.5s ease;
-      position: relative;
-      overflow: hidden;
-    }
-
-    /* Top Section / Header */
-    .header-panel {
-      text-align: center;
-      padding: 28px 20px;
-    }
-
-    .app-title {
-      font-size: 2.1rem;
-      font-weight: 800;
-      letter-spacing: -0.5px;
-      margin-bottom: 8px;
-      background: linear-gradient(135deg, #ffffff 30%, var(--text-sub) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .developer-tag {
-      font-size: 0.95rem;
-      color: var(--text-sub);
-      font-weight: 500;
-      margin-bottom: 14px;
-    }
-
-    .developer-tag strong {
-      color: var(--text-main);
-      font-weight: 700;
-    }
-
-    .disclaimer-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: rgba(245, 158, 11, 0.1);
-      border: 1px solid rgba(245, 158, 11, 0.3);
-      color: #fbbf24;
-      padding: 6px 16px;
-      border-radius: 999px;
-      font-size: 0.82rem;
-      font-weight: 500;
-    }
-
-    /* Bố cục Grid 2 cột */
-    .grid-2 {
-      display: grid;
-      grid-template-columns: 1.25fr 1fr;
-      gap: 22px;
-    }
-
-    @media (max-width: 820px) {
-      .grid-2 { grid-template-columns: 1fr; }
-      .color-switcher-bubble { top: 16px; right: 16px; }
-    }
-
-    .section-title {
-      font-size: 0.78rem;
-      font-weight: 700;
-      letter-spacing: 1.2px;
-      color: var(--text-sub);
-      text-transform: uppercase;
-      margin-bottom: 18px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    /* Thẻ Dự Đoán */
-    .pred-value {
-      font-size: 3.5rem;
-      font-weight: 800;
-      line-height: 1;
-      margin-bottom: 6px;
-      letter-spacing: -1px;
-    }
-
-    .tai-color { color: #34d399; text-shadow: 0 0 35px rgba(52, 211, 153, 0.4); }
-    .xiu-color { color: #f87171; text-shadow: 0 0 35px rgba(248, 113, 113, 0.4); }
-
-    .pred-confidence {
-      font-size: 1.35rem;
-      font-weight: 700;
-      color: #fbbf24;
-      margin-bottom: 16px;
-    }
-
-    .pred-info-list {
-      font-size: 0.92rem;
-      color: var(--text-sub);
-      line-height: 1.6;
-    }
-
-    .pred-info-list div span {
-      color: var(--text-main);
-      font-weight: 600;
-    }
-
-    /* Bảng Thống Kê Hiệu Suất */
-    .stats-matrix {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-
-    .stat-card {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid var(--glass-border);
-      border-radius: 16px;
-      padding: 14px;
-      text-align: center;
-    }
-
-    .stat-num {
-      font-size: 1.6rem;
-      font-weight: 700;
-      margin-bottom: 2px;
-    }
-
-    .stat-lbl {
-      font-size: 0.75rem;
-      color: var(--text-sub);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    .num-ok { color: #34d399; }
-    .num-err { color: #f87171; }
-    .num-acc { color: #60a5fa; }
-
-    .streak-container {
-      background: rgba(239, 68, 68, 0.08);
-      border: 1px solid rgba(239, 68, 68, 0.2);
-      border-radius: 14px;
-      padding: 10px 16px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 0.88rem;
-    }
-
-    /* Bảng Lịch Sử */
-    .table-responsive {
-      width: 100%;
-      overflow-x: auto;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.88rem;
-    }
-
-    th {
-      text-align: left;
-      font-size: 0.74rem;
-      color: var(--text-sub);
-      text-transform: uppercase;
-      padding: 12px 10px;
-      border-bottom: 1px solid var(--glass-border);
-      letter-spacing: 0.8px;
-    }
-
-    td {
-      padding: 12px 10px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-      color: var(--text-main);
-    }
-
-    tr:hover td {
-      background: rgba(255, 255, 255, 0.03);
-    }
-
-    .pill-badge {
-      padding: 4px 10px;
-      border-radius: 8px;
-      font-size: 0.75rem;
-      font-weight: 700;
-      display: inline-block;
-    }
-
-    .pill-tai { background: rgba(52, 211, 153, 0.15); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.3); }
-    .pill-xiu { background: rgba(248, 113, 113, 0.15); color: #f87171; border: 1px solid rgba(248, 113, 113, 0.3); }
-
-    .res-ok { color: #34d399; font-weight: 700; }
-    .res-err { color: #f87171; font-weight: 700; }
-
-    footer {
-      text-align: center;
-      margin-top: 24px;
-      font-size: 0.82rem;
-      color: var(--text-sub);
-    }
-  </style>
+  footer {
+    margin-top: 32px; padding-top: 20px;
+    border-top: 1px solid var(--line);
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--mute);
+  }
+  footer strong { color: var(--dim); font-weight: 600; }
+</style>
 </head>
 <body>
-
-  <!-- Nút tròn đổi màu giao diện ở góc -->
-  <button class="color-switcher-bubble" onclick="switchGlassTheme()" title="Nhấp để đổi giao diện Glassmorphism">
-    <div class="bubble-dot"></div>
-  </button>
-
-  <div class="container">
-    <!-- Header Section -->
-    <div class="glass-panel header-panel">
-      <div class="app-title">Sunwin Phân Tích Thuật Toán</div>
-      <div class="developer-tag">Phát triển bởi Developer <strong>Anh Khôi</strong></div>
-      <div class="disclaimer-pill">
-        <span>⚠️ Chỉ có tính chất mang số liệu tham khảo, không nên tin 100%</span>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="brand-logo">PAK</div>
+      <div>
+        <h1>Công Nghệ Vip PAK</h1>
+        <small>Dice Signal Analyzer</small>
       </div>
     </div>
+    <div id="status" class="status"><span class="dot"></span><span id="statusText">Đang kết nối</span></div>
+  </header>
 
-    <!-- Main Grid Content -->
-    <div class="grid-2">
-      <!-- Card Dự Đoán -->
-      <div class="glass-panel">
-        <div class="section-title">
-          <span>Dự Đoán Phiên Tiếp Theo</span>
-          <span id="themeBadge" style="font-size:0.7rem; color:var(--text-sub);">Theme: Dark Glass</span>
-        </div>
-        <div id="pred" class="pred-value">---</div>
-        <div id="conf" class="pred-confidence">--% độ tin cậy</div>
-        <div class="pred-info-list">
-          <div>Phiên dự đoán: <span id="phien">#---</span></div>
-          <div>Dạng cầu: <span id="loai">Đang phân tích dữ liệu...</span></div>
-          <div style="margin-top: 6px;" id="lyDo">Đang kết nối luồng dữ liệu API...</div>
-        </div>
+  <div class="grid">
+    <div class="card">
+      <div class="card-title">Dự đoán phiên kế tiếp</div>
+      <div id="pSide" class="pred-side none">--</div>
+      <div class="pred-meta">
+        <span>Độ tin cậy: <strong id="pConf">--%</strong></span>
+        <span>Phiên: <strong id="pPhien">#--</strong></span>
       </div>
-
-      <!-- Card Hiệu Suất -->
-      <div class="glass-panel">
-        <div class="section-title">Thống Kê Thuật Toán</div>
-        <div class="stats-matrix">
-          <div class="stat-card">
-            <div class="stat-num" id="total">0</div>
-            <div class="stat-lbl">Tổng phiên</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-num num-ok" id="correct">0</div>
-            <div class="stat-lbl">Phiên Đúng</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-num num-err" id="wrong">0</div>
-            <div class="stat-lbl">Phiên Sai</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-num num-acc" id="acc">0%</div>
-            <div class="stat-lbl">Chính Xác</div>
-          </div>
-        </div>
-        <div class="streak-container">
-          <span style="color:var(--text-sub)">Chuỗi phiên chưa chính xác</span>
-          <span id="streak" style="font-weight:800; color:#f87171">0</span>
-        </div>
-      </div>
+      <div id="pTag" class="pred-tag">--</div>
+      <div id="pInfo" class="pred-info">Đang chờ dữ liệu...</div>
     </div>
 
-    <!-- Card Lịch Sử -->
-    <div class="glass-panel">
-      <div class="section-title">Nhật Ký Phiên Thời Gian Thực</div>
-      <div class="table-responsive">
-        <table>
-          <thead>
-            <tr>
-              <th>Phiên</th>
-              <th>Dự đoán</th>
-              <th>Thực tế</th>
-              <th>Độ tin cậy</th>
-              <th>Thuật toán áp dụng</th>
-              <th>Kết quả</th>
-            </tr>
-          </thead>
-          <tbody id="tbody">
-            <tr><td colspan="6" style="text-align:center; color:var(--text-sub); padding: 20px;">Đang tải danh sách...</td></tr>
-          </tbody>
-        </table>
+    <div class="card">
+      <div class="card-title">Thống kê</div>
+      <div class="stats">
+        <div class="stat"><div id="sTotal" class="stat-n">0</div><div class="stat-k">Tổng</div></div>
+        <div class="stat"><div id="sCorrect" class="stat-n ok">0</div><div class="stat-k">Đúng</div></div>
+        <div class="stat"><div id="sWrong" class="stat-n bad">0</div><div class="stat-k">Sai</div></div>
+        <div class="stat"><div id="sAcc" class="stat-n acc">0%</div><div class="stat-k">Tỷ lệ đúng</div></div>
       </div>
+      <div class="streak">
+        <span class="k">CHUỖI SAI</span>
+        <span id="sStreak" class="v">0</span>
+      </div>
+      <div class="foot" id="footNote">--</div>
     </div>
-
-    <footer>
-      Hệ Thống Phân Tích Dữ Liệu Sunwin Glassmorphism UI · 2026
-    </footer>
   </div>
 
-  <script>
-    // Danh sách 5 Style Glassmorphism
-    const themes = ['dark', 'neon', 'aurora', 'holo', 'minimal'];
-    let currentThemeIdx = 0;
+  <div class="card">
+    <div class="card-title">Lịch sử dự đoán</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Phiên</th><th>Dự đoán</th><th>Thực tế</th><th>Tin cậy</th><th>Signal</th><th>Kết quả</th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <tr><td colspan="6" class="empty">Chưa có dữ liệu.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
 
-    function switchGlassTheme() {
-      currentThemeIdx = (currentThemeIdx + 1) % themes.length;
-      const theme = themes[currentThemeIdx];
-      document.documentElement.setAttribute('data-theme', theme);
-      
-      const themeNames = {
-        'dark': 'Dark Glass',
-        'neon': 'Neon Cyber Glass',
-        'aurora': 'Aurora Glass',
-        'holo': 'Holographic UI',
-        'minimal': 'Minimal Frosted'
-      };
-      document.getElementById('themeBadge').textContent = 'Theme: ' + themeNames[theme];
+  <footer>
+    <div>Developer: <strong>Anh Khôi</strong></div>
+    <div id="footTime">--</div>
+  </footer>
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const set = (id, v) => { const el = $(id); if (el) el.textContent = v == null ? '' : String(v); };
+
+  function setSide(el, side) {
+    el.classList.remove('tai', 'xiu', 'none');
+    if (side === 'TAI') { el.classList.add('tai'); el.textContent = 'TÀI'; }
+    else if (side === 'XIU') { el.classList.add('xiu'); el.textContent = 'XỈU'; }
+    else { el.classList.add('none'); el.textContent = '--'; }
+  }
+
+  function renderLog(rows) {
+    const tb = $('tbody');
+    while (tb.firstChild) tb.removeChild(tb.firstChild);
+    if (!rows || rows.length === 0) {
+      const tr = document.createElement('tr');
+      const td = document.createElement('td');
+      td.colSpan = 6; td.className = 'empty';
+      td.textContent = 'Chưa có phiên nào được chốt.';
+      tr.appendChild(td); tb.appendChild(tr);
+      return;
     }
+    for (const r of rows) {
+      const tr = document.createElement('tr');
 
-    async function loadDashboard() {
-      try {
-        const response = await fetch('/api/dashboard');
-        const data = await response.json();
+      const tdPhien = document.createElement('td');
+      tdPhien.textContent = '#' + r.phien;
+      tr.appendChild(tdPhien);
 
-        if (data.prediction) {
-          const p = data.prediction;
-          const predEl = document.getElementById('pred');
-          predEl.textContent = p.display;
-          predEl.className = 'pred-value ' + (p.display === 'Tài' ? 'tai-color' : 'xiu-color');
+      const tdPred = document.createElement('td');
+      const sp = document.createElement('span');
+      sp.className = 'tag ' + (r.predict === 'TAI' ? 'tai' : 'xiu');
+      sp.textContent = r.predict === 'TAI' ? 'TÀI' : 'XỈU';
+      tdPred.appendChild(sp);
+      tr.appendChild(tdPred);
 
-          document.getElementById('conf').textContent = p.conf + '% độ tin cậy';
-          document.getElementById('phien').textContent = '#' + p.phienDuDoan;
-          document.getElementById('loai').textContent = p.loai || '---';
-          document.getElementById('lyDo').textContent = p.lyDo || '';
-        }
-
-        document.getElementById('total').textContent = data.stats.total;
-        document.getElementById('correct').textContent = data.stats.correct;
-        document.getElementById('wrong').textContent = data.stats.wrong;
-
-        const accuracy = data.stats.total > 0 ? ((data.stats.correct / data.stats.total) * 100).toFixed(1) : 0;
-        document.getElementById('acc').textContent = accuracy + '%';
-        document.getElementById('streak').textContent = data.error_streak || 0;
-
-        const tbody = document.getElementById('tbody');
-        if (data.log && data.log.length > 0) {
-          tbody.innerHTML = data.log.map(i => \`
-            <tr>
-              <td>#\${i.phien}</td>
-              <td><span class="pill-badge \${i.predict==='TAI'?'pill-tai':'pill-xiu'}">\${i.predict==='TAI'?'TÀI':'XỈU'}</span></td>
-              <td><span class="pill-badge \${i.actual==='TAI'?'pill-tai':'pill-xiu'}">\${i.actual==='TAI'?'TÀI':'XỈU'}</span></td>
-              <td>\${i.confidence}%</td>
-              <td style="color:var(--text-sub)">\${i.loai||''}</td>
-              <td class="\${i.correct?'res-ok':'res-err'}">\${i.correct?'ĐÚNG':'SAI'}</td>
-            </tr>
-          \`).join('');
-        }
-      } catch (err) {
-        console.error('Lỗi nạp bảng thông tin:', err);
+      const tdAct = document.createElement('td');
+      if (r.actual) {
+        const sa = document.createElement('span');
+        sa.className = 'tag ' + (r.actual === 'TAI' ? 'tai' : 'xiu');
+        sa.textContent = r.actual === 'TAI' ? 'TÀI' : 'XỈU';
+        tdAct.appendChild(sa);
+      } else {
+        const sa = document.createElement('span');
+        sa.className = 'tag miss';
+        sa.textContent = 'MISS';
+        tdAct.appendChild(sa);
       }
-    }
+      tr.appendChild(tdAct);
 
-    loadDashboard();
-    setInterval(loadDashboard, 6000);
-  </script>
+      const tdConf = document.createElement('td');
+      tdConf.textContent = (r.confidence != null ? r.confidence : '--') + '%';
+      tr.appendChild(tdConf);
+
+      const tdTag = document.createElement('td');
+      tdTag.textContent = r.tag || '';
+      tdTag.style.color = 'var(--dim)';
+      tr.appendChild(tdTag);
+
+      const tdRes = document.createElement('td');
+      if (r.miss) { tdRes.className = 'r-miss'; tdRes.textContent = 'MISS'; }
+      else if (r.correct) { tdRes.className = 'r-ok'; tdRes.textContent = 'ĐÚNG'; }
+      else { tdRes.className = 'r-bad'; tdRes.textContent = 'SAI'; }
+      tr.appendChild(tdRes);
+
+      tb.appendChild(tr);
+    }
+  }
+
+  async function pull() {
+    try {
+      const res = await fetch('/api/dashboard', { cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const d = await res.json();
+
+      if (d.prediction) {
+        setSide($('pSide'), d.prediction.side);
+        set('pConf', d.prediction.confidence + '%');
+        set('pPhien', '#' + d.prediction.phienDuDoan);
+        set('pTag', d.prediction.tag || '--');
+        set('pInfo', d.prediction.info || '');
+      } else {
+        setSide($('pSide'), null);
+        set('pConf', '--%');
+        set('pPhien', '#--');
+        set('pTag', '--');
+        set('pInfo', 'Cần ít nhất 10 phiên dữ liệu để phân tích.');
+      }
+
+      set('sTotal', d.stats.total);
+      set('sCorrect', d.stats.correct);
+      set('sWrong', d.stats.wrong);
+      const acc = d.stats.total > 0 ? ((d.stats.correct / d.stats.total) * 100).toFixed(1) : '0.0';
+      set('sAcc', acc + '%');
+      set('sStreak', d.error_streak);
+
+      set('footNote',
+        'Fallback: ' + d.stats.fallback_correct + '/' + d.stats.fallback_total +
+        ' · Dữ liệu: ' + d.dataCount + ' phiên'
+      );
+      set('footTime', 'Cập nhật: ' + d.lastUpdate);
+
+      renderLog(d.log);
+
+      const st = $('status');
+      st.classList.remove('off');
+      set('statusText', 'Đang hoạt động');
+    } catch (e) {
+      const st = $('status');
+      st.classList.add('off');
+      set('statusText', 'Mất kết nối');
+      console.error('[UI]', e);
+    }
+  }
+
+  pull();
+  setInterval(pull, 8000);
+</script>
 </body>
 </html>`;
-    res.send(html);
+
+app.get('/', (req, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(HTML);
 });
 
 app.get('/api/dashboard', (req, res) => {
     res.json({
         prediction: lastPrediction,
         stats,
-        log: predictionLog.slice(0, 30),
-        error_streak: engine.error_streak,
+        log: predictionLog.slice(0, 60),
+        error_streak: engine.errorStreak,
         lastUpdate: vnNow(),
-        totalRecords: lastData.length
+        dataCount: lastData.length,
     });
 });
 
-app.listen(PORT, () => {
-    console.log(`Server Glassmorphism đang chạy tại http://localhost:${PORT}`);
+app.get('/api/raw', (req, res) => {
+    res.json({ data: lastData.slice(0, 60) });
 });
+
+app.listen(PORT, () => {
+    console.log('[PAK] Công Nghệ Vip PAK — Dice Signal Analyzer');
+    console.log('[PAK] Server: http://localhost:' + PORT);
+    console.log('[PAK] Developer: Anh Khôi');
+});
+
+fetchAndAnalyze();
+setInterval(fetchAndAnalyze, FETCH_INTERVAL_MS);
